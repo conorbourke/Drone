@@ -8,7 +8,7 @@ Phase 1 scope: hosting, login, project and version storage, parts database struc
 
 - Browser only for the owner. Everything runs on one hosted container. The owner never runs a command.
 - Single user today, but every owned row carries `owner_id` so users can be added later.
-- Metric units everywhere. Field names carry the unit as a suffix: `span_mm`, `mass_g`, `speed_ms`, `power_w`, `energy_wh`, `price_eur`.
+- Metric units everywhere. Field names carry the unit as a suffix: `span_mm`, `mass_g`, `speed_mps` (metres per second; never `_ms`, which reads as milliseconds), `power_w`, `energy_wh`, `price_eur`.
 - Every number shown in the UI has a plain-language explanation available on hover or click (the `Explain` component).
 - The engine (later phases) produces every number. The assistant (Phase 3) only reads and explains.
 - Secrets live only in server environment variables.
@@ -58,8 +58,8 @@ tests/             pytest; use a temp SQLite file per test session
 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
-| `APP_SECRET_KEY` | yes in prod | dev fallback with warning | Signs session cookies. Any long random string. |
-| `APP_PASSWORD` | yes | none | Owner password (plain). Hashed in memory at startup. |
+| `APP_SECRET_KEY` | yes in prod | in development a random `secrets.token_hex(32)` per process (sessions reset on restart; nothing forgeable lives in the repo) | Signs session cookies. Any long random string. |
+| `APP_PASSWORD` | yes | none | Owner password (plain). Hashed in memory at startup. Must be at most 72 bytes (bcrypt limit); startup fails with a plain message otherwise. |
 | `APP_PASSWORD_HASH` | no | none | bcrypt hash; if set, overrides `APP_PASSWORD`. |
 | `APP_OWNER_EMAIL` | no | `owner@example.com` | Display identity of the single user. |
 | `APP_DATA_DIR` | no | `./data` locally, `/data` in container | DB, files, backups live here. |
@@ -70,7 +70,7 @@ tests/             pytest; use a temp SQLite file per test session
 | `BACKUP_HOUR_UTC` | no | `3` | Hour of the daily backup. |
 | `BACKUP_KEEP` | no | `14` | Number of backups retained. |
 
-In production, startup fails loudly if `APP_SECRET_KEY` or a password is missing.
+In production, startup fails loudly if `APP_SECRET_KEY` or a password is missing. Secret values (`APP_PASSWORD`, `APP_PASSWORD_HASH`, `APP_SECRET_KEY`, `ANTHROPIC_API_KEY`) are typed `pydantic.SecretStr` so they never appear in logs, tracebacks or `/api/system/info`. FastAPI `debug` is never enabled.
 
 ### Data model (`app/models.py`)
 
@@ -109,7 +109,7 @@ landing_gear: { type: "skids" | "legs" | "none", height_mm }
 scale: "prototype" | "final"
 target_takeoff_mass_kg (default 2.5)
 target_endurance_min (default 45 for prototype)
-cruise_speed_ms (default 16)
+cruise_speed_mps (default 16)
 payload_min_g (default 150), payload_max_g (default 400)
 ```
 
@@ -143,20 +143,25 @@ limits: { design_mtow_kg: 24.0, legal_mtow_kg: 25.0, warn_mtow_kg: 23.0 }
 checks: {
   hover_thrust_to_weight_min: 2.0,
   static_margin_min: 0.05, static_margin_max: 0.20,
-  stall_speed_ratio_max: 0.77 (cruise must be at least 1.3 × stall),
+  cruise_to_stall_speed_ratio_min: 1.3 (cruise speed must be at least 1.3 × stall speed; stored the way the source states it),
   battery_reserve_fraction: 0.20,
-  battery_current_margin: 0.80 (peak draw at most 80 % of continuous rating),
+  battery_current_max_fraction_of_rating: 0.80 (peak draw at most 80 % of the pack's continuous rating),
 }
 units: { system: "metric" }
 ```
+
+Invariants enforced by `PUT /api/settings` with plain-language 422 messages: `warn_mtow_kg <= design_mtow_kg <= legal_mtow_kg <= 25`; `usable_envelope_mm <= build_volume_mm` per axis and all positive; `0 < static_margin_min < static_margin_max`; `battery_reserve_fraction` and `battery_current_max_fraction_of_rating` in (0, 1); `hover_thrust_to_weight_min > 1`; `cruise_to_stall_speed_ratio_min >= 1`.
 
 The document carries `schema_version: 1`. Each threshold has a `description` and `source` string in the API response (from a static table in `defaults.py`) so the UI can show them. Sources are marked "proposed, confirm in Phase 3" where the brief asks for owner confirmation. `GET /api/settings` merges stored overrides over defaults; `PUT /api/settings` validates the full document and persists only the keys whose value differs from `DEFAULT_SETTINGS` (diff computed server-side), so improved defaults in later phases reach the owner unless they changed that value themselves. `meta` reports `is_default: bool` per dotted path.
 
 ### Authentication (`app/security.py`, `app/routers/auth.py`)
 
 - Single owner. Password verified against bcrypt hash derived from env at startup. Timing-safe.
-- On success set cookie `vtol_session`: `itsdangerous.URLSafeTimedSerializer` token containing `{"uid": user.id}`; `HttpOnly`, `SameSite=Lax`, `Secure` when `APP_ENV=production`, `Path=/`, max age 30 days. Server checks `max_age` on every request.
-- Rate limit: 5 failed logins per 15 minutes per client IP (in-memory; client IP is the first `X-Forwarded-For` hop when present, else the socket peer). Respond 429 with a plain message.
+- On success set cookie `vtol_session`: `itsdangerous.URLSafeTimedSerializer(secret, salt="session")` token containing `{"uid": user.id, "pw": sha256(active_password_hash)[:16]}`; `HttpOnly`, `SameSite=Lax`, `Secure` when `APP_ENV=production`, `Path=/`, max age 30 days. Server checks `max_age` and the `pw` fingerprint on every request, so changing the password or the secret signs out every device (documented in `docs/DEPLOYMENT.md`).
+- Passwords longer than 72 bytes (byte length, not characters) are rejected before bcrypt is called (401, counted as a failed attempt) because bcrypt 5 raises on them.
+- Scope: every `/api` route requires `current_user` except `POST /api/auth/login` and `GET /api/health`. Enforce it as router-level `dependencies=[Depends(current_user)]` on every router, and ship a pytest that walks `app.routes` and asserts 401 for every `/api` path outside that allowlist.
+- Headers: one middleware adds `Cache-Control: no-store` on `/api/*`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, and `Strict-Transport-Security: max-age=31536000` when `APP_ENV=production`. No `CORSMiddleware`: the SPA is same-origin and Vite proxies `/api` in development.
+- Rate limit: 5 failed logins per 15 minutes per client IP, plus a global bucket of 30 failures per 15 minutes across all IPs (in-memory; resets on restart, which is acceptable). Client IP is the `Fly-Client-IP` header when `APP_ENV=production` (set by Fly's proxy from its own view of the connection), else `request.client.host`. Never parse `X-Forwarded-For`: its leftmost entries are client-supplied. Respond 429 with a plain message.
 - CSRF: cookie is SameSite=Lax; additionally every state-changing `/api` request must carry header `X-Requested-With: fetch` (frontend client sets it) or it is rejected with 403. GET never mutates.
 - `GET /api/auth/me` returns the user or 401. Unauthenticated API calls return 401 JSON `{detail: "..."}`; the SPA redirects to `/login`.
 
@@ -203,9 +208,12 @@ System
 - `GET /api/system/info` → `{version, phase: 1, environment, data_dir, backup: {last_run_at, next_run_at, count}}`.
 - `GET /api/system/backups` → `[{name, size_bytes, created_at}]`.
 - `POST /api/system/backups` → 201 created backup entry.
-- `GET /api/system/backups/{name}` → file download (`application/octet-stream`). Name must match `^app-\d{8}-\d{6}\.db$`.
+- `GET /api/system/backups/{name}` → file download (`application/octet-stream`, `Content-Disposition: attachment`, `Cache-Control: no-store`). Name must match `^app-\d{8}-\d{6}\.db$` and the resolved path must stay inside the backups directory.
 
-Static SPA: everything not under `/api` serves `frontend/dist` (copied into the image at `/app/static`). Unknown paths return `index.html` so client-side routing works. `/api/*` unknown paths return 404 JSON.
+Schema (plain-language explanations served from one source of truth)
+- `GET /api/schema/design` and `GET /api/schema/mission` → `{"<dotted.path>": {label, unit, type, description, min?, max?, enum?: [{value, label, note?}]}}` generated from the Pydantic models' field metadata. The frontend renders labels, units and `Explain` text from these; nothing is hand-copied into TypeScript. For `layout`, the `rear_tilt` option carries the note "Less common in ArduPilot; support to be confirmed in Phase 2".
+
+Static SPA: Vite's hashed output is mounted with Starlette `StaticFiles` at `/assets`; a fixed allowlist of root files from `frontend/dist` (`favicon.svg`, `manifest.webmanifest`, `robots.txt`) is served by explicit routes; every other non-`/api` GET returns `FileResponse(static_dir / "index.html")` unconditionally, so client-side routing works and no filesystem path is ever derived from the URL. `/api/*` unknown paths return 404 JSON ahead of the catch-all. `frontend/dist` is copied into the image at `/app/static`.
 
 ### Backups (`app/backup.py`)
 
@@ -228,7 +236,8 @@ frontend/
   src/
     main.tsx, App.tsx (router, auth gate)
     api/client.ts      fetch wrapper: credentials include, X-Requested-With: fetch, JSON, 401 → redirect to /login, typed errors
-    api/types.ts       TS types mirroring the API schemas (Project, DesignVersion, DesignParameters, Mission, Part, Settings)
+    api/types.ts       TS types mirroring the API schemas (Project, DesignVersion, DesignParameters, Mission, Part, Settings, FieldMeta)
+    api/schema.ts      loads /api/schema/design and /api/schema/mission once; labels, units and explanations come from here
     auth/AuthContext.tsx
     pages/LoginPage.tsx, ProjectsPage.tsx, ProjectPage.tsx, SettingsPage.tsx, NotFoundPage.tsx
     layout/AppShell.tsx (top bar: project name, tabs, settings link, logout; right rail: Versions + Assistant panels)
@@ -244,7 +253,7 @@ Routes: `/login`, `/` (projects list), `/projects/:id` with `?tab=inputs|design|
 Phase 1 behaviour per screen:
 - Login: password field, error message, rate-limit message.
 - Projects: list, create (name + description), rename, delete with confirm.
-- Project workspace: tabs left to right. Inputs tab shows the mission form (NumberFields with explanations, layout selector, scale selector) and a placeholder card for reference-image upload labelled "Phase 2". Design tab shows grouped parameter NumberFields (wing, fuselage, booms, motors, tilt or pusher, tail, nose bay, landing gear) and a placeholder for the 3D view and drawings labelled "Phase 2". Parts tab lists categories and parts from the API with a note that recommendations arrive in Phase 4. Files and Flight data tabs are placeholders with the phase that delivers them.
+- Project workspace: tabs left to right. Inputs tab shows the mission form (NumberFields with explanations, layout selector, scale selector) and a placeholder card for reference-image upload labelled "Phase 2". The layout selector shows the `rear_tilt` note from the schema endpoint ("Less common in ArduPilot; support to be confirmed in Phase 2") through the `Explain` component. Design tab shows grouped parameter NumberFields (wing, fuselage, booms, motors, tilt or pusher, tail, nose bay, landing gear) and a placeholder for the 3D view and drawings labelled "Phase 2". Parts tab lists categories and parts from the API with a note that recommendations arrive in Phase 4. Files and Flight data tabs are placeholders with the phase that delivers them.
 - Draft editing: fields update local state immediately; a debounced (800 ms) `PUT /draft` saves; a status indicator shows "Saved" / "Saving…" / "Unsaved changes" / error. A warning banner appears when `target_takeoff_mass_kg >= warn_mtow_kg` and an error state when it exceeds `design_mtow_kg`.
 - Versions panel (right rail, every tab): "Save version" (name, notes), list with number, name, date; per-version menu: Restore (confirm if draft is dirty), Duplicate, Rename, Delete. Shows "Draft based on v3 (modified)" when dirty relative to the version it was restored from (compare JSON).
 - Assistant panel: collapsed card "Assistant arrives in Phase 3".
@@ -252,11 +261,14 @@ Phase 1 behaviour per screen:
 
 Accessibility and polish: labelled inputs, keyboard-usable menus, no layout shift on load, 16 px gutters on narrow screens.
 
+Test IDs (stable `data-testid` attributes the e2e suite relies on; do not rename):
+`login-password`, `login-submit`, `login-error`; `projects-new`, `project-name`, `project-description`, `project-create`, `project-card` (one per project, with `data-project-id`), `project-delete`; `tab-inputs`, `tab-design`, `tab-parts`, `tab-files`, `tab-flight`; every mission or design input is `field-<dotted.path>` (for example `field-target_takeoff_mass_kg`, `field-wing.span_mm`, `field-layout`); `draft-status` (text: "Saved", "Saving…", "Unsaved changes", or an error), `mtow-banner`; `versions-save`, `version-name`, `version-notes`, `version-save-confirm`, `version-item` (one per version, with `data-version-number` and `data-version-id`), `version-menu`, `version-restore`, `version-duplicate`, `version-rename`, `version-delete`, `confirm-ok`, `confirm-cancel`, `draft-basis` (text such as "Draft based on v1" or "Draft based on v1 (modified)"); `logout`, `settings-link`, `backup-now`.
+
 ## End-to-end tests (`e2e/`)
 
 Playwright (`@playwright/test`), Chromium only. `playwright.config.ts` starts the backend with `APP_PASSWORD=test-password`, a temporary `APP_DATA_DIR`, and serves the built frontend from `frontend/dist` (so the test exercises the production static-serving path). Honour `PLAYWRIGHT_BROWSERS_PATH`; when `/opt/pw-browsers/chromium` exists use it via `executablePath`.
 
-`tests/phase1.spec.ts` covers the acceptance criterion: open URL → redirected to login → wrong password shows error → correct password → create project → set mission take-off mass → save version "v1" → change wingspan → save version "v2" → both versions listed with numbers 1 and 2 → restore v1 → wingspan reverts → reload keeps login and data → logout → protected route redirects.
+`tests/phase1.spec.ts` covers the acceptance criterion: open URL → redirected to login → wrong password shows error → correct password → create project → set mission take-off mass (`field-target_takeoff_mass_kg`) → save version "v1" → change wingspan (`field-wing.span_mm`) and wait for `draft-status` to read "Saved" → save version "v2" → both versions listed with numbers 1 and 2 → restore v1 → wingspan reverts → reload keeps login and data → logout → protected route redirects. A second spec checks that `/api/system/backups/<name>` without a session returns 401 and that the SPA fallback never serves a file outside `dist`.
 
 ## Hosting and deployment
 
@@ -304,14 +316,15 @@ Deployment is driven entirely from GitHub Actions so the owner never installs an
 - **Token:** the owner creates a *personal access token* (or an org token) in the Fly dashboard in the browser and stores it as the `FLY_API_TOKEN` GitHub secret. Not an app-scoped deploy token: that needs the CLI to create and cannot create the app or recreate Fly's remote builder.
 - **No remote builder.** `deploy.yml` builds the image on the GitHub runner and deploys with `flyctl deploy --local-only --ha=false --app "$FLY_APP_NAME"`. `--ha=false` is mandatory: the default creates two machines, which with a volume mount means two SQLite databases. The `[mounts] initial_size` lets the first deploy create exactly one volume; there is no separate volume-create step (volume names are not unique, so a bare create is not idempotent).
 - **Steps in `deploy.yml`** (on push to `main` and on manual dispatch; `concurrency: deploy` so two runs cannot race the bootstrap): install `flyctl`; `flyctl apps create "$FLY_APP_NAME" --org personal` only if `flyctl apps list --json` does not already contain it, and on a name clash print a plain-language message telling the owner to set the `FLY_APP_NAME` repository variable to a unique name and re-run; stage secrets (`APP_SECRET_KEY`, `APP_PASSWORD`, and `ANTHROPIC_API_KEY` when set) with `flyctl secrets set --stage`, treating Fly's non-zero "No change detected" exit as success; `flyctl deploy --local-only --ha=false`; print the public URL `https://$FLY_APP_NAME.fly.dev`.
-- Required GitHub secrets: `FLY_API_TOKEN`, `APP_SECRET_KEY`, `APP_PASSWORD`. Optional: `ANTHROPIC_API_KEY`. Repository variable: `FLY_APP_NAME` (falls back to `vtol-drone-designer`).
+- Required GitHub secrets: `FLY_API_TOKEN`, `APP_SECRET_KEY`, `APP_PASSWORD`. Optional: `ANTHROPIC_API_KEY` (staged only when the secret exists; nothing reads it until Phase 3). Repository variable: `FLY_APP_NAME` (falls back to `vtol-drone-designer`).
+- Hygiene: every action pinned to a release tag; top-level `permissions: contents: read`; secret values reach `flyctl` through `env:` and stdin (`flyctl secrets import --stage` reading `KEY=value` lines) rather than argv, so odd characters cannot break the shell. The Fly token is org-scoped because the workflow creates the app; `docs/DEPLOYMENT.md` says so plainly and tells the owner how to rotate it in the Fly dashboard.
 - `ci.yml` on pull requests and pushes: ruff, pytest, tsc, eslint, vite build, Playwright e2e, `docker build` (no push).
 
-Container: `python:3.12-slim-bookworm` runtime, `uv` for dependency install, `/data` volume, port 8080. The final image user is a non-root `app` user set with `USER app` (no gosu or su-exec entrypoint: Fly chowns the mount to the image's `USER`, and the volume root contains a root-owned `lost+found`, so the app must never chown `/data` recursively). The entrypoint runs `alembic upgrade head` then `uvicorn app.main:app --host 0.0.0.0 --port 8080 --proxy-headers --forwarded-allow-ips='*'` so the app sees the real client IP and scheme behind Fly's proxy; the login rate limiter keys on the first `X-Forwarded-For` hop. Leave a clearly commented place for the Phase 3 build stage that compiles AVL and XFOIL with `gfortran` so the layout does not change later.
+Container: `python:3.12-slim-bookworm` runtime, `uv` for dependency install, `/data` volume, port 8080. The final image user is a non-root `app` user set with `USER app` (no gosu or su-exec entrypoint: Fly chowns the mount to the image's `USER`, and the volume root contains a root-owned `lost+found`, so the app must never chown `/data` recursively). The entrypoint runs `alembic upgrade head` then `uvicorn app.main:app --host 0.0.0.0 --port 8080 --proxy-headers --forwarded-allow-ips='*'` so the app sees the request scheme behind Fly's proxy; the login rate limiter keys on `Fly-Client-IP` in production (see Authentication). Leave a clearly commented place for the Phase 3 build stage that compiles AVL and XFOIL with `gfortran` so the layout does not change later.
 
 ## Conventions
 
 - Python: ruff (line length 100), type hints everywhere, `from __future__ import annotations`.
 - TypeScript: strict, no `any` without a comment, named exports.
 - Commit messages: imperative, scoped (`backend: ...`, `frontend: ...`, `infra: ...`, `docs: ...`).
-- Never put secrets, API keys or the owner's email in the repository.
+- Never put secrets, API keys or the owner's email in the repository. `.gitignore` and `.dockerignore` list `.env`, `data/`, `*.db`, `backups/`, `node_modules/`, `.venv/`, `dist/`, `test-results/`, `playwright-report/`.

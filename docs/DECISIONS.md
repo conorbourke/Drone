@@ -47,9 +47,9 @@ These are stored in Settings with a description and source, and are editable in 
 |---|---|---|
 | Hover thrust-to-weight minimum | 2.0 | Common multirotor/VTOL design rule: hover at or below about 50 % throttle leaves authority for gusts, descent control and a motor-out margin. To be cited precisely in Phase 3 (ArduPilot QuadPlane tuning guidance recommends hover throttle well below half). |
 | Static margin range | 5 % to 20 % of mean aerodynamic chord | Standard fixed-wing stability guidance (Raymer, *Aircraft Design: A Conceptual Approach*; typical RC/UAV practice 5–15 %). Too low is unstable, too high is sluggish and trim-draggy. |
-| Stall speed ratio (stall ÷ cruise) maximum | 0.77 (cruise at least 1.3 × stall) | The 1.3 × stall approach/manoeuvre margin is standard in piloted aviation and widely used for UAV cruise margin. |
+| Cruise-to-stall speed ratio minimum | 1.3 (cruise speed at least 1.3 × stall speed) | The 1.3 × stall approach/manoeuvre margin is standard in piloted aviation and widely used for UAV cruise margin. |
 | Battery reserve fraction | 20 % | LiPo and Li-ion packs should not be run below about 20 % remaining; also gives a landing reserve. |
-| Battery current margin | peak draw ≤ 80 % of continuous rating | Keeps the pack inside its continuous discharge rating with headroom for ageing and cold. |
+| Battery current, maximum fraction of rating | 0.8 (peak draw ≤ 80 % of continuous rating) | Keeps the pack inside its continuous discharge rating with headroom for ageing and cold. |
 | MTOW design limit / legal limit / warning | 24 kg / 25 kg / 23 kg | From the brief (EU Open A3 upper limit 25 kg, 1 kg safety margin). |
 
 ## 5. Published designs for the validation suite (needs owner confirmation before Phase 3)
