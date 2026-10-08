@@ -1,0 +1,17 @@
+# Local development only (used by Claude Code, not by the owner).
+# Builds the production image and runs it with a named volume for /data.
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: development
+      APP_PASSWORD: ${APP_PASSWORD:-dev-password}
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-dev-secret-not-for-production}
+      APP_OWNER_EMAIL: ${APP_OWNER_EMAIL:-owner@example.com}
+    volumes:
+      - app-data:/data
+
+volumes:
+  app-data:

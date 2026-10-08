@@ -1,0 +1,108 @@
+name: Deploy to Fly.io
+
+# Runs on every push to main and on demand ("Run workflow" button in the Actions tab).
+# The owner never needs a terminal: everything below runs on GitHub's servers.
+# Required repository secrets: FLY_API_TOKEN, APP_SECRET_KEY, APP_PASSWORD. Optional: ANTHROPIC_API_KEY.
+# Optional repository variables: FLY_APP_NAME (default vtol-drone-designer), FLY_ORG (default personal).
+# See docs/DEPLOYMENT.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build on GitHub, deploy to Fly.io
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'vtol-drone-designer' }}
+      FLY_ORG: ${{ vars.FLY_ORG || 'personal' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@1.5
+
+      - name: Check that the required secrets exist
+        env:
+          APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in FLY_API_TOKEN APP_SECRET_KEY APP_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Repository secret $name is missing. Add it under Settings → Secrets and variables → Actions, then re-run."
+              missing=1
+            fi
+          done
+          if [ "$(printf '%s' "$APP_PASSWORD" | wc -c)" -gt 72 ]; then
+            echo "::error::APP_PASSWORD is longer than 72 bytes, which the password hasher cannot accept. Choose a shorter passphrase."
+            missing=1
+          fi
+          test "$missing" = 0
+
+      - name: Create the Fly app if it does not exist yet
+        run: |
+          set -euo pipefail
+          if flyctl apps list --json | jq -e --arg n "$FLY_APP_NAME" 'any(.[]; ((.Name // .name) == $n))' >/dev/null; then
+            echo "App $FLY_APP_NAME already exists."
+          else
+            echo "Creating app $FLY_APP_NAME in org $FLY_ORG..."
+            if ! flyctl apps create "$FLY_APP_NAME" --org "$FLY_ORG"; then
+              echo "::error::Could not create the Fly app '$FLY_APP_NAME'. If the message above says the name is taken, set the repository variable FLY_APP_NAME to a unique name (Settings → Secrets and variables → Actions → Variables) and re-run this workflow. If it mentions the organisation, set FLY_ORG to your Fly organisation slug."
+              exit 1
+            fi
+          fi
+
+      - name: Stage application secrets on Fly
+        env:
+          APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          # Values are passed on stdin as KEY=value lines, never on the command line.
+          tmp=$(mktemp)
+          {
+            printf 'APP_SECRET_KEY=%s\n' "$APP_SECRET_KEY"
+            printf 'APP_PASSWORD=%s\n' "$APP_PASSWORD"
+            if [ -n "${ANTHROPIC_API_KEY:-}" ]; then printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"; fi
+          } > "$tmp"
+          set +e
+          out=$(flyctl secrets import --stage --app "$FLY_APP_NAME" < "$tmp" 2>&1)
+          rc=$?
+          set -e
+          rm -f "$tmp"
+          if [ $rc -ne 0 ]; then
+            # flyctl exits non-zero when nothing changed; that is the normal case after the first deploy.
+            if printf '%s' "$out" | grep -qi 'no change'; then
+              echo "Secrets unchanged."
+            else
+              printf '%s\n' "$out"
+              exit $rc
+            fi
+          else
+            echo "Secrets staged; they take effect with this deploy."
+          fi
+
+      - name: Deploy (image built on this runner, one machine, one volume)
+        run: flyctl deploy --local-only --ha=false --app "$FLY_APP_NAME" --config fly.toml
+
+      - name: Report the URL
+        run: |
+          url="https://$FLY_APP_NAME.fly.dev"
+          echo "Deployed: $url"
+          {
+            echo "## Deployed"
+            echo
+            echo "Open **$url** and log in with the APP_PASSWORD secret."
+          } >> "$GITHUB_STEP_SUMMARY"

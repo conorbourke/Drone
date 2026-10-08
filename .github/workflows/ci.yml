@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.11.32"
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+
+jobs:
+  backend:
+    name: Backend (ruff, pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install
+        run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check .
+      - name: Format check
+        run: uv run ruff format --check .
+      - name: Tests
+        run: uv run pytest -q
+
+  frontend:
+    name: Frontend (tsc, eslint, vitest, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+      - name: Install backend
+        run: uv sync --frozen
+        working-directory: backend
+      - name: Build frontend
+        run: npm ci --no-audit --no-fund && npm run build
+        working-directory: frontend
+      - name: Install e2e
+        run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: Run Playwright
+        run: npx playwright test
+        working-directory: e2e
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7
+
+  docker:
+    name: Container image (build and smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t vtol-drone-designer:ci .
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke -p 8080:8080 \
+            -e APP_PASSWORD=ci-password -e APP_SECRET_KEY=ci-secret-key-for-smoke-test-only \
+            vtol-drone-designer:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/api/health >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8080/api/health
+          echo
+          # The SPA must be served from the image and the API must refuse unauthenticated calls.
+          curl -fsS -o /dev/null -w "root: %{http_code}\n" http://127.0.0.1:8080/
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/api/projects)
+          echo "projects without session: $code"
+          test "$code" = "401"
+          # Login must work over the container's own port (Secure cookies are only required over HTTPS in production;
+          # the smoke test checks the status code, not the cookie).
+          code=$(curl -s -o /dev/null -w "%{http_code}" -H 'Content-Type: application/json' -H 'X-Requested-With: fetch' \
+            -d '{"password":"ci-password"}' http://127.0.0.1:8080/api/auth/login)
+          echo "login: $code"
+          test "$code" = "200"
+          docker logs smoke | tail -n 20
+          docker rm -f smoke

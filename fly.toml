@@ -1,0 +1,39 @@
+# Fly.io app definition — see docs/DEPLOYMENT.md.
+# Exactly one machine and one volume, always on. Deploy with:
+#   flyctl deploy --local-only --ha=false --app "$FLY_APP_NAME"
+# (--ha=false is mandatory: the default creates two machines, which with a
+#  volume mount would mean two separate SQLite databases.)
+
+app = "vtol-drone-designer"       # overridden by the FLY_APP_NAME repository variable via --app
+primary_region = "lhr"             # London: nearest region to Ireland. Single source of truth for the region.
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_ENV = "production"
+  APP_DATA_DIR = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"       # always on: the SQLite file and the daily backup task live in this process
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/api/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+
+[mounts]
+  source = "data"
+  destination = "/data"
+  initial_size = "3gb"             # created by the first deploy; no separate volume step
+  snapshot_retention = 14          # Fly's daily volume snapshots are the disaster-recovery copy
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"                   # raise to 2gb when Phase 3 (AVL/XFOIL) and Phase 5 (CadQuery) land

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# Local data, databases and secrets (never commit)
+.env
+.env.*
+data/
+*.db
+*.db-wal
+*.db-shm
+backups/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
