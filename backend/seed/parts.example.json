@@ -1,0 +1,103 @@
+[
+  {
+    "category": "motor",
+    "manufacturer": "Example Motors",
+    "model": "EM-4110-400 (placeholder)",
+    "mass_g": 148,
+    "price_eur_estimate": 55,
+    "source": "example placeholder, not verified",
+    "verified": false,
+    "notes": "Illustrates the motor spec shape. Replace with real, sourced data in Phase 4.",
+    "spec": {
+      "kv_rpm_per_v": 400,
+      "resistance_ohm": 0.08,
+      "no_load_current_a": 0.6,
+      "max_current_a": 30,
+      "max_power_w": 700,
+      "lipo_cells_min": 4,
+      "lipo_cells_max": 6,
+      "stator_size": "4110",
+      "shaft_mm": 5,
+      "mount_pattern": "25x25 M3",
+      "thrust_data": [
+        {"prop": "15x5.5", "voltage_v": 22.2, "throttle_pct": 50, "thrust_g": 1100, "current_a": 7.5, "power_w": 166, "rpm": 5200},
+        {"prop": "15x5.5", "voltage_v": 22.2, "throttle_pct": 100, "thrust_g": 2400, "current_a": 24, "power_w": 533, "rpm": 7600}
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "Example Hobby Shop IE",
+        "country": "IE",
+        "url": "https://example.com/em-4110-400",
+        "price_eur": 55,
+        "in_stock": null,
+        "last_checked_at": null
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "Example Props",
+    "model": "EP-15x5.5 folding (placeholder)",
+    "mass_g": 28,
+    "price_eur_estimate": 18,
+    "source": "example placeholder, not verified",
+    "verified": false,
+    "notes": "Illustrates the propeller spec shape.",
+    "spec": {
+      "diameter_mm": 381,
+      "pitch_mm": 139.7,
+      "trade_size": "15x5.5",
+      "blades": 2,
+      "folding": true,
+      "hub_bore_mm": 6,
+      "material": "carbon",
+      "max_rpm": null
+    },
+    "listings": []
+  },
+  {
+    "category": "battery",
+    "manufacturer": "Example Cells",
+    "model": "EC-6S-5000 (placeholder)",
+    "mass_g": 640,
+    "price_eur_estimate": 70,
+    "source": "example placeholder, not verified",
+    "verified": false,
+    "notes": "Illustrates the battery spec shape.",
+    "spec": {
+      "chemistry": "lipo",
+      "cells_series": 6,
+      "cells_parallel": 1,
+      "capacity_mah": 5000,
+      "nominal_voltage_v": 22.2,
+      "discharge_c_continuous": 25,
+      "discharge_c_burst": 50,
+      "length_mm": 155,
+      "width_mm": 48,
+      "height_mm": 46,
+      "connector": "XT90"
+    },
+    "listings": []
+  },
+  {
+    "category": "carbon_tube",
+    "manufacturer": "Example Composites",
+    "model": "ECT-20x18-1000 (placeholder)",
+    "mass_g": 95,
+    "price_eur_estimate": 25,
+    "source": "example placeholder, not verified",
+    "verified": false,
+    "notes": "Illustrates the carbon tube spec shape.",
+    "spec": {
+      "outer_diameter_mm": 20,
+      "inner_diameter_mm": 18,
+      "length_mm": 1000,
+      "layup": "roll_wrapped",
+      "mass_per_m_g": 95,
+      "youngs_modulus_gpa": null,
+      "tensile_strength_mpa": null
+    },
+    "listings": []
+  }
+]

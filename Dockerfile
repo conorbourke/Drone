@@ -32,6 +32,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PYTHON=/usr/local/bin/python3.12 \
     UV_PROJECT_ENVIRONMENT=/app/.venv
 
 # uv: fast, reproducible installs from uv.lock. Pinned to the version used to create the lock.

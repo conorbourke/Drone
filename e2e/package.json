@@ -1,0 +1,20 @@
+{
+  "name": "vtol-drone-designer-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Playwright end-to-end tests that drive the built VTOL drone designer (backend serving frontend/dist).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0",
+    "@types/node": "^22.19.11",
+    "typescript": "~5.9.3"
+  }
+}

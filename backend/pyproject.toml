@@ -1,0 +1,53 @@
+[project]
+name = "vtol-drone-backend"
+version = "0.1.0"
+description = "Backend for the VTOL drone design tool: FastAPI API, SQLite storage, static SPA serving."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "bcrypt>=4.1",
+    "itsdangerous>=2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+    "ruff>=0.6",
+]
+
+[tool.uv]
+# The backend is an application, not a distributable package: nothing is built or installed
+# into the environment, the `app` package is imported from the working directory.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "RUF012", # mutable class attributes: SQLAlchemy / pydantic model_config patterns
+]
+
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+known-first-party = ["app", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+filterwarnings = [
+    "error::DeprecationWarning:app.*",
+    # Starlette 1.x prefers httpx2 for its TestClient; httpx still works and is what the contract names.
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]
