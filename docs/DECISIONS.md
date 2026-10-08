@@ -9,8 +9,8 @@ The brief lists five decisions for Claude Code to confirm with the owner before 
 **Why Fly.io:**
 - Runs an ordinary Docker image, so the compiled Fortran tools (AVL, XFOIL) and CadQuery that Phase 3 and Phase 5 need are no problem.
 - Persistent volumes, so one container holds the database and files without a separate database service.
-- Everything is driven from GitHub Actions with a single API token, so the owner never installs anything. The owner's only steps are in a browser (create a Fly account, create a token, paste secrets into GitHub, click "Run workflow").
-- Machines can suspend when idle and wake on the next request, which keeps a single-user app cheap.
+- Everything is driven from GitHub Actions with a single API token, so the owner never installs anything. The owner's only steps are in a browser (create a Fly account, create a personal access token in the Fly dashboard, paste secrets into GitHub, click "Run workflow"). The container image is built on the GitHub runner, so the deploy never depends on Fly's remote builder, which Fly removes after idle periods and which only a laptop CLI session could restore.
+- A single always-on small machine is cheap enough that the app never needs to stop when idle, so there are no cold starts and the daily backup always runs.
 
 **Cost estimate (Fly.io pricing update effective 1 October 2026, see sources):**
 
@@ -21,7 +21,7 @@ The brief lists five decisions for Claude Code to confirm with the owner before 
 | 3 GB volume | $0.15 / GB / month | $0.45 |
 | Egress (Europe) | $0.02 / GB | pennies |
 
-Roughly $7–8 (≈ €7) a month if the machine ran all the time; less with idle suspend. Phase 3 (AVL/XFOIL) and Phase 5 (CadQuery) will likely need 2 GB of RAM, taking it to about $14 (≈ €13) a month. Both are inside the €10–30 budget. Pay-as-you-go Claude API usage is separate.
+Roughly $7–8 (≈ €7) a month always on. Phase 3 (AVL/XFOIL) and Phase 5 (CadQuery) will likely need 2 GB of RAM, taking it to about $14 (≈ €13) a month. Both are inside the €10–30 budget. Fly's daily volume snapshots (14 kept) add well under a euro. Pay-as-you-go Claude API usage is separate.
 
 **Alternatives considered:** Railway (similar, slightly less control over volumes), Render (persistent disk only on paid plans, no suspend), Hetzner VPS (cheapest, but needs server administration that would fall on Claude Code every time). The Dockerfile is provider-neutral, so switching later is a matter of a new deploy workflow.
 

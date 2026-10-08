@@ -74,17 +74,17 @@ In production, startup fails loudly if `APP_SECRET_KEY` or a password is missing
 
 ### Data model (`app/models.py`)
 
-All tables have integer primary key `id`, `created_at`, `updated_at` (UTC, timezone-aware stored as ISO text in SQLite via SQLAlchemy DateTime(timezone=True)).
+All tables have integer primary key `id`, `created_at`, `updated_at`. All datetimes are stored as UTC through a `TZDateTime` `TypeDecorator` in `db.py` that converts to UTC on bind and attaches `timezone.utc` on load (SQLite ignores `DateTime(timezone=True)`, so a plain column would silently drop the offset). Pydantic serialises every datetime with an explicit `Z`. One shared type, used by every model.
 
 - `users`: `email` (unique), `password_hash` (nullable; the single owner authenticates against env, but the column exists for later), `display_name`, `is_owner` (bool).
-- `projects`: `owner_id` FK users, `name`, `description`, `draft_parameters` (JSON), `draft_mission` (JSON), `draft_based_on_version_id` (nullable FK versions, no cascade), `draft_updated_at`. Unique `(owner_id, name)`.
-- `design_versions`: `project_id` FK projects (cascade delete), `owner_id`, `name`, `notes`, `number` (per-project sequence 1,2,3...), `parameters` (JSON), `mission` (JSON), `parent_version_id` (nullable self FK; set on duplicate), `schema_version` (int). Unique `(project_id, number)`.
+- `projects`: `owner_id` FK users, `name`, `description`, `draft_parameters` (JSON), `draft_mission` (JSON), `draft_based_on_version_id` (nullable FK design_versions, `ON DELETE SET NULL` at DDL level), `draft_updated_at`, `next_version_number` (int, default 1). Unique `(owner_id, name)`.
+- `design_versions`: `project_id` FK projects (`ON DELETE CASCADE`), `owner_id`, `name`, `notes`, `number` (permanent per-project label: `POST /versions` and `/duplicate` read and increment `projects.next_version_number` in the same transaction as the insert, so numbers are monotonic and never reused after a delete), `parameters` (JSON), `mission` (JSON), `parent_version_id` (nullable self FK, `ON DELETE SET NULL`). Unique `(project_id, number)`. `id` remains the target of every foreign key; `number` is only a label.
 - `parts`: `category` (string enum, see Parts), `manufacturer`, `model` (name), `mass_g`, `price_eur_estimate` (nullable), `spec` (JSON validated against the category schema), `source` (text: where the spec came from), `verified` (bool, false for placeholders), `notes`. Unique `(category, manufacturer, model)`.
 - `part_listings`: `part_id` FK parts (cascade), `supplier_name`, `country` (`IE` or `UK`), `url`, `price_eur` (nullable), `in_stock` (nullable bool), `last_checked_at` (nullable datetime).
 - `app_settings`: `owner_id` FK users (unique), `data` (JSON, full settings document, see Settings).
-- Reserved for later phases (do not create yet, but do not block): `images`, `analyses`, `flight_logs`, `calibrations`, `export_files`.
+- Reserved for later phases (do not create yet, but do not block): `images`, `analyses`, `flight_logs`, `calibrations`, `export_files`. Policy: rows in those tables that reference a version use `ON DELETE RESTRICT`, and `DELETE /api/versions/{vid}` returns 409 with a plain message when a version is still referenced, so flight logs and calibrations can never be orphaned silently.
 
-JSON columns use SQLAlchemy `JSON` type. Design parameters and mission are validated by Pydantic on write; stored JSON always includes `schema_version`.
+JSON columns use SQLAlchemy `JSON` type. Design parameters and mission are validated by Pydantic on write; stored JSON always includes `schema_version` inside the document (there is no separate column). Upgrade policy: every schema change ships an upgrader step in `app/schemas/migrate.py` (`upgrade_parameters(doc)`, `upgrade_mission(doc)`, `upgrade_settings(doc)`); stored documents are upgraded on read and on restore and returned at the current schema version; stored rows are never rewritten in place; new fields must have defaults. Alembic `env.py` sets `render_as_batch=True` so later constraint changes work on SQLite.
 
 ### Design parameters and mission (`app/schemas/design.py`, `mission.py`, `app/defaults.py`)
 
@@ -92,14 +92,14 @@ JSON columns use SQLAlchemy `JSON` type. Design parameters and mission are valid
 
 ```
 layout: "front_tilt" | "rear_tilt" | "quad_pusher"
-wing: { span_mm, root_chord_mm, tip_chord_mm, sweep_deg, dihedral_deg, incidence_deg, airfoil (str id, default "sd7037") }
+wing: { span_mm, root_chord_mm, tip_chord_mm, sweep_deg, dihedral_deg, incidence_deg, airfoil (str id, default "sd7037"), x_le_mm (wing root leading edge measured from the fuselage nose), z_mm (vertical offset from the fuselage centreline, 0 = mid-wing, positive = up) }
 fuselage: { length_mm, width_mm, height_mm, cross_section: "ellipse" | "rounded_rect" }
 booms: { count (2), lateral_offset_mm (distance from centreline), length_mm, x_offset_mm (boom front relative to wing leading edge, negative = ahead) }
 motors: { front_x_mm, rear_x_mm (along boom from boom front), height_mm (above boom centreline) }
 tilt: { axis_x_mm (position of tilt axis along boom), max_angle_deg (default 90) }   # ignored for quad_pusher
 pusher: { prop_diameter_mm, x_mm }   # only used for quad_pusher
 tail: { type: "conventional" | "v_tail" | "inverted_v" | "twin_boom_h", span_mm, chord_mm, arm_mm (wing quarter chord to tail quarter chord), height_mm }
-nose_bay: { length_mm, width_mm, height_mm, payload_min_g, payload_max_g }
+nose_bay: { length_mm, width_mm, height_mm }   # geometry only; the payload mass range lives in Mission
 landing_gear: { type: "skids" | "legs" | "none", height_mm }
 ```
 
@@ -113,7 +113,7 @@ cruise_speed_ms (default 16)
 payload_min_g (default 150), payload_max_g (default 400)
 ```
 
-Validation: positive numbers, `payload_max_g >= payload_min_g`, `tip_chord_mm <= root_chord_mm`, `target_takeoff_mass_kg` must not exceed `settings.limits.design_mtow_kg` (return 422 with a plain-language message). Defaults in `app/defaults.py` describe a plausible 2.5 kg front-tilt prototype (span 1800 mm, root chord 260, tip chord 180, fuselage 900 long, booms ±300 mm) and are explicitly labelled as starting values, not an analysed design.
+Validation is limited to shape and sanity: positive numbers, `payload_max_g >= payload_min_g`, `tip_chord_mm <= root_chord_mm`, `x_le_mm + root_chord_mm <= fuselage.length_mm`. The 24 kg design limit is a check, not an input constraint: the server never rejects a draft or version for exceeding it (otherwise the autosave would strand edits), the UI shows the warn/error banner, and the Phase 3 check reads the limit from settings at evaluation time. Defaults in `app/defaults.py` describe a plausible 2.5 kg front-tilt prototype (span 1800 mm, root chord 260, tip chord 180, fuselage 900 long, wing leading edge 300 mm from the nose, booms ±300 mm) and are explicitly labelled as starting values, not an analysed design.
 
 ### Parts catalogue (`app/parts_catalog/`)
 
@@ -122,7 +122,7 @@ Categories and the spec fields the engine will need. Each category has a Pydanti
 | Category | Spec fields |
 |---|---|
 | `motor` | `kv_rpm_per_v`, `resistance_ohm`, `no_load_current_a`, `max_current_a`, `max_power_w`, `lipo_cells_min`, `lipo_cells_max`, `stator_size` (str), `shaft_mm`, `mount_pattern` (str), `thrust_data` (list of {prop (str), voltage_v, throttle_pct, thrust_g, current_a, power_w, rpm}) |
-| `propeller` | `diameter_in`, `pitch_in`, `blades`, `folding` (bool), `hub_bore_mm`, `material`, `max_rpm` (nullable) |
+| `propeller` | `diameter_mm`, `pitch_mm`, `trade_size` (optional text such as "15x5.5", shown beside the metric values), `blades`, `folding` (bool), `hub_bore_mm`, `material`, `max_rpm` (nullable) |
 | `esc` | `continuous_current_a`, `burst_current_a`, `lipo_cells_min`, `lipo_cells_max`, `firmware` (str), `bec_v` (nullable), `telemetry` (bool) |
 | `servo` | `torque_kg_cm`, `speed_s_per_60deg`, `voltage_min_v`, `voltage_max_v`, `gear_material`, `width_mm`, `length_mm`, `height_mm`, `digital` (bool) |
 | `battery` | `chemistry` ("lipo" or "li-ion"), `cells_series`, `cells_parallel`, `capacity_mah`, `nominal_voltage_v`, `discharge_c_continuous`, `discharge_c_burst`, `length_mm`, `width_mm`, `height_mm`, `connector` |
@@ -150,13 +150,13 @@ checks: {
 units: { system: "metric" }
 ```
 
-Each threshold has a `description` and `source` string in the API response (from a static table in `defaults.py`) so the UI can show them. Sources are marked "proposed, confirm in Phase 3" where the brief asks for owner confirmation. `GET /api/settings` merges stored overrides over defaults; `PUT /api/settings` validates and stores the full document.
+The document carries `schema_version: 1`. Each threshold has a `description` and `source` string in the API response (from a static table in `defaults.py`) so the UI can show them. Sources are marked "proposed, confirm in Phase 3" where the brief asks for owner confirmation. `GET /api/settings` merges stored overrides over defaults; `PUT /api/settings` validates the full document and persists only the keys whose value differs from `DEFAULT_SETTINGS` (diff computed server-side), so improved defaults in later phases reach the owner unless they changed that value themselves. `meta` reports `is_default: bool` per dotted path.
 
 ### Authentication (`app/security.py`, `app/routers/auth.py`)
 
 - Single owner. Password verified against bcrypt hash derived from env at startup. Timing-safe.
 - On success set cookie `vtol_session`: `itsdangerous.URLSafeTimedSerializer` token containing `{"uid": user.id}`; `HttpOnly`, `SameSite=Lax`, `Secure` when `APP_ENV=production`, `Path=/`, max age 30 days. Server checks `max_age` on every request.
-- Rate limit: 5 failed logins per 15 minutes per client IP (in-memory). Respond 429 with a plain message.
+- Rate limit: 5 failed logins per 15 minutes per client IP (in-memory; client IP is the first `X-Forwarded-For` hop when present, else the socket peer). Respond 429 with a plain message.
 - CSRF: cookie is SameSite=Lax; additionally every state-changing `/api` request must carry header `X-Requested-With: fetch` (frontend client sets it) or it is rejected with 403. GET never mutates.
 - `GET /api/auth/me` returns the user or 401. Unauthenticated API calls return 401 JSON `{detail: "..."}`; the SPA redirects to `/login`.
 
@@ -180,12 +180,12 @@ Projects (all require auth; only the owner's rows)
 
 Versions
 - `GET /api/projects/{id}/versions` → `[{id, number, name, notes, parent_version_id, created_at}]` ordered by number desc.
-- `POST /api/projects/{id}/versions` body `{name, notes?, parameters?, mission?}` → 201 full version. When `parameters`/`mission` are omitted the current draft is snapshotted. Sets `draft_based_on_version_id` to the new version. 409 if `name` already exists in the project.
-- `GET /api/versions/{vid}` → `{id, project_id, number, name, notes, parameters, mission, parent_version_id, schema_version, created_at}`.
+- `POST /api/projects/{id}/versions` body `{name, notes?, parameters?, mission?}` → 201 full version. When `parameters`/`mission` are omitted the current draft is snapshotted, `parent_version_id` is set to the draft's `based_on_version_id`, and `draft_based_on_version_id` then points at the new version. When `parameters`/`mission` are supplied explicitly, `parent_version_id` is null and the draft pointer is left untouched. 409 if `name` already exists in the project.
+- `GET /api/versions/{vid}` → `{id, project_id, number, name, notes, parameters, mission, parent_version_id, created_at}` (documents are returned upgraded to the current schema version).
 - `PATCH /api/versions/{vid}` body `{name?, notes?}` → version.
 - `POST /api/versions/{vid}/duplicate` body `{name?}` → 201 new version in the same project with `parent_version_id = vid`; default name `"{name} (copy)"`, de-duplicated with a numeric suffix.
 - `POST /api/versions/{vid}/restore` → 200 draft; copies the version's parameters and mission into the project draft and sets `draft_based_on_version_id`.
-- `DELETE /api/versions/{vid}` → 204. If the draft was based on it, `draft_based_on_version_id` becomes null.
+- `DELETE /api/versions/{vid}` → 204. The DDL `ON DELETE SET NULL` clears `draft_based_on_version_id` and any child's `parent_version_id`; a version referenced by a later-phase RESTRICT table returns 409.
 
 Parts
 - `GET /api/parts/categories` → `[{key, label, description, fields: [{name, label, unit, type, required, description}]}]`.
@@ -195,8 +195,8 @@ Parts
 - `POST /api/parts/{id}/listings`, `DELETE /api/parts/listings/{lid}`.
 
 Settings
-- `GET /api/settings` → `{settings: {...}, meta: {"<dotted.path>": {description, source}}}`.
-- `PUT /api/settings` body full settings document → same shape.
+- `GET /api/settings` → `{settings: {...}, meta: {"<dotted.path>": {description, source, is_default}}}`.
+- `PUT /api/settings` body full settings document → same shape (only values that differ from the defaults are stored).
 
 System
 - `GET /api/health` (no auth) → `{status: "ok", version, db: "ok"}`; 503 if the DB is unreachable.
@@ -209,7 +209,10 @@ Static SPA: everything not under `/api` serves `frontend/dist` (copied into the 
 
 ### Backups (`app/backup.py`)
 
-Daily at `BACKUP_HOUR_UTC` an asyncio task runs `sqlite3.Connection.backup()` into `{APP_DATA_DIR}/backups/app-YYYYMMDD-HHMMSS.db`, keeps the newest `BACKUP_KEEP`, and records `last_run_at`. Restore procedure is in `docs/DEPLOYMENT.md` (download the backup in the browser; to restore, upload via a Fly machine console or ask Claude Code).
+Two layers, with honest labels:
+
+1. **Undo-a-mistake backups (in app).** Daily at `BACKUP_HOUR_UTC` an asyncio task runs `sqlite3.Connection.backup()` into `{APP_DATA_DIR}/backups/app-YYYYMMDD-HHMMSS.db`, keeps the newest `BACKUP_KEEP`, and records `last_run_at`. On startup, if the newest backup is older than 24 h (or none exists), a backup runs immediately, so a restarted machine never silently skips a day. The app creates the `backups` directory itself with `mkdir -p`. The owner can download any backup in the browser; that download is the owner's off-site copy. These files live on the same volume as the database, so they are not disaster protection.
+2. **Disaster recovery (Fly volume snapshots).** Fly takes daily snapshots of the volume; `snapshot_retention = 14` in `fly.toml` keeps two weeks. Restore is a Claude Code task (not browser-only, and the Fly dashboard has no shell): either recreate the volume from a snapshot (`fly volumes create data --snapshot-id <id>` then redeploy) or copy the owner's downloaded backup file into `/data` with `fly ssh sftp` and restart. `docs/DEPLOYMENT.md` documents both paths and promises nothing else.
 
 ### Migrations
 
@@ -257,14 +260,54 @@ Playwright (`@playwright/test`), Chromium only. `playwright.config.ts` starts th
 
 ## Hosting and deployment
 
-Provider: Fly.io (see `docs/DECISIONS.md` for the reasoning and alternatives). One machine, region `lhr`, `shared-cpu-1x` 1024 MB to start, persistent volume `data` mounted at `/data`, automatic HTTPS, `auto_stop_machines = "suspend"` and `min_machines_running = 0` so idle time is cheap.
+Provider: Fly.io (see `docs/DECISIONS.md` for the reasoning and alternatives). Exactly one machine, one volume, always on (no auto-stop: an in-process backup scheduler and a SQLite file cannot live on a machine that is stopped or suspended when idle; always-on shared-cpu-1x with 1 GB is about USD 7 a month, well inside the budget).
+
+`fly.toml` (pinned here because the details matter):
+
+```
+app = "vtol-drone-designer"        # overridden by the FLY_APP_NAME repository variable via --app
+primary_region = "lhr"              # the single source of truth for the region; no FLY_REGION variable
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_ENV = "production"
+  APP_DATA_DIR = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/api/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+
+[mounts]
+  source = "data"
+  destination = "/data"
+  initial_size = "3gb"
+  snapshot_retention = 14
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
+```
 
 Deployment is driven entirely from GitHub Actions so the owner never installs anything:
-- `deploy.yml` on push to `main` and on manual dispatch: install `flyctl`, create the app if missing (`FLY_APP_NAME` repo variable), create the volume if missing, stage secrets from GitHub secrets (`APP_SECRET_KEY`, `APP_PASSWORD`, `ANTHROPIC_API_KEY` if set), then `flyctl deploy --remote-only`. Prints the public URL.
-- Required GitHub secrets: `FLY_API_TOKEN`, `APP_SECRET_KEY`, `APP_PASSWORD`. Optional: `ANTHROPIC_API_KEY`. Repository variable: `FLY_APP_NAME` (default `vtol-drone-designer`), `FLY_REGION` (default `lhr`).
+- **Token:** the owner creates a *personal access token* (or an org token) in the Fly dashboard in the browser and stores it as the `FLY_API_TOKEN` GitHub secret. Not an app-scoped deploy token: that needs the CLI to create and cannot create the app or recreate Fly's remote builder.
+- **No remote builder.** `deploy.yml` builds the image on the GitHub runner and deploys with `flyctl deploy --local-only --ha=false --app "$FLY_APP_NAME"`. `--ha=false` is mandatory: the default creates two machines, which with a volume mount means two SQLite databases. The `[mounts] initial_size` lets the first deploy create exactly one volume; there is no separate volume-create step (volume names are not unique, so a bare create is not idempotent).
+- **Steps in `deploy.yml`** (on push to `main` and on manual dispatch; `concurrency: deploy` so two runs cannot race the bootstrap): install `flyctl`; `flyctl apps create "$FLY_APP_NAME" --org personal` only if `flyctl apps list --json` does not already contain it, and on a name clash print a plain-language message telling the owner to set the `FLY_APP_NAME` repository variable to a unique name and re-run; stage secrets (`APP_SECRET_KEY`, `APP_PASSWORD`, and `ANTHROPIC_API_KEY` when set) with `flyctl secrets set --stage`, treating Fly's non-zero "No change detected" exit as success; `flyctl deploy --local-only --ha=false`; print the public URL `https://$FLY_APP_NAME.fly.dev`.
+- Required GitHub secrets: `FLY_API_TOKEN`, `APP_SECRET_KEY`, `APP_PASSWORD`. Optional: `ANTHROPIC_API_KEY`. Repository variable: `FLY_APP_NAME` (falls back to `vtol-drone-designer`).
 - `ci.yml` on pull requests and pushes: ruff, pytest, tsc, eslint, vite build, Playwright e2e, `docker build` (no push).
 
-Container: `python:3.12-slim-bookworm` runtime, `uv` for dependency install, non-root user, `/data` volume, port 8080, entrypoint runs migrations then `uvicorn app.main:app --host 0.0.0.0 --port 8080`. Leave a clearly commented place for the Phase 3 build stage that compiles AVL and XFOIL with `gfortran` so the layout does not change later.
+Container: `python:3.12-slim-bookworm` runtime, `uv` for dependency install, `/data` volume, port 8080. The final image user is a non-root `app` user set with `USER app` (no gosu or su-exec entrypoint: Fly chowns the mount to the image's `USER`, and the volume root contains a root-owned `lost+found`, so the app must never chown `/data` recursively). The entrypoint runs `alembic upgrade head` then `uvicorn app.main:app --host 0.0.0.0 --port 8080 --proxy-headers --forwarded-allow-ips='*'` so the app sees the real client IP and scheme behind Fly's proxy; the login rate limiter keys on the first `X-Forwarded-For` hop. Leave a clearly commented place for the Phase 3 build stage that compiles AVL and XFOIL with `gfortran` so the layout does not change later.
 
 ## Conventions
 
