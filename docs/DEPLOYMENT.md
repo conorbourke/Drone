@@ -19,7 +19,7 @@ Everything runs on one small Fly.io machine. The owner never installs anything: 
 3. **Add secrets to GitHub.** In this repository on GitHub go to *Settings → Secrets and variables → Actions → New repository secret* and add:
    - `FLY_API_TOKEN`: the token from step 2.
    - `APP_SECRET_KEY`: any long random string (40 or more characters; a password manager can generate one). It signs your login session. Keep it private; changing it later signs you out everywhere.
-   - `APP_PASSWORD`: the password you will log in with. At most 72 characters; any characters are fine, including `#`, quotes and spaces.
+   - `APP_PASSWORD`: the password you will log in with. Any characters are fine, including `#`, quotes and spaces. Keep it under 72 bytes: up to 72 plain letters, digits or symbols, fewer if you use accented or non-Latin characters.
    - `ANTHROPIC_API_KEY` (optional until Phase 3): your Claude API key.
 4. **Optional variables** (same page, *Variables* tab): `FLY_APP_NAME` if you want a different app name. The name becomes the address `https://<name>.fly.dev` and must be unique across Fly.io; the default is `vtol-drone-designer`. `FLY_ORG` if your token belongs to an organisation other than *personal*.
 5. **Run the deploy.** Open the *Actions* tab, choose *Deploy to Fly.io*, press *Run workflow*, keep the suggested branch, and press the green button. The first run takes about 5 to 8 minutes: it creates the app and its volume, stores the secrets, builds the container on GitHub's servers and starts it.

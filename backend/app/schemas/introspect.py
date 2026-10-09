@@ -34,7 +34,8 @@ UNIT_SUFFIXES: tuple[tuple[str, str], ...] = (
     ("_mps", "m/s"),
     ("_pct", "%"),
     ("_eur", "€"),
-    ("_min", "min"),
+    # "_min" is deliberately absent: it usually means "minimum", not minutes.
+    # Duration fields declare unit="min" explicitly.
     ("_deg", "°"),
     ("_mm", "mm"),
     ("_kg", "kg"),

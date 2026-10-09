@@ -335,3 +335,23 @@ def test_project_reports_next_version_number(auth_client: TestClient, project: d
 def test_owner_row_exists(app: FastAPI) -> None:
     with app.state.session_factory() as db:
         assert db.scalar(select(User).where(User.is_owner.is_(True))) is not None
+
+
+# CON-1 / CON-6 ------------------------------------------------------------------------------
+
+
+def test_count_fields_are_not_minutes(auth_client: TestClient) -> None:
+    categories = {c["key"]: c for c in auth_client.get("/api/parts/categories").json()}
+    for key in ("motor", "esc"):
+        fields = {f["name"]: f for f in categories[key]["fields"]}
+        assert fields["lipo_cells_min"]["unit"] is None
+        assert fields["lipo_cells_max"]["unit"] is None
+        assert fields["lipo_cells_min"]["label"] != fields["lipo_cells_max"]["label"]
+        assert "min" not in fields["lipo_cells_min"]["label"].lower().split()
+    mission = auth_client.get("/api/schema/mission").json()
+    assert mission["target_endurance_min"]["unit"] == "min"
+
+
+def test_schema_notes_expose_the_defaults_label(auth_client: TestClient) -> None:
+    notes = auth_client.get("/api/schema/notes").json()
+    assert "starting values" in notes["defaults"].lower()

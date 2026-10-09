@@ -34,8 +34,16 @@ class MotorSpec(_Spec):
     no_load_current_a: float = Field(ge=0, description="Current drawn with no propeller.")
     max_current_a: float = Field(gt=0, description="Maximum continuous current.")
     max_power_w: float = Field(gt=0, description="Maximum continuous electrical power.")
-    lipo_cells_min: int = Field(ge=1, description="Minimum battery cell count (S).")
-    lipo_cells_max: int = Field(ge=1, description="Maximum battery cell count (S).")
+    lipo_cells_min: int = Field(
+        ge=1,
+        description="Minimum battery cell count (S).",
+        json_schema_extra={"label": "Minimum LiPo cells", "unit": None},
+    )
+    lipo_cells_max: int = Field(
+        ge=1,
+        description="Maximum battery cell count (S).",
+        json_schema_extra={"label": "Maximum LiPo cells", "unit": None},
+    )
     stator_size: str = Field(description="Stator size code, e.g. '4110' (41 mm, 10 mm tall).")
     shaft_mm: float = Field(gt=0, description="Shaft diameter.")
     mount_pattern: str = Field(description="Bolt pattern, e.g. '25x25 M3'.")
@@ -68,8 +76,16 @@ class PropellerSpec(_Spec):
 class EscSpec(_Spec):
     continuous_current_a: float = Field(gt=0, description="Continuous current rating.")
     burst_current_a: float = Field(gt=0, description="Short burst current rating.")
-    lipo_cells_min: int = Field(ge=1, description="Minimum battery cell count (S).")
-    lipo_cells_max: int = Field(ge=1, description="Maximum battery cell count (S).")
+    lipo_cells_min: int = Field(
+        ge=1,
+        description="Minimum battery cell count (S).",
+        json_schema_extra={"label": "Minimum LiPo cells", "unit": None},
+    )
+    lipo_cells_max: int = Field(
+        ge=1,
+        description="Maximum battery cell count (S).",
+        json_schema_extra={"label": "Maximum LiPo cells", "unit": None},
+    )
     firmware: str = Field(description="ESC firmware family, e.g. BLHeli_32, AM32.")
     bec_v: float | None = Field(None, gt=0, description="Built-in BEC output voltage, if any.")
     telemetry: bool = Field(description="Whether the ESC reports telemetry to the autopilot.")

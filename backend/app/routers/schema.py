@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
+from app.defaults import DEFAULTS_NOTE
 from app.deps import current_user
 from app.schemas.design import DesignParameters
 from app.schemas.introspect import document_schema
@@ -22,3 +23,10 @@ def design_schema() -> dict[str, dict[str, Any]]:
 @router.get("/mission")
 def mission_schema() -> dict[str, dict[str, Any]]:
     return document_schema(Mission)
+
+
+@router.get("/notes")
+def schema_notes() -> dict[str, str]:
+    """Plain-language notes the UI shows beside the documents (for example that a new
+    project's numbers are starting values, not an analysed design)."""
+    return {"defaults": DEFAULTS_NOTE}

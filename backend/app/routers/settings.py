@@ -121,6 +121,7 @@ def build_response(merged: dict[str, Any], warnings: list[str] | None = None) ->
     flat_defaults = flatten({k: v for k, v in DEFAULT_SETTINGS.items() if k != "schema_version"})
     meta = {
         path: SettingsMeta(
+            label=SETTINGS_META.get(path, {}).get("label", path.rsplit(".", 1)[-1]),
             description=SETTINGS_META.get(path, {}).get("description", ""),
             source=SETTINGS_META.get(path, {}).get("source", ""),
             is_default=(flat_defaults.get(path) == value),

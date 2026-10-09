@@ -64,11 +64,14 @@ tests/             pytest; use a temp SQLite file per test session
 | `APP_OWNER_EMAIL` | no | `owner@example.com` | Display identity of the single user. |
 | `APP_DATA_DIR` | no | `./data` locally, `/data` in container | DB, files, backups live here. |
 | `DATABASE_URL` | no | `sqlite:///{APP_DATA_DIR}/app.db` | SQLAlchemy URL. |
-| `APP_ENV` | no | `development` | `production` enables Secure cookies and strict checks. |
+| `APP_ENV` | no | `development` | `production` enables Secure cookies, HSTS and the fail-loud startup checks; `test` is used by the test suite. |
 | `APP_BASE_URL` | no | none | Public URL, used for links in later phases. |
 | `ANTHROPIC_API_KEY` | no (Phase 3) | none | Claude API key, server only. |
 | `BACKUP_HOUR_UTC` | no | `3` | Hour of the daily backup. |
 | `BACKUP_KEEP` | no | `14` | Number of backups retained. |
+| `BACKUP_ENABLED` | no | `true` | Runs the startup catch-up backup and the daily scheduler; tests and the e2e suite set `false`. Manual backups still work. |
+| `APP_STATIC_DIR` | no | `/app/static` if present, else `../frontend/dist` | Directory with the built frontend. When neither exists the API still runs and `/` says the frontend is not built. |
+| `APP_VERSION` | no | package version | Overrides the reported version (for example a git SHA). |
 
 In production, startup fails loudly if `APP_SECRET_KEY` or a password is missing. Secret values (`APP_PASSWORD`, `APP_PASSWORD_HASH`, `APP_SECRET_KEY`, `ANTHROPIC_API_KEY`) are typed `pydantic.SecretStr` so they never appear in logs, tracebacks or `/api/system/info`. FastAPI `debug` is never enabled.
 
@@ -133,7 +136,7 @@ Categories and the spec fields the engine will need. Each category has a Pydanti
 | `telemetry` | `frequency_mhz`, `range_km_los`, `air_rate_kbps`, `interface` |
 | `carbon_tube` | `outer_diameter_mm`, `inner_diameter_mm`, `length_mm`, `layup` ("pultruded" or "roll_wrapped"), `mass_per_m_g`, `youngs_modulus_gpa` (nullable), `tensile_strength_mpa` (nullable) |
 
-All parts also carry `mass_g` and optional dimensions at the top level. Seed file `backend/seed/parts.example.json` contains a few clearly labelled example entries with `verified: false` and `source: "example placeholder, not verified"`. Phase 4 seeds real components. The loader (`python -m app.parts_catalog.load seed/parts.example.json`) upserts by `(category, manufacturer, model)` and is idempotent; the app does not auto-seed in production.
+All parts carry `mass_g` at the top level; dimensions live inside each category's spec (for example `length_mm`, `width_mm`, `height_mm` on batteries and servos) because they mean different things per category. Seed file `backend/seed/parts.example.json` contains a few clearly labelled example entries with `verified: false` and `source: "example placeholder, not verified"`. Phase 4 seeds real components. The loader (`python -m app.parts_catalog.load seed/parts.example.json`) upserts by `(category, manufacturer, model)` and is idempotent; the app does not auto-seed in production.
 
 ### Settings document (`app/schemas/settings.py`, defaults in `app/defaults.py`)
 
@@ -152,7 +155,7 @@ units: { system: "metric" }
 
 Invariants enforced by `PUT /api/settings` with plain-language 422 messages: `warn_mtow_kg <= design_mtow_kg <= legal_mtow_kg <= 25`; `usable_envelope_mm <= build_volume_mm` per axis and all positive; `0 < static_margin_min < static_margin_max`; `battery_reserve_fraction` and `battery_current_max_fraction_of_rating` in (0, 1); `hover_thrust_to_weight_min > 1`; `cruise_to_stall_speed_ratio_min >= 1`.
 
-The document carries `schema_version: 1`. Each threshold has a `description` and `source` string in the API response (from a static table in `defaults.py`) so the UI can show them. Sources are marked "proposed, confirm in Phase 3" where the brief asks for owner confirmation. `GET /api/settings` merges stored overrides over defaults; `PUT /api/settings` validates the full document and persists only the keys whose value differs from `DEFAULT_SETTINGS` (diff computed server-side), so improved defaults in later phases reach the owner unless they changed that value themselves. `meta` reports `is_default: bool` per dotted path.
+The document carries `schema_version: 1`. Each threshold has a `description` and `source` string in the API response (from a static table in `defaults.py`) so the UI can show them. Sources are marked "proposed, confirm in Phase 3" where the brief asks for owner confirmation. `GET /api/settings` merges stored overrides over defaults; `PUT /api/settings` validates the full document and persists only the keys whose value differs from `DEFAULT_SETTINGS` (diff computed server-side), so improved defaults in later phases reach the owner unless they changed that value themselves. `meta` reports `label`, `description`, `source` and `is_default` per dotted path; the UI renders labels from here and never derives them from keys.
 
 ### Authentication (`app/security.py`, `app/routers/auth.py`)
 
@@ -202,7 +205,7 @@ Parts
 - `POST /api/parts/{id}/listings`, `DELETE /api/parts/listings/{lid}`.
 
 Settings
-- `GET /api/settings` → `{settings: {...}, meta: {"<dotted.path>": {description, source, is_default}}, warnings: [...]}`. Stored overrides that no longer fit the current defaults (a retired key, or a value that now breaks an invariant) are dropped for that path and reported in `warnings` instead of failing the request, so the Settings page can always load.
+- `GET /api/settings` → `{settings: {...}, meta: {"<dotted.path>": {label, description, source, is_default}}, warnings: [...]}`. Stored overrides that no longer fit the current defaults (a retired key, or a value that now breaks an invariant) are dropped for that path and reported in `warnings` instead of failing the request, so the Settings page can always load.
 - `PUT /api/settings` body full settings document → same shape (only values that differ from the defaults are stored).
 
 System
@@ -214,6 +217,7 @@ System
 
 Schema (plain-language explanations served from one source of truth)
 - `GET /api/schema/design` and `GET /api/schema/mission` → `{"<dotted.path>": {label, unit, type, description, min?, max?, enum?: [{value, label, note?}]}}` generated from the Pydantic models' field metadata. The frontend renders labels, units and `Explain` text from these; nothing is hand-copied into TypeScript. For `layout`, the `rear_tilt` option carries the note "Less common in ArduPilot; support to be confirmed in Phase 2".
+- `GET /api/schema/notes` → `{defaults: "..."}`: the plain-language note that a new project's numbers are starting values, not an analysed design; the Inputs and Design tabs show it.
 
 Static SPA: Vite's hashed output is mounted with Starlette `StaticFiles` at `/assets`; a fixed allowlist of root files from `frontend/dist` (`favicon.svg`, `manifest.webmanifest`, `robots.txt`) is served by explicit routes; every other non-`/api` GET returns `FileResponse(static_dir / "index.html")` unconditionally, so client-side routing works and no filesystem path is ever derived from the URL. `/api/*` unknown paths return 404 JSON ahead of the catch-all. `frontend/dist` is copied into the image at `/app/static`.
 
@@ -319,7 +323,7 @@ Deployment is driven entirely from GitHub Actions so the owner never installs an
 - **No remote builder.** `deploy.yml` builds the image on the GitHub runner and deploys with `flyctl deploy --local-only --ha=false --app "$FLY_APP_NAME"`. `--ha=false` is mandatory: the default creates two machines, which with a volume mount means two SQLite databases. The `[mounts] initial_size` lets the first deploy create exactly one volume; there is no separate volume-create step (volume names are not unique, so a bare create is not idempotent).
 - **Steps in `deploy.yml`** (on push to `main` and on manual dispatch; `concurrency: deploy` so two runs cannot race the bootstrap): install `flyctl`; `flyctl apps create "$FLY_APP_NAME" --org personal` only if `flyctl apps list --json` does not already contain it, and on a name clash print a plain-language message telling the owner to set the `FLY_APP_NAME` repository variable to a unique name and re-run; stage secrets (`APP_SECRET_KEY`, `APP_PASSWORD`, and `ANTHROPIC_API_KEY` when set) with `flyctl secrets set --stage`, treating Fly's non-zero "No change detected" exit as success; `flyctl deploy --local-only --ha=false`; print the public URL `https://$FLY_APP_NAME.fly.dev`.
 - Required GitHub secrets: `FLY_API_TOKEN`, `APP_SECRET_KEY`, `APP_PASSWORD`. Optional: `ANTHROPIC_API_KEY` (staged only when the secret exists; nothing reads it until Phase 3). Repository variable: `FLY_APP_NAME` (falls back to `vtol-drone-designer`).
-- Hygiene: every action pinned to a release tag; top-level `permissions: contents: read`; secret values reach `flyctl` through `env:` and stdin (`flyctl secrets import --stage` reading `KEY=value` lines) rather than argv, so odd characters cannot break the shell. The Fly token is org-scoped because the workflow creates the app; `docs/DEPLOYMENT.md` says so plainly and tells the owner how to rotate it in the Fly dashboard.
+- Hygiene: every action pinned to a release tag; top-level `permissions: contents: read`; secret values are exposed to the step through `env:` and passed to `flyctl secrets set --stage` as individually quoted `KEY=VALUE` arguments (`"APP_PASSWORD=$APP_PASSWORD"`), never interpolated into the script text, so `#`, quotes, spaces and `=` reach Fly unchanged. The `secrets import` line format is deliberately not used: its dotenv-style parser strips quotes and cuts values at `#`. The Fly token is org-scoped because the workflow creates the app; `docs/DEPLOYMENT.md` says so plainly and tells the owner how to rotate it in the Fly dashboard.
 - `ci.yml` on pull requests and pushes: ruff, pytest, tsc, eslint, vite build, Playwright e2e, `docker build` (no push).
 
 Container: `python:3.12-slim-bookworm` runtime, `uv` for dependency install, `/data` volume, port 8080. The final image user is a non-root `app` user set with `USER app` (no gosu or su-exec entrypoint: Fly chowns the mount to the image's `USER`, and the volume root contains a root-owned `lost+found`, so the app must never chown `/data` recursively). The entrypoint runs `alembic upgrade head` then `uvicorn app.main:app --host 0.0.0.0 --port 8080 --proxy-headers --forwarded-allow-ips='*'` so the app sees the request scheme behind Fly's proxy; the login rate limiter keys on `Fly-Client-IP` in production (see Authentication). Leave a clearly commented place for the Phase 3 build stage that compiles AVL and XFOIL with `gfortran` so the layout does not change later.

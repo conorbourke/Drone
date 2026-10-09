@@ -119,6 +119,7 @@ class SettingsDocument(_Doc):
 
 
 class SettingsMeta(BaseModel):
+    label: str
     description: str
     source: str
     is_default: bool

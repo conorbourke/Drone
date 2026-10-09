@@ -114,84 +114,102 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 
 _PROPOSED = "proposed, confirm in Phase 3"
 
-# Plain-language description and source for every leaf of the settings document, keyed by
-# dotted path. Served by GET /api/settings as ``meta`` so the UI can explain each value.
+# Label, plain-language description and source for every leaf of the settings document,
+# keyed by dotted path. Served by GET /api/settings as ``meta`` so the UI never guesses a
+# label from a key (``static_margin_min`` is a minimum, not minutes).
 SETTINGS_META: dict[str, dict[str, str]] = {
     "printer.name": {
+        "label": "Printer",
         "description": "The 3D printer the print files are split for.",
         "source": "Build brief: Bambu Lab P2S.",
     },
     "printer.build_volume_mm.x": {
+        "label": "Build volume X",
         "description": "Printer build volume along X, in millimetres.",
         "source": "Bambu Lab P2S specification: 256 x 256 x 256 mm.",
     },
     "printer.build_volume_mm.y": {
+        "label": "Build volume Y",
         "description": "Printer build volume along Y, in millimetres.",
         "source": "Bambu Lab P2S specification: 256 x 256 x 256 mm.",
     },
     "printer.build_volume_mm.z": {
+        "label": "Build volume Z (height)",
         "description": "Printer build volume along Z (height), in millimetres.",
         "source": "Bambu Lab P2S specification: 256 x 256 x 256 mm.",
     },
     "printer.usable_envelope_mm.x": {
+        "label": "Usable envelope X",
         "description": "Largest part size along X that print files are split to, leaving a "
         "margin inside the build volume.",
         "source": "Build brief: usable envelope 240 x 240 x 240 mm by default.",
     },
     "printer.usable_envelope_mm.y": {
+        "label": "Usable envelope Y",
         "description": "Largest part size along Y that print files are split to.",
         "source": "Build brief: usable envelope 240 x 240 x 240 mm by default.",
     },
     "printer.usable_envelope_mm.z": {
+        "label": "Usable envelope Z (height)",
         "description": "Largest part height that print files are split to.",
         "source": "Build brief: usable envelope 240 x 240 x 240 mm by default.",
     },
     "limits.design_mtow_kg": {
+        "label": "Design take-off mass limit",
         "description": "Design limit for maximum take-off mass. A design above this fails the "
         "mass check. It is a check, not an input constraint: drafts can still be saved.",
         "source": "Build brief: 24 kg design limit, 1 kg under the legal limit.",
     },
     "limits.legal_mtow_kg": {
+        "label": "Legal take-off mass limit",
         "description": "Legal upper limit for a homebuilt drone in the EU Open category (A3).",
         "source": "EU Regulation 2019/947, Open category: below 25 kg.",
     },
     "limits.warn_mtow_kg": {
+        "label": "Warning take-off mass",
         "description": "Take-off mass at which the UI starts showing a warning banner.",
         "source": f"Phase 1 default (1 kg under the design limit); {_PROPOSED}.",
     },
     "checks.hover_thrust_to_weight_min": {
+        "label": "Minimum hover thrust-to-weight",
         "description": "Minimum ratio of total hover thrust to aircraft weight. 2.0 means the "
         "motors can lift twice the aircraft weight, so hover sits near half throttle with "
         "margin for gusts, descent control and a motor-out case.",
         "source": f"Common multirotor/VTOL design rule; {_PROPOSED}.",
     },
     "checks.static_margin_min": {
+        "label": "Minimum static margin",
         "description": "Lowest acceptable static margin, as a fraction of the mean aerodynamic "
         "chord. Below this the aircraft is close to unstable in pitch.",
         "source": f"Raymer, Aircraft Design: A Conceptual Approach; typical UAV 5-15 %; "
         f"{_PROPOSED}.",
     },
     "checks.static_margin_max": {
+        "label": "Maximum static margin",
         "description": "Highest acceptable static margin. Above this the aircraft is sluggish "
         "and carries extra trim drag.",
         "source": f"Raymer, Aircraft Design: A Conceptual Approach; {_PROPOSED}.",
     },
     "checks.cruise_to_stall_speed_ratio_min": {
+        "label": "Minimum cruise-to-stall speed ratio",
         "description": "Cruise speed must be at least this many times the stall speed. "
         "Stored the way the source states it (cruise / stall).",
         "source": f"Standard 1.3 x stall approach margin in aviation practice; {_PROPOSED}.",
     },
     "checks.battery_reserve_fraction": {
+        "label": "Battery reserve fraction",
         "description": "Fraction of battery energy kept in reserve and never planned for use.",
         "source": f"LiPo/Li-ion practice: do not discharge below about 20 %; {_PROPOSED}.",
     },
     "checks.battery_current_max_fraction_of_rating": {
+        "label": "Battery current, maximum fraction of rating",
         "description": "Peak current draw may be at most this fraction of the pack's "
         "continuous discharge rating (0.8 = 80 %).",
         "source": f"Keeps the pack inside its rating with headroom for ageing and cold; "
         f"{_PROPOSED}.",
     },
     "units.system": {
+        "label": "Unit system",
         "description": "Unit system used throughout the app. Only metric is supported.",
         "source": "Build brief: metric units throughout.",
     },

@@ -26,8 +26,9 @@ def test_get_settings_returns_defaults_with_meta(auth_client: TestClient) -> Non
     )
     assert paths == set(SETTINGS_META)
     for path, meta in body["meta"].items():
-        assert set(meta) == {"description", "source", "is_default"}
-        assert meta["description"] and meta["source"], path
+        assert set(meta) == {"label", "description", "source", "is_default"}
+        assert meta["label"] and meta["description"] and meta["source"], path
+        assert not meta["label"].endswith(" min"), path
         assert meta["is_default"] is True
     assert "proposed, confirm in Phase 3" in body["meta"]["checks.static_margin_min"]["source"]
 
