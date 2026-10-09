@@ -87,6 +87,17 @@ All tables have integer primary key `id`, `created_at`, `updated_at`. All dateti
 - `app_settings`: `owner_id` FK users (unique), `data` (JSON, full settings document, see Settings).
 - Reserved for later phases (do not create yet, but do not block): `images`, `analyses`, `flight_logs`, `calibrations`, `export_files`. Policy: rows in those tables that reference a version use `ON DELETE RESTRICT`, and `DELETE /api/versions/{vid}` returns 409 with a plain message when a version is still referenced, so flight logs and calibrations can never be orphaned silently.
 
+#### Tables added in Phases 5 to 7
+
+Full column lists and the reasons behind them are in the "As built" sections of `docs/phases/PHASE5.md` to `PHASE7.md`. The reserved name `export_files` became `exports`.
+
+- `exports` (migration `0005`, `kind` added by `0007`): one file-generation job and its manifest. `kind` is `"files"` (Phase 5: print, CAD, drawings, BOM, notes) or `"moulds"` (Phase 7: mould tiles, STEP halves, PDF sheets). Files under `{APP_DATA_DIR}/files/exports/{id}/`. `version_id` is `ON DELETE CASCADE`, an intended exception to the RESTRICT policy: exports can be made again from the version and never block deleting it.
+- `flight_logs` (`0006`): one uploaded ArduPilot DataFlash log and what the worker made of it (phases, statistics, chart series, comparison). File under `{APP_DATA_DIR}/files/logs/`. `version_id` (the version that flew) is RESTRICT.
+- `calibrations` (`0006`): one row per applied calibration factor of a project (hover power, cruise drag, battery usable energy, structural mass), with uncertainty and source logs; deleted on undo. `version_id` is RESTRICT.
+- `built_weights` (`0006`): one weighed component mass per project, next to the model's prediction.
+
+Calibrations and built weights are per project, not per version.
+
 JSON columns use SQLAlchemy `JSON` type. Design parameters and mission are validated by Pydantic on write; stored JSON always includes `schema_version` inside the document (there is no separate column). Upgrade policy: every schema change ships an upgrader step in `app/schemas/migrate.py` (`upgrade_parameters(doc)`, `upgrade_mission(doc)`, `upgrade_settings(doc)`); stored documents are upgraded on read and on restore and returned at the current schema version; stored rows are never rewritten in place; new fields must have defaults. Alembic `env.py` sets `render_as_batch=True` so later constraint changes work on SQLite.
 
 ### Design parameters and mission (`app/schemas/design.py`, `mission.py`, `app/defaults.py`)
@@ -218,6 +229,24 @@ System
 Schema (plain-language explanations served from one source of truth)
 - `GET /api/schema/design` and `GET /api/schema/mission` → `{"<dotted.path>": {label, unit, type, description, min?, max?, enum?: [{value, label, note?}]}}` generated from the Pydantic models' field metadata. The frontend renders labels, units and `Explain` text from these; nothing is hand-copied into TypeScript. For `layout`, the `rear_tilt` option carries the note "Less common in ArduPilot than front tilt. ArduPilot supports it through Q_TILT_MASK; check your setup in a simulator before flying." (text changed in Phase 2).
 - `GET /api/schema/notes` → `{defaults: "..."}`: the plain-language note that a new project's numbers are starting values, not an analysed design; the Inputs and Design tabs show it.
+
+Files (Phase 5; details in `docs/phases/PHASE5.md` section 6)
+- `POST /api/projects/{id}/exports` `{source}` → 202 job; `GET /api/projects/{id}/exports`; `GET`/`DELETE /api/exports/{eid}`.
+- `GET /api/exports/{eid}/files/{path}`, `GET /api/exports/{eid}/zip`, `GET /api/exports/{eid}/pieces/{piece_id}/mesh`.
+
+Flight data (Phase 6; details in `docs/phases/PHASE6.md` section 8)
+- `GET /api/flight-data/guide`.
+- `POST /api/projects/{id}/flight-logs?filename=…` (raw `.bin`/`.log` body, streamed, at most 200 MB; `.tlog` refused with 415) and `POST /api/projects/{id}/flight-logs/sample` → 202 job; `GET /api/projects/{id}/flight-logs`.
+- `GET`/`PATCH`/`DELETE /api/flight-logs/{lid}`, `GET /api/flight-logs/{lid}/series`, `POST /api/flight-logs/{lid}/reprocess`.
+- `GET`/`POST`/`DELETE /api/projects/{id}/calibration`, `GET /api/projects/{id}/calibration/preview`.
+- `GET`/`PUT /api/projects/{id}/built-weights`.
+
+Moulds and full scale (Phase 7; details in `docs/phases/PHASE7.md` section 4)
+- `POST /api/projects/{id}/moulds` `{source, parts?, min_draft_deg?, vent_channels?}` → 202 job; `GET /api/projects/{id}/moulds`; `GET`/`DELETE /api/moulds/{mid}`.
+- `GET /api/moulds/{mid}/files/{path}`, `GET /api/moulds/{mid}/zip`, `GET /api/moulds/{mid}/tiles/{tile_id}/mesh`.
+- `POST /api/projects/{id}/fullscale` `{source}` → full-scale checks (synchronous).
+
+Like the Phase 2 image upload, the flight-log upload has its own body limit (200 MB, only for a signed-in owner); every other `/api` route keeps the 1 MB limit.
 
 Static SPA: Vite's hashed output is mounted with Starlette `StaticFiles` at `/assets`; a fixed allowlist of root files from `frontend/dist` (`favicon.svg`, `manifest.webmanifest`, `robots.txt`) is served by explicit routes; every other non-`/api` GET returns `FileResponse(static_dir / "index.html")` unconditionally, so client-side routing works and no filesystem path is ever derived from the URL. `/api/*` unknown paths return 404 JSON ahead of the catch-all. `frontend/dist` is copied into the image at `/app/static`.
 

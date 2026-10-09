@@ -7,8 +7,8 @@ Everything runs on one small Fly.io machine. The owner never installs anything: 
 | Piece | Where | Notes |
 |---|---|---|
 | Web app (the pages you use) | Served by the API process from the same container | Built from `frontend/` |
-| API and engineering engine | One Fly.io machine in London (`lhr`), 1 GB RAM | Built from `backend/` |
-| Database, uploaded files, backups | A 3 GB persistent volume mounted at `/data` | SQLite file plus daily in-app backups |
+| API, engineering engine and CAD | One Fly.io machine in London (`lhr`), 2 GB RAM | Built from `backend/`. One background worker runs analyses, file exports, mould sets and flight-log reading one at a time |
+| Database, uploaded files, backups | A 3 GB persistent volume mounted at `/data` | SQLite file, daily in-app backups, reference images, generated files, moulds and flight logs (see Disk space) |
 | Disaster-recovery copies | Fly.io daily volume snapshots, 14 kept | Restored by Claude Code if ever needed |
 | Secrets (password, signing key, Claude API key) | Fly.io secrets, set from GitHub secrets | Never in the repository or the browser |
 
@@ -42,6 +42,30 @@ Two layers, with honest labels:
 1. **In-app backups (undo a mistake).** Every day at 03:00 UTC the app copies its database to `/data/backups/` and keeps the newest 14. If the machine was restarted and the newest backup is older than a day, it backs up at startup. *Settings → Backups* in the app lists them, lets you make one now, and downloads any of them to your laptop. That download is your off-site copy; keep one somewhere safe before big changes. These files live on the same volume as the database, so they do not protect against the volume itself failing.
 2. **Fly.io snapshots (disaster recovery).** Fly takes a daily snapshot of the whole volume and keeps 14. If the volume or its host ever fails, Claude Code restores it: either `fly volumes create data --snapshot-id <id>` followed by a redeploy, or copying your downloaded backup file into `/data` with `fly ssh sftp` and restarting. The Fly dashboard has no file upload or shell, so this is not something you need to do yourself; ask Claude Code.
 
+## Disk space on the volume
+
+Everything the app keeps lives on the 3 GB volume, and since Phases 5 to 7 the generated files take most of it:
+
+| What | Where on the volume | Typical size | Removed when |
+|---|---|---|---|
+| File exports (*Files* tab) | `/data/files/exports/<id>/` | 20 to 35 MB each | you delete the export, its version or its project |
+| Mould sets (*Full scale* tab) | `/data/files/exports/<id>/` | about 60 MB each (24 kg design, all three parts) | you delete the mould set, its version or its project |
+| Flight logs (*Flight data* tab) | `/data/files/logs/` | up to 200 MB each; the sample flight is 8.9 MB each time it is loaded | you delete the log or its project |
+| Database and in-app backups | `/data/app.db`, `/data/backups/` | small; 14 backups kept | automatically |
+
+Generating identical files or moulds again reuses the earlier ones instead of using more space. If the volume fills up, deleting old exports, mould sets and flight logs in the app frees the space; nothing else needs doing. If more room is needed, Claude Code can extend the volume (`fly volumes extend`), at about $0.15 per GB a month.
+
+The in-app backups copy the database only, not these files. Exports and moulds can always be generated again from the saved versions; flight logs cannot, so keep your own copy of every log you upload. Fly's daily volume snapshots do include all of them.
+
+## Memory and time limits of the background jobs
+
+- File exports and mould sets run the CAD tools in a separate process that is stopped if it uses more than 1500 MB (`EXPORT_MEMORY_LIMIT_MB`). Measured peaks: about 700 MB for a file export and about 880 MB for a mould set.
+- File exports are stopped after 10 minutes (`EXPORT_TIMEOUT_S`); they normally take a minute or two.
+- Mould sets are stopped after 30 minutes (`MOULD_TIMEOUT_S`). They take about 3 minutes on a fast desktop and several minutes on the shared Fly CPU, and other jobs wait behind them.
+- A deploy or restart while a job is running marks that job as interrupted; press *Generate files* or *Generate moulds* again, or *Compare again* for a flight log. Jobs that were still waiting are queued again on their own.
+
+These limits are environment variables with sensible defaults; there is nothing to set.
+
 ## Costs
 
 Fly.io pricing update effective 1 October 2026 (see `docs/DECISIONS.md` for sources):
@@ -52,7 +76,7 @@ Fly.io pricing update effective 1 October 2026 (see `docs/DECISIONS.md` for sour
 | 3 GB volume | $0.45 |
 | Snapshots and egress | pennies |
 
-About €7 a month with 1 GB of RAM (Phases 1 and 2). From Phase 3 the machine has 2 GB for the aerodynamics and CAD tools, about €13 a month. Claude API usage is billed separately by Anthropic.
+About €7 a month with 1 GB of RAM (Phases 1 and 2). From Phase 3 the machine has 2 GB for the aerodynamics and CAD tools (Phases 5 to 7 need it too), about €13 a month. Claude API usage is billed separately by Anthropic.
 
 ## Troubleshooting
 

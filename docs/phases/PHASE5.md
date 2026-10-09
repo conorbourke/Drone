@@ -34,3 +34,48 @@ Files tab: "Generate files" for the draft or a version, progress, then a grouped
 
 - pytest: CAD builds for all three layouts and four tail types; split pieces all fit the envelope; joints have keys and channels; no split within the root exclusion zone; STL watertight (trimesh); 3MF package valid; STEP re-imports; DXF opens with ezdxf; PDF has the expected pages; BOM totals equal the parts list totals.
 - Playwright `e2e/tests/phase5.spec.ts`: generate files for the default design, see every piece ticked as fitting, download the ZIP and the BOM.
+
+## 6. As built
+
+Built in commits `ec26663` (CAD library), `f746fc9` (export jobs and downloads) and `7684fff` (Files tab). These notes record the choices the contract left open and what does not yet match it.
+
+**CAD library** `backend/app/cad/` (entry point `generate_files` in `__init__.py`). The model agrees with the engine's geometry module to 0.2 mm. Everything is built part by part (one part's solids are meshed, written and released before the next) so memory stays bounded. Output layout under the export directory:
+
+```
+print/stl/<part>_<n>of<m>.stl     one binary STL per piece, in print orientation
+print/3mf/<part>.3mf              one 3MF per part (its pieces x copies, on plates)
+print/all_pieces.3mf              every printed piece on bed-sized plates
+cad/<part>.step, cad/assembly.step  STEP AP214, aircraft coordinates, mm
+drawings/drawings.pdf             dimensioned drawings, 4 A3 sheets
+drawings/dxf/*.dxf                flat plates for CNC-cut carbon
+bom.csv                           bill of materials with totals
+notes/<part>.md, notes/printing_notes.pdf
+manifest.json                     what was made: parts, pieces, checks, files, BOM totals
+```
+
+Measured locally: the default design makes 27 pieces (all fit 240 mm) in about 40 s with a peak of about 680 MB; a 3 m span prototype makes 36 pieces at about 710 MB. One export takes 20 to 35 MB of disk.
+
+**Export job** (`backend/app/exports.py`, `backend/app/export_child.py`).
+
+- Table `exports` (migration `0005`; `kind` added by `0007`, default `"files"`; mould sets of Phase 7 are rows with `kind = "moulds"`): owner, project (cascade), `version_id` (nullable; `ON DELETE CASCADE`, deliberately not the Phase 1 RESTRICT policy, because files can be made again from the version and must never block deleting it), `source`, `inputs` (snapshot), `inputs_hash`, `status` (queued, running, done, error), `progress`, `stage`, `error`, `manifest`, `files_dir`, `total_size_bytes`, `duration_s`, `peak_rss_mb`, `started_at`, `finished_at`, `reused_from_id`. Ids are never reused (they name directories).
+- Inputs are snapshotted when the export is queued: the source's parameters and mission, the owner's settings, the newest finished full analysis of the same source with the same parameters and mission (only its balance and structure blocks are used, for the CG and neutral point marks and the spar), the Phase 4 parts list (the BOM lists exactly those parts at their best listing; generic sizes with an empty catalogue) and the title-block text. `inputs_hash` covers everything except the title-block date.
+- Reuse: a queued or running export with the same hash for the same source is returned as is; a finished one whose files are all still on disk is returned, or hard-linked into a new export for another source, instead of running again.
+- The job runs on the single analysis worker, but the CAD work happens in a child process (`python -m app.export_child`): OpenCascade holds about 470 MB once loaded and only gives it back when the process ends. The child reports progress as JSON lines. The worker kills it after `EXPORT_TIMEOUT_S` (default 600 s) or when its resident memory passes `EXPORT_MEMORY_LIMIT_MB` (default 1500 MB on the 2 GB machine), and records its peak memory. CAD and envelope errors become a plain message on the row.
+- Files live in `{APP_DATA_DIR}/files/exports/{id}/` and are removed with the row, its version or its project; directories without a row are swept at startup, and exports left running by a restart become errors. Downloads are looked up in the stored manifest; no path is taken from the URL.
+
+**Endpoints** (router-level auth; `X-Requested-With: fetch` on state-changing calls):
+
+- `POST /api/projects/{id}/exports` `{source: "draft" | {version_id}}` → 202 list item (503 while the worker starts).
+- `GET /api/projects/{id}/exports` → list; `GET /api/exports/{eid}` → detail with manifest; `DELETE /api/exports/{eid}` → 204 (cancels a running one).
+- `GET /api/exports/{eid}/files/{path}` → one file; `GET /api/exports/{eid}/zip` → every file as one ZIP, streamed while it is written (3MF stored, the rest deflated); 410 when files have gone missing from disk.
+- `GET /api/exports/{eid}/pieces/{piece_id}/mesh` → indexed mesh of one piece in print orientation for the preview (decimated above 60,000 triangles).
+
+**Files tab** (`frontend/src/tabs/FilesTab.tsx`, helpers `frontend/src/lib/files.ts`, API `frontend/src/api/exports.ts`, preview `frontend/src/components/PiecePreview3D.tsx`, lazy-loaded three.js). Choose the draft or a version, *Generate files*, progress polled every 1.5 s (queue position while waiting), then: printed parts with piece count, a fit tick per piece against the envelope from settings, filament, mass and print time, and a 3D preview of the selected piece standing on the bed outline inside the envelope box; every file grouped (print, CAD, drawings, bill of materials, notes) with what it is and which free program opens it; *Download all (ZIP)*. A banner says when the draft has changed since the files were made. Earlier exports are listed underneath and can be shown again or deleted.
+
+**Tests**: `backend/tests/cad/` (CAD, split, joints, watertight STL, 3MF package, STEP re-import, DXF, PDF, BOM totals), `backend/tests/test_phase5_exports.py` (job, reuse, memory guard, downloads, ZIP, deletes), `e2e/tests/phase5.spec.ts`.
+
+**Known limits.**
+
+- Exports are kept until deleted. Each one uses 20 to 35 MB of the 3 GB volume; delete old ones on the Files tab if space runs short.
+- The Phase 1 RESTRICT policy does not apply to exports (see above): deleting a version deletes its files.
+- Only one job runs at a time on the worker, so an export waits behind any running analysis, flight log or mould set.
