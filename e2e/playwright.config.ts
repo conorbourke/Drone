@@ -25,6 +25,8 @@
  * contacted) instead of calling Claude with web search.
  * VALIDATION_ON_STARTUP=false keeps the validation suite from running at startup; the
  * Validation page then shows the committed snapshot (docs/validation/latest.json).
+ * EXPORT_FAKE_GENERATOR=tests.export_fakes:generate_files makes "Generate files" on the Files tab
+ * write a small, complete fake file set at once instead of running the CAD kernel (never in production).
  */
 import { defineConfig, devices } from '@playwright/test';
 import fs from 'node:fs';
@@ -130,6 +132,9 @@ export default defineConfig({
       CLAUDE_FAKE_CHAT_FILE,
       CLAUDE_FAKE_SUPPLIER_FILE,
       VALIDATION_ON_STARTUP: 'false',
+      // Phase 5: file exports use the fast fake generator (backend/tests/export_fakes.py) instead of
+      // the CAD kernel, so "Generate files" finishes in about a second.
+      EXPORT_FAKE_GENERATOR: 'tests.export_fakes:generate_files',
     },
   },
 });
