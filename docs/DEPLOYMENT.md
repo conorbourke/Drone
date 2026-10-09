@@ -52,7 +52,7 @@ Fly.io pricing update effective 1 October 2026 (see `docs/DECISIONS.md` for sour
 | 3 GB volume | $0.45 |
 | Snapshots and egress | pennies |
 
-About €7 a month for Phase 1. Phase 3 and Phase 5 will probably need 2 GB of RAM, about €13 a month. Claude API usage is billed separately by Anthropic.
+About €7 a month with 1 GB of RAM (Phases 1 and 2). From Phase 3 the machine has 2 GB for the aerodynamics and CAD tools, about €13 a month. Claude API usage is billed separately by Anthropic.
 
 ## Troubleshooting
 

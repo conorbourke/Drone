@@ -36,4 +36,4 @@ primary_region = "lhr"             # London: nearest region to Ireland. Single s
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"                   # raise to 2gb when Phase 3 (AVL/XFOIL) and Phase 5 (CadQuery) land
+  memory = "2gb"                   # AVL/XFOIL (Phase 3) and CadQuery (Phase 5) need the headroom
