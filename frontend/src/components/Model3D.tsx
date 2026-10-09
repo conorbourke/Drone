@@ -365,6 +365,9 @@ export default function Model3D({ geometry, parameters, schema, onEdit }: Model3
       controls.dispose();
       if (s.model) dispose(s.model);
       dispose(handles);
+      // Release the WebGL context now rather than when the browser gets round to it: browsers
+      // cap live contexts (about 16), and remounting the view would otherwise leak one each time.
+      renderer.forceContextLoss();
       renderer.dispose();
       renderer.domElement.remove();
       sceneRef.current = null;

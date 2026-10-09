@@ -147,6 +147,8 @@ SUMMARY_KEYS = (
     "cd_min",
     "cl_at_cd_min",
     "cm0",
+    # True when the alpha sweep ended before the section stalled: cl_max is a lower bound.
+    "cl_max_at_sweep_end",
 )
 
 

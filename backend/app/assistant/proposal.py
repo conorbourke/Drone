@@ -43,6 +43,8 @@ LAYOUT_ALIASES: dict[str, str] = {
 }
 
 DESIGN_META = document_schema(DesignParameters)
+# Rows at or above this confidence are selected by default in the review table.
+DEFAULT_SELECTION_CONFIDENCE = 0.5
 
 
 def normalise_layout(value: str) -> str | None:
@@ -81,6 +83,24 @@ def _set(doc: dict[str, Any], path: str, value: Any) -> None:
     for part in parts[:-1]:
         node = node.setdefault(part, {})
     node[parts[-1]] = value
+
+
+def _design_problems(
+    draft_parameters: dict[str, Any],
+    layout: str | None,
+    entries: dict[str, dict[str, Any]],
+) -> list[str]:
+    """The design-check messages for the draft with ``entries`` (and ``layout``) applied."""
+    merged = copy.deepcopy(draft_parameters)
+    for path, entry in entries.items():
+        _set(merged, path, entry["value"])
+    if layout is not None:
+        merged["layout"] = layout
+    try:
+        DesignParameters.model_validate(merged)
+    except ValidationError as exc:
+        return sorted({str(e["msg"]).removeprefix("Value error, ") for e in exc.errors()})
+    return []
 
 
 def build_proposal(
@@ -221,18 +241,32 @@ def build_proposal(
             "Rear motor position: the estimate was not behind the front motor, so it is left out."
         )
 
-    merged = copy.deepcopy(draft_parameters)
-    for path, entry in params.items():
-        _set(merged, path, entry["value"])
-    merged["layout"] = layout
-    try:
-        DesignParameters.model_validate(merged)
-    except ValidationError as exc:
-        messages = sorted({str(e["msg"]).removeprefix("Value error, ") for e in exc.errors()})
+    # Check what the owner is likely to apply: every value, and the subset the review table
+    # selects by default (confidence of 0.5 or more; see defaultSelection in
+    # frontend/src/tabs/inputs/ImageReading.tsx). A subset can break the cross-field rules
+    # even when the full set passes, e.g. a new tip chord with the current, narrower root.
+    problems_all = _design_problems(draft_parameters, layout, params)
+    if problems_all:
         warnings.append(
             "Applying every proposed value as it stands would not pass the design checks: "
-            + " ".join(messages)
+            + " ".join(problems_all)
         )
+    default_paths = {
+        path
+        for path, entry in params.items()
+        if entry["confidence"] >= DEFAULT_SELECTION_CONFIDENCE
+    }
+    if default_paths != set(params) or layout_confidence < DEFAULT_SELECTION_CONFIDENCE:
+        subset = {path: params[path] for path in default_paths}
+        subset_layout = layout if layout_confidence >= DEFAULT_SELECTION_CONFIDENCE else None
+        problems_default = _design_problems(draft_parameters, subset_layout, subset)
+        if problems_default and problems_default != problems_all:
+            warnings.append(
+                "Applying only the values selected by default (confidence 50 % or more) would "
+                "not pass the design checks: "
+                + " ".join(problems_default)
+                + " When you apply, the conflicting values are adjusted and listed."
+            )
 
     return {
         "layout": layout,

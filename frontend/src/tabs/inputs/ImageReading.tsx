@@ -24,6 +24,7 @@ import { Explain } from '../../components/Explain';
 import { StatusPill } from '../../components/StatusPill';
 import { useToast } from '../../components/Toast';
 import { getAtPath } from '../../lib/draft';
+import { mergeProposal } from '../../lib/proposal';
 import { LAYOUT_LABELS } from '../../engine';
 
 export const POLL_INTERVAL_MS = 2000;
@@ -131,6 +132,7 @@ export function ImageReadingCard({
   const [starting, setStarting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [appliedId, setAppliedId] = useState<number | null>(null);
+  const [applyNote, setApplyNote] = useState<{ blocked: string | null; adjustments: string[] } | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -215,6 +217,7 @@ export function ImageReadingCard({
       setReading(started);
       setNow(Date.now());
       setAppliedId(null);
+      setApplyNote(null);
     } catch (error) {
       if (isAuthError(error)) return;
       if (error instanceof ApiError && error.status === 503) {
@@ -231,13 +234,18 @@ export function ImageReadingCard({
 
   const apply = () => {
     if (!proposal) return;
-    let count = 0;
-    for (const row of rows) {
-      if (!selected.has(row.path)) continue;
-      update(`parameters.${row.path}`, row.proposed);
-      count += 1;
+    const selections = rows.filter((row) => selected.has(row.path)).map((row) => ({ path: row.path, value: row.proposed }));
+    // The selected values with the rest of the draft must still pass the server's checks, or
+    // every autosave after this would be refused.
+    const merge = mergeProposal(doc.parameters, selections, schema);
+    if (merge.blocked) {
+      setApplyNote({ blocked: merge.blocked, adjustments: [] });
+      return;
     }
+    for (const [path, value] of merge.updates) update(`parameters.${path}`, value);
+    setApplyNote(merge.adjustments.length > 0 ? { blocked: null, adjustments: merge.adjustments } : null);
     setAppliedId(reading?.id ?? null);
+    const count = selections.length;
     toast.success(count === 0 ? 'Nothing selected to apply.' : `Applied ${count} ${count === 1 ? 'value' : 'values'} to the draft.`);
   };
 
@@ -456,6 +464,23 @@ export function ImageReadingCard({
               <span className="small muted">Values you do not select keep their current setting.</span>
             )}
           </div>
+          {applyNote?.blocked ? (
+            <p className="banner banner-warn small" role="alert" data-testid="proposal-blocked">
+              {applyNote.blocked}
+            </p>
+          ) : null}
+          {applyNote && !applyNote.blocked && applyNote.adjustments.length > 0 && appliedId === reading?.id ? (
+            <div className="banner banner-warn small" role="status" data-testid="proposal-adjusted">
+              <div>
+                <div className="banner-title">Adjusted so the design stays valid</div>
+                <ul>
+                  {applyNote.adjustments.map((a, i) => (
+                    <li key={i}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>

@@ -577,3 +577,31 @@ def test_running_readings_are_closed_at_startup(
     assert mark_interrupted_readings(app.state.session_factory) == 1
     stored = auth_client.get(f"/api/image-readings/{rid}").json()
     assert stored["status"] == "error" and stored["error"] == INTERRUPTED_MESSAGE
+
+
+def test_default_selected_subset_is_checked(fake_answer: dict) -> None:
+    """Every value together passes, but the rows selected by default (confidence >= 0.5)
+    leave out the fuselage length, so the new wing position and root chord would run past
+    the end of the current, shorter fuselage. The proposal says so."""
+    payload = copy.deepcopy(fake_answer)
+    payload["fuselage_length_to_span"]["confidence"] = 0.4  # 960 mm, not selected by default
+    draft = copy.deepcopy(DEFAULT_DESIGN_PARAMETERS)
+    draft["fuselage"]["length_mm"] = 500
+    draft["wing"]["x_le_mm"] = 100
+    proposal = build_proposal(_answer(payload), "wing.span_mm", 2000, draft)
+    p = proposal["parameters"]
+    assert p["fuselage.length_mm"]["value"] == 960
+    assert p["wing.x_le_mm"]["value"] + p["wing.root_chord_mm"]["value"] == 586  # > 500
+    warnings = proposal["warnings"]
+    assert not any(w.startswith("Applying every proposed value") for w in warnings)
+    subset = [w for w in warnings if w.startswith("Applying only the values selected by default")]
+    assert len(subset) == 1
+    assert "extend past the end of the fuselage" in subset[0]
+    assert "adjusted" in subset[0]
+
+
+def test_consistent_default_subset_adds_no_warning(fake_answer: dict) -> None:
+    proposal = build_proposal(
+        _answer(fake_answer), "wing.span_mm", 2000, copy.deepcopy(DEFAULT_DESIGN_PARAMETERS)
+    )
+    assert not any("design checks" in w for w in proposal["warnings"])

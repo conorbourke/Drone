@@ -568,7 +568,7 @@ export function solveMass(ctx: MassContext): MassSolution {
       unit: 'kg',
       label: 'Take-off mass (heaviest camera)',
       explain: 'Total weight ready to fly with the heaviest camera. It sets the stall speed, the hover power and whether you stay under the 25 kg legal limit.',
-      source: `Component build-up iterated to convergence (${iterations} passes); range: structure uncertainties added linearly, other items root-sum-square.`,
+      source: `${converged ? `Component build-up iterated to convergence (${iterations} passes)` : `Component build-up did NOT converge in ${iterations} ${iterations === 1 ? 'pass' : 'passes'} (mass or balance point still changing); this is the last pass, not a settled value`}; range: structure uncertainties added linearly, other items root-sum-square.`,
     }),
     takeoff_min_payload: mk(kg(totalMin), kg(sigma), {
       unit: 'kg',

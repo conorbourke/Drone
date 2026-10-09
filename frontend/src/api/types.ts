@@ -223,6 +223,11 @@ export interface AirfoilPolarSummary {
   cd_min: number;
   cl_at_cd_min: number;
   cm0: number;
+  /**
+   * True when the XFOIL alpha sweep ended before the section stalled, so cl_max is a lower
+   * bound (the real maximum may be higher).
+   */
+  cl_max_at_sweep_end?: boolean;
 }
 
 /** Row of GET /api/airfoils (what the Tier 1 engine needs). */

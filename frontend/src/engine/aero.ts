@@ -29,6 +29,7 @@ import {
   MOTOR_CAN_HEIGHT_RATIO,
   OSWALD_MAX,
   OSWALD_MIN,
+  SECTION_CL_ALPHA_MAX,
   PROP_AZIMUTH_AVERAGE,
   PROP_BLADE_RADIUS_FRACTION,
   PROP_BLADE_THICKNESS_RATIO,
@@ -42,7 +43,7 @@ import { degToRad } from './units';
 
 // ---------- Airfoil data ----------
 
-export type PolarPoint = Omit<AirfoilPolarSummary, 're'>;
+export type PolarPoint = Omit<AirfoilPolarSummary, 're' | 'cl_max_at_sweep_end'>;
 
 export interface PolarLookup {
   polar: PolarPoint;
@@ -50,6 +51,11 @@ export interface PolarLookup {
   quality: 'table' | 'clamped' | 'generic';
   reMin: number;
   reMax: number;
+  /**
+   * True when a table row used for this lookup had its cl_max at the end of the XFOIL alpha
+   * sweep: cl_max is then a lower bound.
+   */
+  clMaxLowerBound: boolean;
 }
 
 const POLAR_KEYS: (keyof PolarPoint)[] = [
@@ -69,7 +75,7 @@ export function interpolatePolar(summary: AirfoilSummary | undefined, re: number
     .slice()
     .sort((a, b) => a.re - b.re);
   if (rows.length === 0 || !Number.isFinite(re) || re <= 0) {
-    return { polar: use === 'tail' ? { ...GENERIC_TAIL_POLAR } : { ...GENERIC_POLAR }, quality: 'generic', reMin: NaN, reMax: NaN };
+    return { polar: use === 'tail' ? { ...GENERIC_TAIL_POLAR } : { ...GENERIC_POLAR }, quality: 'generic', reMin: NaN, reMax: NaN, clMaxLowerBound: false };
   }
   const reMin = rows[0].re;
   const reMax = rows[rows.length - 1].re;
@@ -78,8 +84,12 @@ export function interpolatePolar(summary: AirfoilSummary | undefined, re: number
     for (const k of POLAR_KEYS) out[k] = r[k];
     return out;
   };
-  if (re <= reMin) return { polar: pick(rows[0]), quality: re < reMin * 0.98 ? 'clamped' : 'table', reMin, reMax };
-  if (re >= reMax) return { polar: pick(rows[rows.length - 1]), quality: re > reMax * 1.02 ? 'clamped' : 'table', reMin, reMax };
+  const atEnd = (r: AirfoilPolarSummary) => r.cl_max_at_sweep_end === true;
+  if (re <= reMin) return { polar: pick(rows[0]), quality: re < reMin * 0.98 ? 'clamped' : 'table', reMin, reMax, clMaxLowerBound: atEnd(rows[0]) };
+  if (re >= reMax) {
+    const last = rows[rows.length - 1];
+    return { polar: pick(last), quality: re > reMax * 1.02 ? 'clamped' : 'table', reMin, reMax, clMaxLowerBound: atEnd(last) };
+  }
   let i = 0;
   while (i < rows.length - 2 && rows[i + 1].re < re) i++;
   const a = rows[i];
@@ -87,7 +97,8 @@ export function interpolatePolar(summary: AirfoilSummary | undefined, re: number
   const t = (Math.log(re) - Math.log(a.re)) / (Math.log(b.re) - Math.log(a.re));
   const out = {} as PolarPoint;
   for (const k of POLAR_KEYS) out[k] = a[k] + t * (b[k] - a[k]);
-  return { polar: out, quality: 'table', reMin, reMax };
+  // An interpolated cl_max is a lower bound if either neighbour's is.
+  return { polar: out, quality: 'table', reMin, reMax, clMaxLowerBound: atEnd(a) || atEnd(b) };
 }
 
 // ---------- Lift ----------
@@ -98,11 +109,16 @@ export function interpolatePolar(summary: AirfoilSummary | undefined, re: number
  *   CLa = 2 pi A / (2 + sqrt(4 + (A beta / eta)^2 (1 + tan^2(L_t) / beta^2))) x F (S_exp / S_ref)
  * with eta = cla / (2 pi / beta), beta^2 = 1 - M^2, L_t the sweep of the maximum-thickness line.
  * `bodyFactor` is F S_exp / S_ref (pass 1 for a tail); Raymer: if it exceeds 1, use 0.98.
+ *
+ * The section slope is capped at 2 pi (thin-airfoil theory). At Re 60k-200k the XFOIL fit can
+ * exceed it (e.g. SD7037 8.57/rad at 60k) because a laminar separation bubble distorts the lift
+ * curve inside the fit range; that is not a real whole-wing slope (see SECTION_CL_ALPHA_MAX).
  */
 export function liftCurveSlope(ar: number, sweepMaxThicknessRad: number, sectionClAlpha: number, machNo: number, bodyFactor = 1): number {
   const beta2 = Math.max(1e-4, 1 - machNo * machNo);
   const beta = Math.sqrt(beta2);
-  const eta = sectionClAlpha / ((2 * Math.PI) / beta);
+  const cla = Math.min(sectionClAlpha, SECTION_CL_ALPHA_MAX);
+  const eta = cla / ((2 * Math.PI) / beta);
   const tanL = Math.tan(sweepMaxThicknessRad);
   const root = Math.sqrt(4 + ((ar * ar * beta2) / (eta * eta)) * (1 + (tanL * tanL) / beta2));
   const factor = bodyFactor > 1 ? FUSELAGE_LIFT_CAP : bodyFactor;

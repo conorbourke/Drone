@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { defaultInput, finalScaleInput } from './__fixtures__/designs';
+import { setAtPath } from '../lib/draft';
+import type { DesignParameters } from '../api/types';
 import { compareLayouts } from './compare';
+import { estimate } from './estimate';
 
 describe('compareLayouts', () => {
   it('returns the three layouts, with the pusher variant heavier and the tilt variants flagged', () => {
@@ -31,6 +34,28 @@ describe('compareLayouts', () => {
     expect(c[1].adjustments.join(' ')).toMatch(/Tilt axis moved to the rear motors/);
     expect(c[2].adjustments.join(' ')).toMatch(/Battery moved/);
     expect(c[2].problems.some((s) => s.key === 'check.static_margin_max_payload')).toBe(false);
+  });
+
+  it('"Use this layout" changes give exactly the design the card describes', () => {
+    const input = defaultInput();
+    const c = compareLayouts(input);
+    expect(c[0].changes).toEqual([['layout', 'front_tilt']]);
+    for (const card of c.slice(1)) {
+      expect(card.changes[0]).toEqual(['layout', card.layout]);
+      const applied = card.changes.reduce<DesignParameters>((p, [path, value]) => setAtPath(p, path, value), input.parameters);
+      const e = estimate({ ...input, parameters: applied });
+      expect(e.mass!.takeoff_max_payload.value).toBeCloseTo(card.takeoff_mass.value, 9);
+      expect(e.performance!.endurance_cruise.value).toBeCloseTo(card.endurance.value, 9);
+      expect(e.statuses.filter((s) => s.level === 'fail' || s.level === 'warn').map((s) => s.key)).toEqual(card.problems.map((s) => s.key));
+    }
+    // Quad + pusher: the battery move is part of the change, and it keeps the design stable.
+    const pusher = c[2];
+    const battery = pusher.changes.find(([path]) => path === 'battery.x_mm');
+    expect(battery?.[1]).toBe(pusher.battery_x_mm);
+    const applied = pusher.changes.reduce<DesignParameters>((p, [path, value]) => setAtPath(p, path, value), input.parameters);
+    expect(estimate({ ...input, parameters: applied }).balance!.static_margin_max_payload.value).toBeGreaterThan(0);
+    // Rear tilt carries its tilt-axis move.
+    expect(c[1].changes.some(([path]) => path === 'tilt.axis_x_mm')).toBe(true);
   });
 
   it('works at the 24 kg final scale', () => {

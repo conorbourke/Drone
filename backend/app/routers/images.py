@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+from collections import defaultdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -30,6 +32,30 @@ log = logging.getLogger("app.images")
 router = APIRouter(prefix="/api", tags=["images"], dependencies=[Depends(current_user)])
 
 FILE_CACHE_CONTROL = "private, max-age=3600"
+
+# The 6-image limit is a count followed by an insert. Parallel uploads to one project would
+# all see the same count, so each project's count + insert + commit runs under its own lock.
+# The server is a single process (one uvicorn worker, see docs/ARCHITECTURE.md), so an
+# in-process lock is enough. Locks are never removed; one per project is a few hundred bytes.
+_upload_locks: defaultdict[int, threading.Lock] = defaultdict(threading.Lock)
+_upload_locks_guard = threading.Lock()
+
+
+def _project_upload_lock(project_id: int) -> threading.Lock:
+    with _upload_locks_guard:
+        return _upload_locks[project_id]
+
+
+def _limit_reached() -> HTTPException:
+    return HTTPException(
+        status.HTTP_409_CONFLICT,
+        detail=f"A project can hold at most {MAX_IMAGES_PER_PROJECT} images. "
+        "Delete one before adding another.",
+    )
+
+
+def _image_count(db: Session, project_id: int) -> int:
+    return db.scalar(select(func.count(Image.id)).where(Image.project_id == project_id)) or 0
 
 
 def image_out(image: Image) -> ImageOut:
@@ -66,13 +92,9 @@ def upload_image(
     view: Annotated[ImageView, Form(description="Which view of the aircraft it shows.")] = "other",
 ) -> ImageOut:
     project = owned_project(db, user, project_id)
-    count = db.scalar(select(func.count(Image.id)).where(Image.project_id == project.id)) or 0
-    if count >= MAX_IMAGES_PER_PROJECT:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            detail=f"A project can hold at most {MAX_IMAGES_PER_PROJECT} images. "
-            "Delete one before adding another.",
-        )
+    # Early refusal, before the body is read and decoded; checked again under the lock.
+    if _image_count(db, project.id) >= MAX_IMAGES_PER_PROJECT:
+        raise _limit_reached()
     data = file.file.read(MAX_IMAGE_BYTES + 1)
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(
@@ -83,28 +105,33 @@ def upload_image(
         processed = process_upload(data)
     except ImageRejected as exc:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail=str(exc)) from None
+    del data
 
-    storage_name = new_storage_name(processed.extension)
-    path = stored_path(settings.images_dir, project.id, storage_name)
-    write_atomically(path, processed.data)
-    image = Image(
-        owner_id=user.id,
-        project_id=project.id,
-        filename=sanitise_filename(file.filename),
-        content_type=processed.content_type,
-        size_bytes=len(processed.data),
-        width_px=processed.width_px,
-        height_px=processed.height_px,
-        view=view,
-        storage_name=storage_name,
-    )
-    db.add(image)
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        path.unlink(missing_ok=True)
-        raise
+    with _project_upload_lock(project.id):
+        db.rollback()  # end the read transaction so the count below sees committed uploads
+        if _image_count(db, project.id) >= MAX_IMAGES_PER_PROJECT:
+            raise _limit_reached()
+        storage_name = new_storage_name(processed.extension)
+        path = stored_path(settings.images_dir, project.id, storage_name)
+        write_atomically(path, processed.data)
+        image = Image(
+            owner_id=user.id,
+            project_id=project.id,
+            filename=sanitise_filename(file.filename),
+            content_type=processed.content_type,
+            size_bytes=len(processed.data),
+            width_px=processed.width_px,
+            height_px=processed.height_px,
+            view=view,
+            storage_name=storage_name,
+        )
+        db.add(image)
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            path.unlink(missing_ok=True)
+            raise
     return image_out(image)
 
 

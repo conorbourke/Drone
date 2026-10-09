@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from starlette.datastructures import MutableHeaders
+from starlette.requests import cookie_parser
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app import __version__
@@ -28,7 +29,7 @@ from app.deps import current_user
 from app.models import User
 from app.routers import airfoils, auth, images, parts, projects, readings, schema, system, versions
 from app.routers import settings as settings_router
-from app.security import AuthState
+from app.security import SESSION_COOKIE, AuthState
 
 log = logging.getLogger("app")
 
@@ -76,6 +77,22 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_headers)
 
 
+def _has_valid_session(scope: Scope, headers: dict[bytes, bytes]) -> bool:
+    """True when the request carries a session cookie that the app's signer accepts, with
+    the current password fingerprint (the same checks as ``deps.current_user``, short of
+    loading the user row)."""
+    raw = headers.get(b"cookie")
+    app = scope.get("app")
+    auth: AuthState | None = getattr(getattr(app, "state", None), "auth", None)
+    if not raw or auth is None:
+        return False
+    token = cookie_parser(raw.decode("latin-1")).get(SESSION_COOKIE)
+    if not token:
+        return False
+    data = auth.signer.load(token)
+    return data is not None and data.get("pw") == auth.fingerprint
+
+
 class ApiBodyLimitMiddleware:
     """Refuses oversized /api request bodies before they are read into memory."""
 
@@ -89,10 +106,14 @@ class ApiBodyLimitMiddleware:
         self.limit = limit
         self.upload_limit = upload_limit
 
-    def _limit_for(self, scope: Scope) -> tuple[int, str]:
-        """The image upload route (POST only) gets its own larger limit; nothing else does."""
-        if scope.get("method", "GET").upper() == "POST" and UPLOAD_ROUTE.match(
-            scope.get("path", "")
+    def _limit_for(self, scope: Scope, headers: dict[bytes, bytes]) -> tuple[int, str]:
+        """The image upload route (POST only) gets its own larger limit, and only for a
+        signed-in owner; nothing else does. Anonymous clients get the normal limit there
+        too, so they cannot make the server receive 15 MB bodies before the 401."""
+        if (
+            scope.get("method", "GET").upper() == "POST"
+            and UPLOAD_ROUTE.match(scope.get("path", ""))
+            and _has_valid_session(scope, headers)
         ):
             return self.upload_limit, f"{self.upload_limit // (1024 * 1024)} MB"
         return self.limit, f"{self.limit // 1000} kB"
@@ -102,7 +123,7 @@ class ApiBodyLimitMiddleware:
             headers = {k: v for k, v in scope["headers"]}
             length = headers.get(b"content-length")
             if length is not None:
-                limit, label = self._limit_for(scope)
+                limit, label = self._limit_for(scope, headers)
                 try:
                     declared = int(length)
                 except ValueError:

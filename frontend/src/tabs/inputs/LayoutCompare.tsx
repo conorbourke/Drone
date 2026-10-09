@@ -1,7 +1,8 @@
 /**
  * The current design re-estimated for each of the three supported layouts, side by side:
  * take-off mass, endurance range, hover and cruise power, complexity with reasons, the
- * ArduPilot note and the adjustments made to compare fairly, with "Use this layout".
+ * ArduPilot note and the adjustments made to compare fairly, with "Use this layout" (which
+ * applies the layout and those adjustments, so the design matches the card's numbers).
  */
 import { useMemo } from 'react';
 import type { DraftDocument, Settings } from '../../api/types';
@@ -36,7 +37,8 @@ export function LayoutCompare({
       </div>
       <p className="card-note">
         Your current design re-estimated with each layout ArduPilot can fly. Battery position and tilt axis are adjusted
-        so each comparison is fair; the adjustments are listed and are not applied to your design.
+        so each comparison is fair and the balance point stays where it is now. The numbers on each card are for the
+        adjusted design, and &ldquo;Use this layout&rdquo; applies the layout together with its listed adjustments.
       </p>
       {!results ? (
         <div className="skeleton" aria-busy="true" aria-label="Loading" />
@@ -81,7 +83,7 @@ export function LayoutCompare({
                 </p>
                 {r.adjustments.length > 0 ? (
                   <details className="small">
-                    <summary>Adjusted to compare ({r.adjustments.length})</summary>
+                    <summary>Adjustments applied with this layout ({r.adjustments.length})</summary>
                     <ul>
                       {r.adjustments.map((a, i) => (
                         <li key={i}>{a}</li>
@@ -108,10 +110,17 @@ export function LayoutCompare({
                   className={`button button-sm${isCurrent ? '' : ' button-primary'}`}
                   data-testid={`layout-use-${r.layout}`}
                   disabled={isCurrent}
-                  onClick={() => update('parameters.layout', r.layout)}
+                  onClick={() => {
+                    for (const [path, value] of r.changes) update(`parameters.${path}`, value);
+                  }}
                 >
                   {isCurrent ? 'In use' : 'Use this layout'}
                 </button>
+                {!isCurrent && r.adjustments.length > 0 ? (
+                  <p className="small muted layout-use-note">
+                    Also applies: {r.adjustments.join(' ')}
+                  </p>
+                ) : null}
               </article>
             );
           })}

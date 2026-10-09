@@ -347,6 +347,12 @@ export interface LayoutComparison {
   ardupilot_note: string;
   /** What was changed to compare fairly (battery moved to keep the balance point, tilt axis moved). */
   adjustments: string[];
+  /**
+   * The parameter changes behind this card's numbers, as [dotted path without "parameters.",
+   * value]: the layout first, then any tilt axis and battery position. "Use this layout"
+   * applies all of them, so the design matches what the card shows.
+   */
+  changes: [string, unknown][];
   /** Battery centre used for this layout, mm from the nose. */
   battery_x_mm: number;
   /** Checks that are warn or fail for this layout. */

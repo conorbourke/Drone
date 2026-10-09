@@ -118,3 +118,31 @@ describe('airfoil polar interpolation', () => {
     expect(interpolatePolar(NACA0009_TEST, 100000, 'tail').polar.cl_alpha_per_rad).toBe(5.6);
   });
 });
+
+describe('section lift-curve slope cap (laminar-bubble XFOIL fits)', () => {
+  it('slopes above 2 pi are treated as 2 pi; lower slopes are used as given', () => {
+    // SD7037 at Re 60k: the XFOIL fit gives 8.57 /rad.
+    expect(liftCurveSlope(8, 0, 8.57, 0)).toBeCloseTo(liftCurveSlope(8, 0, 2 * Math.PI, 0), 12);
+    expect(liftCurveSlope(8, 0, 8.57, 0.05, 0.95)).toBeCloseTo(liftCurveSlope(8, 0, 2 * Math.PI, 0.05, 0.95), 12);
+    expect(liftCurveSlope(8, 0, 6.0, 0)).toBeLessThan(liftCurveSlope(8, 0, 2 * Math.PI, 0));
+  });
+});
+
+describe('cl_max at the end of the XFOIL sweep', () => {
+  const flagged = (flags: boolean[]) => ({
+    ...SD7037_TEST,
+    polar_summary: SD7037_TEST.polar_summary.map((r, i) => ({ ...r, cl_max_at_sweep_end: flags[i] ?? false })),
+  });
+
+  it('marks the lookup as a lower bound when a row used for it is flagged', () => {
+    // Rows: 60k, 100k, 200k, 400k, ...; flag only 100k.
+    const one = flagged([false, true]);
+    expect(interpolatePolar(one, 80_000, 'wing').clMaxLowerBound).toBe(true);
+    expect(interpolatePolar(one, 150_000, 'wing').clMaxLowerBound).toBe(true);
+    expect(interpolatePolar(one, 300_000, 'wing').clMaxLowerBound).toBe(false);
+    expect(interpolatePolar(one, 100_000, 'wing').clMaxLowerBound).toBe(true);
+    expect(interpolatePolar(flagged([true]), 10_000, 'wing').clMaxLowerBound).toBe(true);
+    expect(interpolatePolar(SD7037_TEST, 150_000, 'wing').clMaxLowerBound).toBe(false);
+    expect(interpolatePolar(undefined, 150_000, 'wing').clMaxLowerBound).toBe(false);
+  });
+});

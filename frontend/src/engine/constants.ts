@@ -373,6 +373,23 @@ export const UNCERTAINTY = {
   lift_slope: 0.08,
 };
 
+/**
+ * Upper limit on the section lift-curve slope fed to Helmbold, per radian: 2 pi, thin-airfoil
+ * theory (Anderson, Fundamentals of Aerodynamics ch. 4). Between Re 60k and 200k the XFOIL fit
+ * over -2..6 degrees can exceed it (SD7037 gives 8.57/rad at 60k) because a laminar separation
+ * bubble shifts the lift curve over part of the fit range. That is a local kink, not a steeper
+ * whole-wing slope, and putting it into Helmbold would move the neutral point aft.
+ */
+export const SECTION_CL_ALPHA_MAX = 2 * Math.PI;
+
+/**
+ * When an XFOIL alpha sweep ended before the section stalled, its cl_max is a lower bound. The
+ * true value may be this much higher (relative); used only to widen the low side of the
+ * stall-speed range (and the high side of CL_max). ESTIMATE: sweeps that stop at the end of the
+ * table usually sit within 0.1-0.2 of the real peak.
+ */
+export const CL_MAX_SWEEP_END_EXTRA = 0.15;
+
 // ---------- Check thresholds not in settings ----------
 
 /** Tail volume coefficient guidance. Source: [Raymer] table 6.4 (homebuilt c_HT 0.50, c_VT 0.04; sailplane 0.50 / 0.02). */

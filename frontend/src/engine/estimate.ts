@@ -19,6 +19,7 @@ import { SEA_LEVEL, mach, reynolds } from './atmosphere';
 import { buildChecks, sortStatuses, validateInput } from './checks';
 import {
   AVIONICS_POWER_W,
+  CL_MAX_SWEEP_END_EXTRA,
   ETA_PROP_CRUISE_PUSHER,
   ETA_PROP_CRUISE_TILT,
   FIGURE_OF_MERIT_HOVER,
@@ -30,7 +31,7 @@ import {
 import { buildGeometry, withDefaults } from './geometry';
 import { solveMass } from './mass';
 import { performanceWithRanges, type PerfInputs } from './performance';
-import { qAbs, qExact, qRel, rss, rssPowers } from './quantity';
+import { qAbs, qExact, qRange, qRel, rss, rssPowers } from './quantity';
 import type { AeroResult, BalanceResult, EngineInput, Estimates, PerformanceResult, Status } from './types';
 import { degToRad } from './units';
 
@@ -110,6 +111,13 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
   const clMax = wingClMax(stallPolar.polar.cl_max, sweepQ);
   const vs = stallSpeed(W, atm.rho, S, clMax);
   const vsRel = rssPowers([[0.5, massRel], [0.5, UNCERTAINTY.cl_max]]);
+  // An XFOIL sweep that ended before the stall gives a cl_max that is only a lower bound: the
+  // real CL_max may be higher, so the stall speed may be lower. Widen only that side.
+  const clMaxLowerBound = stallPolar.clMaxLowerBound;
+  const clMaxRelHigh = clMaxLowerBound ? UNCERTAINTY.cl_max + CL_MAX_SWEEP_END_EXTRA : UNCERTAINTY.cl_max;
+  const vsRelLow = rssPowers([[0.5, massRel], [0.5, clMaxRelHigh]]);
+  const vsLow = vs * (1 - vsRelLow);
+  const vsHigh = vs * (1 + vsRel);
 
   // ----- Drag -----
   const drag = parasiteDrag({ p, g, atm, speed: V, scale, liftMotorMassG: ms.liftMotorMassG });
@@ -153,10 +161,10 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
     reynolds_cruise: qExact(reCruise, { unit: '', label: 'Reynolds number (cruise)', explain: 'A measure of how "big and fast" the wing is to the air. Small, slow wings (below about 200,000) suffer more drag and stall earlier, so the airfoil choice matters more.', source: 'ρ V c̄ / μ, sea-level ISA, on the mean aerodynamic chord.' }),
     reynolds_stall: qExact(reStall, { unit: '', label: 'Reynolds number (stall)', explain: 'The Reynolds number near the stall speed, used to look up the airfoil’s maximum lift.', source: 'ρ V_stall c̄ / μ, sea-level ISA.' }),
     lift_curve_slope: qRel(aw, UNCERTAINTY.lift_slope, { unit: '/rad', label: 'Wing lift-curve slope', explain: 'How quickly the wing’s lift grows as its angle to the air increases. It feeds the stability (neutral point) calculation.', source: 'Helmbold/DATCOM formula with sweep and fuselage factor (Raymer ch. 12.4; Anderson), section slope from the XFOIL polar.' }),
-    cl_max: qRel(clMax, UNCERTAINTY.cl_max, { unit: '', label: 'Wing maximum lift coefficient', explain: 'The most lift the wing can make before it stalls, as a coefficient. It sets the stall speed.', source: '0.9 x section cl_max x cos(quarter-chord sweep) (Raymer ch. 12.4), section cl_max from the XFOIL polar at the stall Reynolds number.' }),
-    stall_speed: qRel(vs, vsRel, { unit: 'm/s', label: 'Stall speed', explain: `The slowest the wing can hold the aircraft up (${(vs * 3.6).toFixed(0)} km/h), with the heaviest camera. Wing flight must stay well above it, especially in turns and during transition.`, source: 'V_s = sqrt(2 W / (ρ S CL_max)) (Anderson, Aircraft Performance and Design); range from ±10 % on CL_max and the mass range.' }),
+    cl_max: qRange(clMax, clMax * (1 - UNCERTAINTY.cl_max), clMax * (1 + clMaxRelHigh), { unit: '', label: 'Wing maximum lift coefficient', explain: 'The most lift the wing can make before it stalls, as a coefficient. It sets the stall speed.', source: `0.9 x section cl_max x cos(quarter-chord sweep) (Raymer ch. 12.4), section cl_max from the XFOIL polar at the stall Reynolds number${clMaxLowerBound ? '; the XFOIL sweep ended before the stall, so the section value is a lower bound and the range extends further upwards' : ''}.` }),
+    stall_speed: qRange(vs, vsLow, vsHigh, { unit: 'm/s', label: 'Stall speed', explain: `The slowest the wing can hold the aircraft up (${(vs * 3.6).toFixed(0)} km/h), with the heaviest camera. Wing flight must stay well above it, especially in turns and during transition.`, source: `V_s = sqrt(2 W / (ρ S CL_max)) (Anderson, Aircraft Performance and Design); range from ±10 % on CL_max and the mass range${clMaxLowerBound ? `, widened downwards because the airfoil's cl_max is a lower bound (+${CL_MAX_SWEEP_END_EXTRA * 100} % allowed)` : ''}.` }),
     cl_cruise: qRel(cl, massRel, { unit: '', label: 'Cruise lift coefficient', explain: 'How hard the wing works at cruise speed. Efficient small-UAV wings cruise around 0.4-0.8; close to the maximum leaves no margin.', source: 'CL = W / (q S), level flight.' }),
-    cruise_to_stall: qRel(V / vs, vsRel, { unit: '', label: 'Cruise / stall speed', explain: 'How many times faster than the stall the aircraft cruises. Around 1.3 or more gives a safety margin for gusts and turns.', source: 'Cruise speed / stall speed.' }),
+    cruise_to_stall: qRange(V / vs, V / vsHigh, V / vsLow, { unit: '', label: 'Cruise / stall speed', explain: 'How many times faster than the stall the aircraft cruises. Around 1.3 or more gives a safety margin for gusts and turns.', source: 'Cruise speed / stall speed.' }),
     cd0: qRel(drag.cd0, UNCERTAINTY.drag, { unit: '', label: 'Zero-lift drag coefficient', explain: 'The drag the airframe makes just by moving through the air (skin friction, shape, stopped propellers, landing gear). Lower is better for endurance.', source: 'Component build-up: skin friction x form factor x interference x wetted area, plus drag areas (Raymer ch. 12.5); ±15 %.' }),
     drag_items: drag.items,
     oswald: qAbs(e, 0.05, { unit: '', label: 'Oswald efficiency', explain: 'How close the wing comes to the ideal (1.0) for drag caused by making lift. Typical straight wings reach 0.75-0.85.', source: 'Raymer ch. 12.6 empirical fit: 1.78 (1 − 0.045 A^0.68) − 0.64 for straight wings.' }),
@@ -219,7 +227,13 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
     `Hover figure of merit ${FIGURE_OF_MERIT_HOVER}, motor efficiency 0.85, ESC 0.95, cruise propeller efficiency ${perfIn.etaProp}.`,
     `Mission: ${mp.takeoff_hover_s} s take-off hover, ${mp.transition_s} s transitions at ${TRANSITION_POWER_FACTOR} x hover power, ${mp.landing_hover_s} s landing hover, ${settings.checks.battery_reserve_fraction * 100} % reserve, ${mp.usable_energy_factor * 100} % of nominal pack energy usable.`,
     'Airfoil data from the XFOIL tables at the cruise and stall Reynolds numbers; Phase 3 replaces the whole-aircraft numbers with AVL and XFOIL runs.',
+    'Section lift-curve slopes above 2π per radian (XFOIL fits distorted by laminar separation bubbles at low Reynolds numbers) are capped at 2π for the wing and tail lift slopes.',
   ];
+  if (clMaxLowerBound) {
+    assumptions.push(
+      `The XFOIL sweep for the ${p.wing.airfoil} wing airfoil ended before it stalled near the stall Reynolds number (${Math.round(reStall).toLocaleString('en-IE')}), so its cl_max is a lower bound: the real stall speed may be lower than shown, and its range is widened on that side.`,
+    );
+  }
 
   const t1 = now();
   return {

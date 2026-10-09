@@ -3,14 +3,25 @@
 from __future__ import annotations
 
 import io
+import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from PIL import Image
+from PIL import Image, ImageChops
 
 from app.config import Settings
-from app.imaging import MAX_IMAGE_BYTES, sanitise_filename
+from app.imaging import (
+    MAX_IMAGE_BYTES,
+    ImageRejected,
+    _png_reduced,
+    jpeg_for_claude,
+    process_upload,
+    sanitise_filename,
+)
 from app.models import Image as ImageRow
 
 
@@ -93,16 +104,115 @@ def test_type_is_sniffed_from_bytes_not_name(auth_client: TestClient, project: d
     assert len(auth_client.get(f"/api/projects/{pid}/images").json()) == 2
 
 
-def test_exif_orientation_is_applied(auth_client: TestClient, project: dict) -> None:
+def test_exif_orientation_is_recorded_and_bytes_kept(
+    auth_client: TestClient, project: dict, tmp_path: Path
+) -> None:
     exif = Image.Exif()
     exif[0x0112] = 6  # rotate 90 degrees clockwise to display
     data = make_image("JPEG", (80, 40), exif=exif.tobytes())
     response = upload(auth_client, project["id"], data, name="phone.jpg", content_type="image/jpeg")
     assert response.status_code == 201, response.text
     body = response.json()
+    # The reported size is the upright one; the stored file is the upload, byte for byte
+    # (browsers apply the orientation when they draw it).
     assert (body["width_px"], body["height_px"]) == (40, 80)
-    stored = Image.open(io.BytesIO(auth_client.get(body["url"]).content))
-    assert stored.size == (40, 80)
+    assert auth_client.get(body["url"]).content == data
+    assert process_upload(data).orientation == 6
+    # Claude's copy is turned upright.
+    path = tmp_path / "phone.jpg"
+    path.write_bytes(data)
+    assert Image.open(io.BytesIO(jpeg_for_claude(path))).size == (40, 80)
+
+
+def test_png_exif_orientation_and_alpha_for_claude(tmp_path: Path) -> None:
+    image = Image.new("RGBA", (90, 30), (255, 0, 0, 0))  # fully transparent red
+    exif = Image.Exif()
+    exif[0x0112] = 8
+    out = io.BytesIO()
+    image.save(out, format="PNG", exif=exif.tobytes())
+    processed = process_upload(out.getvalue())
+    assert (processed.width_px, processed.height_px, processed.orientation) == (30, 90, 8)
+    path = tmp_path / "a.png"
+    path.write_bytes(out.getvalue())
+    claude = Image.open(io.BytesIO(jpeg_for_claude(path)))
+    assert claude.size == (30, 90)
+    r, g, b = claude.convert("RGB").getpixel((15, 45))  # type: ignore[misc]
+    assert min(r, g, b) > 245  # transparent pixels become white, not red or black
+
+
+def test_png_band_decoding_matches_full_decode() -> None:
+    w, h = 1001, 703
+    noise = Image.effect_noise((w, h), 60)
+    gradient = Image.linear_gradient("L").resize((w, h))
+    rgb = Image.merge("RGB", (noise, gradient, noise.transpose(Image.Transpose.FLIP_LEFT_RIGHT)))
+    rgba = rgb.copy()
+    rgba.putalpha(gradient)
+    for source in (rgb, rgba, noise, Image.merge("LA", (noise, gradient)), rgb.quantize(64)):
+        out = io.BytesIO()
+        source.save(out, format="PNG")
+        for factor in (1, 3):
+            reduced = _png_reduced(io.BytesIO(out.getvalue()), factor)
+            assert reduced is not None
+            full = Image.open(io.BytesIO(out.getvalue())).convert(reduced.mode).reduce(factor)
+            assert ImageChops.difference(reduced, full).getbbox() is None, (source.mode, factor)
+
+
+def test_pixel_limits() -> None:
+    # 7680 x 7680 is 59 MP: refused from the header, before any decoding.
+    out = io.BytesIO()
+    Image.new("L", (7680, 7680)).save(out, format="PNG", compress_level=1)
+    with pytest.raises(ImageRejected, match="40 megapixels"):
+        process_upload(out.getvalue())
+    out = io.BytesIO()
+    Image.new("RGB", (3000, 3000)).save(out, format="WEBP")
+    with pytest.raises(ImageRejected, match="8 megapixels"):
+        process_upload(out.getvalue())
+
+
+PEAK_MEMORY_SCRIPT = """
+import sys
+from pathlib import Path
+from app.imaging import jpeg_for_claude, process_upload
+path = Path(sys.argv[1])
+processed = process_upload(path.read_bytes())
+del processed
+jpeg_for_claude(path)
+status = Path("/proc/self/status").read_text()
+print(next(line.split()[1] for line in status.splitlines() if line.startswith("VmHWM:")))
+"""
+
+
+@pytest.mark.parametrize(
+    ("fmt", "size"),
+    [("PNG", (6300, 6300)), ("JPEG", (7300, 5470))],
+    ids=["png-rgba-40mp", "jpeg-40mp"],
+)
+@pytest.mark.skipif(not Path("/proc/self/status").exists(), reason="needs Linux /proc")
+def test_peak_memory_for_large_images(fmt: str, size: tuple[int, int], tmp_path: Path) -> None:
+    """The whole upload check plus Claude's copy, in a fresh interpreter. Pillow allocates
+    pixels outside Python's allocator, so tracemalloc would not see them; the process's
+    resident high-water mark (VmHWM) does. (ru_maxrss would carry over this test process's
+    own peak through fork and exec.) Fully decoded, the PNG alone would be 159 MB."""
+    w, h = size
+    coarse = Image.effect_noise((w // 16, h // 16), 80).resize((w, h))
+    image = Image.merge("RGB", (coarse, Image.linear_gradient("L").resize((w, h)), coarse))
+    path = tmp_path / f"big.{fmt.lower()}"
+    if fmt == "PNG":
+        image.putalpha(coarse)
+        image.save(path, format="PNG", compress_level=1)
+    else:
+        image.save(path, format="JPEG", quality=90)
+    del image, coarse
+    result = subprocess.run(
+        [sys.executable, "-c", PEAK_MEMORY_SCRIPT, str(path)],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=120,
+    )
+    peak_mb = int(result.stdout.strip()) / 1024  # VmHWM is in kB
+    assert peak_mb < 150, f"peak {peak_mb:.0f} MB"
 
 
 def test_size_limits(auth_client: TestClient, project: dict) -> None:
@@ -133,6 +243,36 @@ def test_count_limit(auth_client: TestClient, project: dict) -> None:
     seventh = upload(auth_client, pid, make_image())
     assert seventh.status_code == 409
     assert "at most 6" in seventh.json()["detail"]
+
+
+def test_count_limit_holds_under_parallel_uploads(auth_client: TestClient, project: dict) -> None:
+    pid = project["id"]
+    data = make_image("PNG", (400, 300))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        codes = sorted(pool.map(lambda _: upload(auth_client, pid, data).status_code, range(10)))
+    assert codes == [201] * 6 + [409] * 4
+    assert len(auth_client.get(f"/api/projects/{pid}/images").json()) == 6
+
+
+def test_upload_allowance_needs_a_valid_session(
+    client: TestClient, auth_client: TestClient, project: dict
+) -> None:
+    body = b"\0" * (2 * 1024 * 1024)  # over 1 MB, under 16 MB
+    url = f"/api/projects/{project['id']}/images"
+    # Signed in: the larger allowance applies, so the route itself answers (not an image).
+    signed_in = upload(auth_client, project["id"], body)
+    assert signed_in.status_code == 415
+    # No cookie, or a forged one: the normal 1 MB limit, before anything is read.
+    auth_client.cookies.clear()
+    anonymous = upload(auth_client, project["id"], body)
+    assert anonymous.status_code == 413
+    assert "1000 kB" in anonymous.json()["detail"]
+    forged = auth_client.post(
+        url,
+        files={"file": ("a.png", body, "image/png")},
+        headers={"Cookie": "vtol_session=eyJ1aWQiOjF9.forged.signature"},
+    )
+    assert forged.status_code == 413
 
 
 def test_view_update_and_validation(auth_client: TestClient, project: dict) -> None:

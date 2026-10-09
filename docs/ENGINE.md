@@ -113,7 +113,7 @@ Each part has a mass, an x position, a relative uncertainty, a source and an exp
 
 `battery.capacity_mah` is the capacity of one parallel unit, so pack capacity = capacity_mah × cells_parallel.
 
-**Iteration.** Motor size depends on total mass and on the balance point, because the motor pair carrying more weight sets the size. The engine starts from the mission target mass and repeats the build-up until the mass changes by less than 0.05 g and the CG by less than 0.05 mm, for at most 20 passes. It reports `converged` and the pass count. Typical designs converge in 7–10 passes. A different starting guess gives the same answer (tested).
+**Iteration.** Motor size depends on total mass and on the balance point, because the motor pair carrying more weight sets the size. The engine starts from the mission target mass and repeats the build-up until the mass changes by less than 0.05 g and the CG by less than 0.05 mm, for at most 20 passes. It reports `converged` and the pass count; when it did not converge, the take-off mass explanation says so instead of claiming convergence. Typical designs converge in 7–10 passes. A different starting guess gives the same answer (tested).
 
 **Balance.** CG = Σ m x / Σ m, at both the maximum and minimum payload, also given as % of MAC from the MAC leading edge. The hover load share of the front motor pair comes from the moment balance: (x_rear − x_cg)/(x_rear − x_front).
 
@@ -129,7 +129,11 @@ CL_α = 2πA / (2 + √(4 + (Aβ/η)²(1 + tan²Λ_t/β²))) × F·S_exp/S
 
 Here η = cl_α/(2π/β), β² = 1 − M², Λ_t is the sweep of the maximum-thickness line and F = 1.07(1 + d/b)². Following Raymer, if F·S_exp/S exceeds 1, 0.98 is used instead. For Λ = 0 and M = 0 this equals Anderson's form a = a₀ / (√(1 + (a₀/πA)²) + a₀/πA) (tested).
 
+The section slope cl_α is capped at 2π per radian (thin-airfoil theory; Anderson, *Fundamentals* ch. 4) before it enters the formula, for the wing and the tail. Between Re 60k and 200k the XFOIL fit over −2° to 6° can exceed 2π (SD7037: 8.57/rad at 60k, MH32 8.26, Clark Y 8.34) because a laminar separation bubble distorts the lift curve inside the fit range. That is a local kink of the section curve, not a steeper whole-wing slope; used as it stands it would overstate the wing and tail lift slopes and move the neutral point. The estimate lists this as an assumption.
+
 **Maximum lift and stall.** CL_max = 0.9 × section cl_max × cos Λ_c/4 (Raymer ch. 12.4; ±10 %). Stall speed V_s = √(2W / (ρ S CL_max)) at the heaviest payload (Anderson, *Aircraft Performance and Design* ch. 5). Cruise lift coefficient CL = W/(qS). The cruise-to-stall ratio is V/V_s.
+
+**cl_max as a lower bound.** Each polar row carries `cl_max_at_sweep_end`: true when the XFOIL alpha sweep ended before the section stalled, so the tabulated cl_max is only the highest value reached. When a row used for the stall lookup (either interpolation neighbour, or the clamped end row) has it set, the engine still uses that cl_max, but treats it as a lower bound: the CL_max range extends +25 % instead of +10 % on the high side (`CL_MAX_SWEEP_END_EXTRA` = 0.15, an estimate), so the stall-speed range widens on its low side (and cruise/stall on its high side), and an assumption note says so. The nominal values and the other side of each range are unchanged.
 
 **Parasite drag: component build-up** (Raymer ch. 12.5). CD₀ = [Σ C_f·FF·Q·S_wet + Σ (D/q)] / S, × 1.10 for leakage and protuberances.
 

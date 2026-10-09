@@ -1026,6 +1026,9 @@ textarea.input {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
+  /* Stored files keep their EXIF orientation tag; the browser turns them upright (this is the
+     default, stated here because the server relies on it). */
+  image-orientation: from-image;
   background: var(--color-surface-2);
 }
 

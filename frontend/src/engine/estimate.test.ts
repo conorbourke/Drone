@@ -142,3 +142,30 @@ describe('performance budget', () => {
     expect((performance.now() - t1) / n).toBeLessThan(5);
   });
 });
+
+describe('cl_max that is only a lower bound (XFOIL sweep ended before the stall)', () => {
+  it('keeps the stall speed but widens its range downwards and says why', () => {
+    const base = defaultInput();
+    const plain = estimate(base);
+    const wingId = base.parameters.wing.airfoil;
+    const summary = base.airfoils[wingId]!;
+    const flaggedInput: EngineInput = {
+      ...base,
+      airfoils: {
+        ...base.airfoils,
+        [wingId]: { ...summary, polar_summary: summary.polar_summary.map((r) => ({ ...r, cl_max_at_sweep_end: true })) },
+      },
+    };
+    const flagged = estimate(flaggedInput);
+    const a = plain.aero!.stall_speed;
+    const b = flagged.aero!.stall_speed;
+    expect(b.value).toBeCloseTo(a.value, 12);
+    expect(b.high).toBeCloseTo(a.high, 12);
+    expect(b.low).toBeLessThan(a.low);
+    expect(flagged.aero!.cl_max.high).toBeGreaterThan(plain.aero!.cl_max.high);
+    expect(flagged.aero!.cruise_to_stall.high).toBeGreaterThan(plain.aero!.cruise_to_stall.high);
+    expect(b.source).toMatch(/lower bound/);
+    expect(flagged.assumptions.some((s) => s.includes('lower bound'))).toBe(true);
+    expect(plain.assumptions.some((s) => s.includes('lower bound'))).toBe(false);
+  });
+});

@@ -62,9 +62,14 @@ const COMPLEXITY: Record<Layout, { rating: 'low' | 'medium' | 'high'; score: num
  * Adapt the design to a layout the way a designer would before comparing: for rear tilt the tilt
  * axis keeps its offset from the tilting motors (so it moves to the rear pair), and the battery is
  * moved so the balance point (heaviest camera) matches the current design's. Without this the
- * comparison would mostly show a CG shift, not the layout.
+ * comparison would mostly show a CG shift, not the layout. Positions are rounded to whole
+ * millimetres so the numbers shown are exactly those of the design "Use this layout" produces.
  */
-function adaptToLayout(input: EngineInput, layout: Layout, targetCgX: number): { input: EngineInput; batteryX: number; notes: string[] } {
+function adaptToLayout(
+  input: EngineInput,
+  layout: Layout,
+  targetCgX: number,
+): { input: EngineInput; batteryX: number; notes: string[]; changes: [string, unknown][] } {
   const base = withDefaults(input.parameters);
   const notes: string[] = [];
   const from = base.layout;
@@ -72,7 +77,7 @@ function adaptToLayout(input: EngineInput, layout: Layout, targetCgX: number): {
   if (layout !== 'quad_pusher' && from !== layout) {
     const fromMotor = from === 'rear_tilt' ? base.motors.rear_x_mm : base.motors.front_x_mm;
     const toMotor = layout === 'rear_tilt' ? base.motors.rear_x_mm : base.motors.front_x_mm;
-    tilt = { ...base.tilt, axis_x_mm: toMotor + (base.tilt.axis_x_mm - fromMotor) };
+    tilt = { ...base.tilt, axis_x_mm: Math.round(toMotor + (base.tilt.axis_x_mm - fromMotor)) };
     notes.push(`Tilt axis moved to the ${layout === 'rear_tilt' ? 'rear' : 'front'} motors (${Math.round(tilt.axis_x_mm)} mm along the boom).`);
   }
   let params: DesignParameters = { ...base, layout, tilt };
@@ -87,14 +92,20 @@ function adaptToLayout(input: EngineInput, layout: Layout, targetCgX: number): {
       const total = est.mass.takeoff_max_payload.value;
       const bat = est.mass.battery.value;
       if (!(bat > 0) || Math.abs(cg - targetCgX) < 0.5) break;
-      batteryX = Math.min(hi, Math.max(lo, batteryX + ((targetCgX - cg) * total) / bat));
+      batteryX = Math.round(Math.min(hi, Math.max(lo, batteryX + ((targetCgX - cg) * total) / bat)));
       params = { ...params, battery: { ...base.battery, x_mm: batteryX } };
     }
     if (Math.abs(batteryX - base.battery.x_mm) >= 1) {
       notes.push(`Battery moved from ${Math.round(base.battery.x_mm)} to ${Math.round(batteryX)} mm to keep the same balance point as your current design.`);
+    } else {
+      batteryX = base.battery.x_mm;
+      params = { ...params, battery: base.battery };
     }
   }
-  return { input: { ...input, parameters: params }, batteryX, notes };
+  const changes: [string, unknown][] = [['layout', layout]];
+  if (tilt.axis_x_mm !== base.tilt.axis_x_mm) changes.push(['tilt.axis_x_mm', tilt.axis_x_mm]);
+  if (batteryX !== base.battery.x_mm) changes.push(['battery.x_mm', batteryX]);
+  return { input: { ...input, parameters: params }, batteryX, notes, changes };
 }
 
 /** Re-estimate the design for each layout (re-balanced, see adaptToLayout). Never throws. */
@@ -106,11 +117,11 @@ export function compareLayouts(input: EngineInput): LayoutComparison[] {
     targetCg = NaN;
   }
   return LAYOUTS.map((layout) => {
-    let adapted: { input: EngineInput; batteryX: number; notes: string[] };
+    let adapted: ReturnType<typeof adaptToLayout>;
     try {
       adapted = adaptToLayout(input, layout, targetCg);
     } catch {
-      adapted = { input: { ...input, parameters: { ...input.parameters, layout } }, batteryX: NaN, notes: [] };
+      adapted = { input: { ...input, parameters: { ...input.parameters, layout } }, batteryX: NaN, notes: [], changes: [['layout', layout]] };
     }
     const est = estimate(adapted.input);
     const missing = (label: string, unit: string): Quantity => qNaN({ unit, label, explain: 'Not available: see the problems listed for this layout.', source: 'Tier 1 estimate.' });
@@ -125,6 +136,7 @@ export function compareLayouts(input: EngineInput): LayoutComparison[] {
       has_tilt_mechanism: layout !== 'quad_pusher',
       ardupilot_note: ARDUPILOT_NOTES[layout],
       adjustments: adapted.notes,
+      changes: adapted.changes,
       battery_x_mm: adapted.batteryX,
       problems: est.statuses.filter((s) => s.level === 'fail' || s.level === 'warn'),
     };
