@@ -88,10 +88,11 @@ def test_defaults_are_the_single_source_of_truth() -> None:
 def test_upgraders_are_identity_at_current_version() -> None:
     assert upgrade_parameters(DEFAULT_DESIGN_PARAMETERS) == DEFAULT_DESIGN_PARAMETERS
     assert upgrade_mission(DEFAULT_MISSION) == DEFAULT_MISSION
-    assert upgrade_settings({"schema_version": 1, "limits": {"warn_mtow_kg": 1}}) == {
-        "schema_version": 1,
+    assert upgrade_settings({"schema_version": 2, "limits": {"warn_mtow_kg": 1}}) == {
+        "schema_version": 2,
         "limits": {"warn_mtow_kg": 1},
     }
+    assert upgrade_settings(DEFAULT_SETTINGS) == DEFAULT_SETTINGS
     legacy = {k: v for k, v in DEFAULT_MISSION.items() if k != "schema_version"}
     assert upgrade_mission(legacy)["schema_version"] == 1
     assert upgrade_settings(DEFAULT_SETTINGS) is not DEFAULT_SETTINGS

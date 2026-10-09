@@ -20,17 +20,19 @@ import { buildChecks, sortStatuses, validateInput } from './checks';
 import {
   AVIONICS_POWER_W,
   CL_MAX_SWEEP_END_EXTRA,
-  ETA_PROP_CRUISE_PUSHER,
-  ETA_PROP_CRUISE_TILT,
   FIGURE_OF_MERIT_HOVER,
   G0,
   MISSION_PROFILE,
+  PROP_COEFF_UNCERTAINTY,
+  PUSHER_BLADES,
+  PUSHER_PITCH_RATIO,
   TRANSITION_POWER_FACTOR,
   UNCERTAINTY,
 } from './constants';
 import { buildGeometry, withDefaults } from './geometry';
 import { solveMass } from './mass';
 import { performanceWithRanges, type PerfInputs } from './performance';
+import { genericPropeller } from './propeller';
 import { qAbs, qExact, qRange, qRel, rss, rssPowers } from './quantity';
 import type { AeroResult, BalanceResult, EngineInput, Estimates, PerformanceResult, Status } from './types';
 import { degToRad } from './units';
@@ -131,6 +133,15 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
   // ----- Performance -----
   const pack = ms.pack;
   const D = p.propulsion.prop_diameter_mm / 1000;
+  // Cruise propeller: the tilted pair of lift propellers, or the pusher (pitch/diameter assumed).
+  const pusherCruise = p.layout === 'quad_pusher';
+  const cruisePropeller = pusherCruise
+    ? genericPropeller(p.pusher.prop_diameter_mm, PUSHER_PITCH_RATIO * p.pusher.prop_diameter_mm, PUSHER_BLADES)
+    : genericPropeller(p.propulsion.prop_diameter_mm, p.propulsion.prop_pitch_mm, p.propulsion.prop_blades);
+  const cruisePropCount = pusherCruise ? 1 : 2;
+  const cruisePropName = pusherCruise
+    ? `the ${Math.round(p.pusher.prop_diameter_mm)} mm pusher propeller (pitch assumed ${PUSHER_PITCH_RATIO} x diameter)`
+    : `the two tilted ${Math.round(p.propulsion.prop_diameter_mm)} x ${Math.round(p.propulsion.prop_pitch_mm)} mm lift propellers`;
   const perfIn: PerfInputs = {
     massKg,
     frontShare: ms.frontShareMax,
@@ -140,7 +151,7 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
     cd0: drag.cd0,
     oswald: e,
     aspectRatio: w.aspect_ratio,
-    etaProp: p.layout === 'quad_pusher' ? ETA_PROP_CRUISE_PUSHER : ETA_PROP_CRUISE_TILT,
+    cruiseProp: { propeller: cruisePropeller, count: cruisePropCount },
     discArea: Math.PI * (D / 2) ** 2,
     avionicsW: AVIONICS_POWER_W[scale],
     energyWh: pack.energyWh,
@@ -151,6 +162,7 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
   const pr = performanceWithRanges(perfIn, massRel);
   const prMin = performanceWithRanges({ ...perfIn, massKg: massMinKg, frontShare: ms.frontShareMin }, massRel);
   const n = pr.nominal;
+  const etaPropText = `${n.cruisePropEfficiency.toFixed(2)} at J = ${n.cruisePropJ.toFixed(2)}`;
 
   const cl = n.cl;
   const aero: AeroResult = {
@@ -181,15 +193,16 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
     cg_min_payload_x: qAbs(ms.cgMinX, ms.cgMinSigma, { unit: 'mm', label: 'Balance point (lightest camera)', explain: 'The balance point with the lightest camera fitted; it moves back as the camera gets lighter.', source: 'Mass-weighted average of component positions.' }),
     cg_max_payload_mac: qAbs(((ms.cgMaxX - w.mac_x_le_mm) / w.mac_mm) * 100, (ms.cgMaxSigma / w.mac_mm) * 100, { unit: '% MAC', label: 'Balance point, % of chord (heaviest camera)', explain: 'The balance point as a percentage of the mean wing chord from its leading edge; most aircraft balance around 25-35 %.', source: '(x_cg − x_LE,MAC) / c̄.' }),
     cg_min_payload_mac: qAbs(((ms.cgMinX - w.mac_x_le_mm) / w.mac_mm) * 100, (ms.cgMinSigma / w.mac_mm) * 100, { unit: '% MAC', label: 'Balance point, % of chord (lightest camera)', explain: 'The balance point as a percentage of the mean wing chord with the lightest camera.', source: '(x_cg − x_LE,MAC) / c̄.' }),
-    neutral_point_x: qAbs(np.x_np_mm, UNCERTAINTY.neutral_point_mac * w.mac_mm, { unit: 'mm', label: 'Neutral point', explain: 'The balance point at which the aircraft would be neither stable nor unstable in pitch. The real balance point must be ahead of it.', source: 'Wing and tail aerodynamic centres weighted by lift slope, tail with downwash and efficiency 0.9, fuselage by Multhopp’s method (Nelson ch. 2; Etkin & Reid ch. 2); ±5 % MAC.' }),
-    static_margin_max_payload: qAbs(sm(ms.cgMaxX), smSigma(ms.cgMaxSigma), { unit: '% MAC', label: 'Static margin (heaviest camera)', explain: 'How far the balance point is ahead of the neutral point, as a percentage of the wing chord. Positive means stable; 5-20 % is the usual target.', source: '(x_np − x_cg) / c̄ (Nelson ch. 2); range combines ±5 % MAC on the neutral point and the CG uncertainty.' }),
+    neutral_point_x: qAbs(np.x_np_mm, UNCERTAINTY.neutral_point_mac * w.mac_mm, { unit: 'mm', label: 'Neutral point', explain: 'The balance point at which the aircraft would be neither stable nor unstable in pitch. The real balance point must be ahead of it.', source: 'Wing and tail aerodynamic centres weighted by lift slope, tail with downwash and efficiency 0.9, fuselage by Multhopp’s method (Nelson ch. 2; Etkin & Reid ch. 2); ±10 % MAC (Tier 1 against AVL: the fuselage and downwash terms differ by up to ~10 % MAC; the full analysis uses AVL).' }),
+    static_margin_max_payload: qAbs(sm(ms.cgMaxX), smSigma(ms.cgMaxSigma), { unit: '% MAC', label: 'Static margin (heaviest camera)', explain: 'How far the balance point is ahead of the neutral point, as a percentage of the wing chord. Positive means stable; 5-20 % is the usual target.', source: '(x_np − x_cg) / c̄ (Nelson ch. 2); range combines ±10 % MAC on the neutral point and the CG uncertainty.' }),
     static_margin_min_payload: qAbs(sm(ms.cgMinX), smSigma(ms.cgMinSigma), { unit: '% MAC', label: 'Static margin (lightest camera)', explain: 'The static margin with the lightest camera: the balance point moves back, so stability is lowest here.', source: '(x_np − x_cg) / c̄ (Nelson ch. 2).' }),
     hover_front_share: qExact(ms.frontShareMax, { unit: '', label: 'Front motors’ share of hover load', explain: 'The fraction of the weight the front pair carries in hover (0.5 is even). Uneven loading leaves less control margin on the busier pair.', source: 'Moment balance of the two motor pairs about the balance point.' }),
   };
 
   const mp = MISSION_PROFILE;
   const perf: PerformanceResult = {
-    cruise_power: pr.quantity((c) => c.cruisePowerW, ['drag', 'mass', 'eta'], { unit: 'W', label: 'Cruise power', explain: 'Electrical power drawn from the battery in level wing flight, including avionics. It decides how long the battery lasts in cruise.', source: `Drag x speed / (η_prop ${perfIn.etaProp} x η_motor 0.85 x η_ESC 0.95) + ${perfIn.avionicsW} W avionics; range from ±15 % drag, mass and ±7 % efficiency.` }),
+    cruise_power: pr.quantity((c) => c.cruisePowerW, ['drag', 'mass', 'eta', 'ct', 'cp'], { unit: 'W', label: 'Cruise power', explain: `Electrical power drawn from the battery in level wing flight, including avionics. It decides how long the battery lasts in cruise. The aircraft cruises on ${cruisePropName}; their efficiency comes from a propeller model at the cruise thrust and speed.`, source: `Drag x speed / (η_prop ${etaPropText} x η_motor 0.85 x η_ESC 0.95) + ${perfIn.avionicsW} W avionics; η_prop from the generic CT(J), CP(J) propeller curves (UIUC-trend fit, Brandt & Selig AIAA 2011-1255; as the server engine); range from ±15 % drag, mass, ±15 % on CT and CP and ±7 % motor x ESC efficiency.` }),
+    cruise_propeller_efficiency: pr.quantity((c) => c.cruisePropEfficiency, ['drag', 'mass', 'ct', 'cp'], { unit: '', label: 'Cruise propeller efficiency', explain: pusherCruise ? 'Share of the pusher’s shaft power that becomes useful thrust power in cruise.' : 'Share of the tilted propellers’ shaft power that becomes useful thrust power in cruise. Hover-sized propellers carry little thrust in cruise and run close to the advance ratio where their thrust falls to zero, so their efficiency is low.', source: `J CT / CP at thrust = drag / ${cruisePropCount} and the cruise speed, generic fixed-pitch propeller (pitch/diameter ${cruisePropeller.pitchRatio.toFixed(2)}, zero thrust at J = ${cruisePropeller.jZeroThrust.toFixed(2)}; Brandt & Selig AIAA 2011-1255 / UIUC trends, ±${PROP_COEFF_UNCERTAINTY * 100} % on CT and CP).` }),
     hover_power: pr.quantity((c) => c.hoverPowerW, ['mass', 'fm', 'eta'], { unit: 'W', label: 'Hover power', explain: 'Electrical power needed to hover with the heaviest camera. Hovering is expensive, which is why the VTOL drone spends as little time as possible doing it.', source: `Momentum theory per rotor, T^1.5 / sqrt(2 ρ A) / FM ${FIGURE_OF_MERIT_HOVER} (Leishman ch. 2), 3 % download, / (η_motor x η_ESC), + avionics.` }),
     transition_power: pr.quantity((c) => c.transitionPowerW, ['mass', 'fm', 'eta'], { unit: 'W', label: 'Transition power', explain: 'Power during the change between hover and wing flight, the most demanding phase.', source: `Taken as ${TRANSITION_POWER_FACTOR} x hover power (stated assumption until the Phase 3 transition model).` }),
     hover_disc_loading: qRel(n.discLoading, massRel, { unit: 'N/m²', label: 'Disc loading', explain: 'Hover thrust per square metre of propeller disc. Lower disc loading (bigger propellers) needs less hover power.', source: 'Hover thrust / total disc area of the four lift propellers.' }),
@@ -198,10 +211,10 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
     battery_energy: qRel(pack.energyWh, UNCERTAINTY.battery_energy, { unit: 'Wh', label: 'Battery energy', explain: 'The energy stored in the pack when full (voltage x capacity).', source: `${p.battery.cells_series} cells x ${perfIn.packVoltage / p.battery.cells_series} V x ${pack.capacityAh.toFixed(2)} Ah (nominal); ±5 %.` }),
     usable_energy: pr.quantity((c) => c.usableWh, ['energy'], { unit: 'Wh', label: 'Usable energy', explain: 'Energy you can use before landing with the reserve still in the pack.', source: `Nominal energy x (1 − ${settings.checks.battery_reserve_fraction} reserve) x ${mp.usable_energy_factor} (stated usable fraction).` }),
     vtol_energy: pr.quantity((c) => c.vtolWh, ['mass', 'fm', 'eta'], { unit: 'Wh', label: 'Energy for take-off, transitions and landing', explain: `Energy for ${mp.takeoff_hover_s} s hover at take-off, two ${mp.transition_s} s transitions and ${mp.landing_hover_s} s hover at landing.`, source: 'Mission profile (Phase 2 contract) x hover and transition power.' }),
-    endurance_cruise: pr.quantity((c) => c.cruiseTimeS / 60, ['drag', 'mass', 'energy', 'fm', 'eta'], { unit: 'min', label: 'Wing-flight endurance', explain: 'Minutes of cruise on the wing after take-off, transitions and landing are paid for, keeping the battery reserve. This is the number to compare with your target.', source: 'Usable energy minus VTOL energy, / cruise power; range combines ±15 % drag, mass, ±5 % energy, figure of merit ±0.05 and ±7 % efficiency (root-sum-square).' }),
-    endurance_total: pr.quantity((c) => c.totalTimeS / 60, ['drag', 'mass', 'energy', 'fm', 'eta'], { unit: 'min', label: 'Total flight time', explain: 'Wing-flight time plus the take-off, transition and landing phases.', source: 'Cruise time + mission-profile VTOL time.' }),
-    range: pr.quantity((c) => c.rangeM / 1000, ['drag', 'mass', 'energy', 'fm', 'eta'], { unit: 'km', label: 'Range (still air)', explain: 'Distance covered in the wing-flight time at cruise speed with no wind. Flying beyond visual line of sight needs IAA authorisation.', source: 'Cruise speed x wing-flight endurance.' }),
-    endurance_cruise_min_payload: prMin.quantity((c) => c.cruiseTimeS / 60, ['drag', 'mass', 'energy', 'fm', 'eta'], { unit: 'min', label: 'Wing-flight endurance (lightest camera)', explain: 'Wing-flight endurance with the lightest camera fitted.', source: 'Same method at the minimum payload.' }),
+    endurance_cruise: pr.quantity((c) => c.cruiseTimeS / 60, ['drag', 'mass', 'energy', 'fm', 'eta', 'ct', 'cp'], { unit: 'min', label: 'Wing-flight endurance', explain: 'Minutes of cruise on the wing after take-off, transitions and landing are paid for, keeping the battery reserve. This is the number to compare with your target.', source: 'Usable energy minus VTOL energy, / cruise power; range combines ±15 % drag, mass, ±5 % energy, figure of merit ±0.05, ±7 % motor x ESC efficiency and ±15 % on the cruise propeller CT and CP (root-sum-square).' }),
+    endurance_total: pr.quantity((c) => c.totalTimeS / 60, ['drag', 'mass', 'energy', 'fm', 'eta', 'ct', 'cp'], { unit: 'min', label: 'Total flight time', explain: 'Wing-flight time plus the take-off, transition and landing phases.', source: 'Cruise time + mission-profile VTOL time.' }),
+    range: pr.quantity((c) => c.rangeM / 1000, ['drag', 'mass', 'energy', 'fm', 'eta', 'ct', 'cp'], { unit: 'km', label: 'Range (still air)', explain: 'Distance covered in the wing-flight time at cruise speed with no wind. Flying beyond visual line of sight needs IAA authorisation.', source: 'Cruise speed x wing-flight endurance.' }),
+    endurance_cruise_min_payload: prMin.quantity((c) => c.cruiseTimeS / 60, ['drag', 'mass', 'energy', 'fm', 'eta', 'ct', 'cp'], { unit: 'min', label: 'Wing-flight endurance (lightest camera)', explain: 'Wing-flight endurance with the lightest camera fitted.', source: 'Same method at the minimum payload.' }),
     hover_thrust_to_weight: qExact(settings.checks.hover_thrust_to_weight_min, { unit: '', label: 'Hover thrust-to-weight', explain: 'Maximum motor thrust divided by weight. It is assumed equal to the Settings minimum because the motors are sized to it; real parts are checked in Phase 4.', source: 'Assumed (motors sized to settings.checks.hover_thrust_to_weight_min).' }),
     mission: n.segments,
   };
@@ -224,7 +237,7 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
     'Sea-level standard air (1.225 kg/m³, 15 °C), still air.',
     `Structure weights use ${scale === 'final' ? 'carbon-composite' : '3D-printed'} densities that are first estimates; Phase 6 built weights will calibrate them.`,
     `Motors are sized so the four lift motors give ${settings.checks.hover_thrust_to_weight_min} x the weight; motor, ESC and propeller weights come from statistical relations until real parts are chosen in Phase 4.`,
-    `Hover figure of merit ${FIGURE_OF_MERIT_HOVER}, motor efficiency 0.85, ESC 0.95, cruise propeller efficiency ${perfIn.etaProp}.`,
+    `Hover figure of merit ${FIGURE_OF_MERIT_HOVER}, motor efficiency 0.85, ESC 0.95. Cruise on ${cruisePropName}: propeller efficiency ${etaPropText} from the generic CT(J), CP(J) model (the same curves as the server analysis).`,
     `Mission: ${mp.takeoff_hover_s} s take-off hover, ${mp.transition_s} s transitions at ${TRANSITION_POWER_FACTOR} x hover power, ${mp.landing_hover_s} s landing hover, ${settings.checks.battery_reserve_fraction * 100} % reserve, ${mp.usable_energy_factor * 100} % of nominal pack energy usable.`,
     'Airfoil data from the XFOIL tables at the cruise and stall Reynolds numbers; Phase 3 replaces the whole-aircraft numbers with AVL and XFOIL runs.',
     'Section lift-curve slopes above 2π per radian (XFOIL fits distorted by laminar separation bubbles at low Reynolds numbers) are capped at 2π for the wing and tail lift slopes.',

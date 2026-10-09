@@ -15,7 +15,7 @@ from typing import Any
 
 DESIGN_SCHEMA_VERSION = 2
 MISSION_SCHEMA_VERSION = 1
-SETTINGS_SCHEMA_VERSION = 1
+SETTINGS_SCHEMA_VERSION = 2
 
 DEFAULTS_NOTE = (
     "Starting values for a new project, not an analysed design. "
@@ -91,7 +91,7 @@ DEFAULT_DESIGN_PARAMETERS: dict[str, Any] = {
         "cells_series": 6,
         "cells_parallel": 1,
         "capacity_mah": 5000.0,
-        "x_mm": 380.0,
+        "x_mm": 290.0,
     },
     "allowances": {
         "avionics_g": 220.0,
@@ -128,7 +128,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "cruise_to_stall_speed_ratio_min": 1.3,
         "battery_reserve_fraction": 0.20,
         "battery_current_max_fraction_of_rating": 0.80,
+        "manoeuvre_load_factor": 3.0,
+        "structural_safety_factor": 1.5,
+        "transition_thrust_margin_min": 1.3,
     },
+    "analysis": {"ncrit": 9.0},
     "units": {"system": "metric"},
 }
 
@@ -227,6 +231,39 @@ SETTINGS_META: dict[str, dict[str, str]] = {
         "continuous discharge rating (0.8 = 80 %).",
         "source": f"Keeps the pack inside its rating with headroom for ageing and cold; "
         f"{_PROPOSED}.",
+    },
+    "checks.manoeuvre_load_factor": {
+        "label": "Manoeuvre load factor",
+        "description": "The largest load, in multiples of the aircraft weight (g), that the "
+        "wing spar and booms must carry in a pull-up or a gust. The structure checks multiply "
+        "the weight by this and by the safety factor.",
+        "source": "3.0 g, a common small-UAV design value (CS-23 normal category uses 3.8 g for "
+        "light aircraft; Gundlach, Designing Unmanned Aircraft Systems, 2014, ch. 9 gives "
+        "3-4 g for small UAVs); proposed in Phase 3, confirm.",
+    },
+    "checks.structural_safety_factor": {
+        "label": "Structural safety factor",
+        "description": "Extra margin on top of the manoeuvre load before a part may break: the "
+        "spar and booms are checked at load factor x safety factor against the material "
+        "strength.",
+        "source": "Ultimate load = 1.5 x limit load (CS-23.303 / FAR 23.303 factor of safety); "
+        "proposed in Phase 3, confirm.",
+    },
+    "checks.transition_thrust_margin_min": {
+        "label": "Minimum transition thrust margin",
+        "description": "Through the change from hover to wing flight, the thrust the motors can "
+        "give must be at least this many times the thrust needed, leaving room to correct "
+        "gusts and attitude.",
+        "source": "Engine rule: available / required thrust of at least 1.3 through the "
+        "transition (control authority for gusts and attitude); proposed in Phase 3, confirm.",
+    },
+    "analysis.ncrit": {
+        "label": "XFOIL transition parameter (Ncrit)",
+        "description": "How smooth the air and the wing surface are assumed to be when XFOIL "
+        "works out the airfoil drag. 9 is clean air and a smooth wing; lower values (4-6) "
+        "model a rougher printed surface or gusty air and give more drag.",
+        "source": "Drela, XFOIL 6.9 user guide: Ncrit 9 for an average wind tunnel or clean "
+        "air; 1-14 is the usable range.",
     },
     "units.system": {
         "label": "Unit system",

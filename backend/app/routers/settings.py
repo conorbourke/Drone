@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import ValidationError
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.defaults import DEFAULT_SETTINGS, SETTINGS_META, SETTINGS_SCHEMA_VERSION
 from app.deps import CurrentUser, DbSession, current_user
@@ -131,13 +132,29 @@ def build_response(merged: dict[str, Any], warnings: list[str] | None = None) ->
     return SettingsResponse(settings=document, meta=meta, warnings=warnings or [])
 
 
-def _stored_overrides(db: DbSession, owner_id: int) -> tuple[AppSettings | None, dict[str, Any]]:
+def _stored_overrides(db: Session, owner_id: int) -> tuple[AppSettings | None, dict[str, Any]]:
     row = db.scalar(select(AppSettings).where(AppSettings.owner_id == owner_id))
     if row is None:
         return None, {}
     doc = upgrade_settings(row.data)
     doc.pop("schema_version", None)
-    return row, doc
+    # Only true overrides: an upgrade step fills new fields with their values at the time,
+    # which must not pin them against later improvements of the defaults.
+    return row, diff_against(DEFAULT_SETTINGS, doc)
+
+
+def effective_settings(db: Session, owner_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The owner's settings document (defaults merged with stored overrides, current schema)
+    and its ``meta`` (dotted path -> label, description, source, is_default), as plain dicts.
+    The analysis engine reads thresholds from the first and names their sources from the
+    second."""
+    _, overrides = _stored_overrides(db, owner_id)
+    merged, _dropped = resilient_merge(overrides)
+    response = build_response(merged)
+    return (
+        response.settings.model_dump(),
+        {path: meta.model_dump() for path, meta in response.meta.items()},
+    )
 
 
 @router.get("", response_model=SettingsResponse)

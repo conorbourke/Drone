@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.validation import run_validation, text_summary
+from app.validation import run_validation, text_summary, write_report
+
+#: The committed snapshot (docs/phases/PHASE3.md section 5), refreshed by every full test run.
+SNAPSHOT = Path(__file__).resolve().parents[3] / "docs" / "validation" / "latest.json"
 
 #: Cases that fail and are reported as such (see the case notes); everything else must pass.
 KNOWN_DEVIATIONS = {"textbook.helmbold_ar4"}
@@ -32,3 +35,5 @@ def test_runner_writes_report(tmp_path: Path, polar_cache: str) -> None:
         assert c["tolerance_pct"] == 30.0
         assert "Assumptions" in c["note"]
     assert "pass" in text_summary(report)
+    if SNAPSHOT.parent.parent.is_dir():  # a source checkout (not the container image)
+        write_report(report, SNAPSHOT)

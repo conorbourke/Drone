@@ -27,7 +27,7 @@ describe('endurance arithmetic against a hand calculation', () => {
     cd0: 0.04,
     oswald: 0.8,
     aspectRatio: 8,
-    etaProp: 0.65,
+    cruiseProp: { fixedEfficiency: 0.65 },
     discArea: Math.PI * 0.165 ** 2,
     avionicsW: 8,
     energyWh: 111,

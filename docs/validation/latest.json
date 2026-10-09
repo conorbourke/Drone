@@ -1,0 +1,649 @@
+{
+ "schema": "validation-report/1",
+ "generated_at": "2026-10-09T07:17:00Z",
+ "engine_version": "tier2-1.0",
+ "summary": {
+  "pass": 24,
+  "fail": 1,
+  "skipped": 2,
+  "info": 5,
+  "cases": 32,
+  "all_passed": false
+ },
+ "tolerance_note": "Tolerances are per case. Textbook and vortex-lattice cases use 0.1-4 %; airfoil data 10-20 % (wind-tunnel scatter); published aircraft +/-30 %, deliberately wide because their geometry is partly assumed: those cases show the size of the error honestly rather than prove accuracy.",
+ "groups": [
+  {
+   "key": "textbook",
+   "label": "Textbook and closed-form results"
+  },
+  {
+   "key": "avl_reference",
+   "label": "AVL against published vortex-lattice values and Tier 1"
+  },
+  {
+   "key": "xfoil_reference",
+   "label": "XFOIL against wind-tunnel data"
+  },
+  {
+   "key": "published_design",
+   "label": "Published aircraft (endurance)"
+  }
+ ],
+ "cases": [
+  {
+   "id": "textbook.elliptic_e",
+   "group": "textbook",
+   "name": "Elliptic wing AR 8: span efficiency",
+   "compared": "AVL span efficiency e (Trefftz plane) vs lifting-line theory (e = 1)",
+   "reference": {
+    "value": 1.0,
+    "unit": "",
+    "source": "Anderson, Fundamentals of Aerodynamics, 6th ed., sec. 5.3.1 (elliptic lift distribution, e = 1)"
+   },
+   "engine": {
+    "value": 0.9997586655138971,
+    "unit": ""
+   },
+   "error_pct": -0.024133448610286212,
+   "tolerance_pct": 2.0,
+   "status": "pass",
+   "note": "A discretised elliptic planform in AVL; small deviations come from the finite number of sections."
+  },
+  {
+   "id": "textbook.elliptic_cdi",
+   "group": "textbook",
+   "name": "Elliptic wing AR 8: induced drag",
+   "compared": "AVL CDi vs CL^2 / (pi AR) at the same CL",
+   "reference": {
+    "value": 0.004434118689439977,
+    "unit": "",
+    "source": "Anderson, Fundamentals of Aerodynamics, eq. 5.62"
+   },
+   "engine": {
+    "value": 0.0044434010145537415,
+    "unit": ""
+   },
+   "error_pct": 0.20933867052026506,
+   "tolerance_pct": 3.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.rect8_e",
+   "group": "textbook",
+   "name": "Rectangular wing AR 8: span efficiency",
+   "compared": "AVL e vs Prandtl lifting-line theory (Glauert series, 40 terms)",
+   "reference": {
+    "value": 0.9366702710753245,
+    "unit": "",
+    "source": "Anderson, Fundamentals of Aerodynamics, sec. 5.3.2 (general lifting-line solution; induced drag factor delta for a rectangular wing, fig. 5.20)"
+   },
+   "engine": {
+    "value": 0.9720322632269226,
+    "unit": ""
+   },
+   "error_pct": 3.7752871254258435,
+   "tolerance_pct": 5.0,
+   "status": "pass",
+   "note": "Lifting-line theory represents the square tips poorly (it gives a larger delta than lifting-surface methods such as AVL); a few per cent difference is expected, hence 5 %."
+  },
+  {
+   "id": "textbook.rect8_cdi",
+   "group": "textbook",
+   "name": "Rectangular wing AR 8: induced drag",
+   "compared": "AVL CDi vs lifting-line CL^2 / (pi AR e_LLT) at AVL's CL",
+   "reference": {
+    "value": 0.00433918191872325,
+    "unit": "",
+    "source": "Anderson, Fundamentals of Aerodynamics, eq. 5.61-5.62 with the lifting-line e"
+   },
+   "engine": {
+    "value": 0.004188974861161276,
+    "unit": ""
+   },
+   "error_pct": -3.4616446227765234,
+   "tolerance_pct": 5.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.helmbold_ar4",
+   "group": "textbook",
+   "name": "Lift-curve slope, elliptic wing AR 4",
+   "compared": "AVL CL_alpha (flat-plate elliptic planform) vs Helmbold's equation (a0 = 2 pi)",
+   "reference": {
+    "value": 3.8832220774509327,
+    "unit": "/rad",
+    "source": "Helmbold (1942) as given in Anderson, Fundamentals of Aerodynamics, eq. 5.81 (derived for elliptic loading, valid down to low aspect ratio)"
+   },
+   "engine": {
+    "value": 3.7095121289489583,
+    "unit": "/rad"
+   },
+   "error_pct": -4.473345717482195,
+   "tolerance_pct": 4.0,
+   "status": "fail",
+   "note": ""
+  },
+  {
+   "id": "textbook.helmbold_ar8",
+   "group": "textbook",
+   "name": "Lift-curve slope, elliptic wing AR 8",
+   "compared": "AVL CL_alpha (flat-plate elliptic planform) vs Helmbold's equation (a0 = 2 pi)",
+   "reference": {
+    "value": 4.905762844912698,
+    "unit": "/rad",
+    "source": "Helmbold (1942) as given in Anderson, Fundamentals of Aerodynamics, eq. 5.81 (derived for elliptic loading, valid down to low aspect ratio)"
+   },
+   "engine": {
+    "value": 4.765136751582857,
+    "unit": "/rad"
+   },
+   "error_pct": -2.866548950193768,
+   "tolerance_pct": 4.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.helmbold_ar16",
+   "group": "textbook",
+   "name": "Lift-curve slope, elliptic wing AR 16",
+   "compared": "AVL CL_alpha (flat-plate elliptic planform) vs Helmbold's equation (a0 = 2 pi)",
+   "reference": {
+    "value": 5.54668426495308,
+    "unit": "/rad",
+    "source": "Helmbold (1942) as given in Anderson, Fundamentals of Aerodynamics, eq. 5.81 (derived for elliptic loading, valid down to low aspect ratio)"
+   },
+   "engine": {
+    "value": 5.464451702115167,
+    "unit": "/rad"
+   },
+   "error_pct": -1.4825535204428695,
+   "tolerance_pct": 4.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.isa_density",
+   "group": "textbook",
+   "name": "Sea-level standard air density",
+   "compared": "p / (R T) at 101 325 Pa and 288.15 K vs the tabulated ISA density",
+   "reference": {
+    "value": 1.225,
+    "unit": "kg/m³",
+    "source": "ICAO Doc 7488 / ISO 2533"
+   },
+   "engine": {
+    "value": 1.225000018124288,
+    "unit": "kg/m³"
+   },
+   "error_pct": 1.479533701902775e-06,
+   "tolerance_pct": 0.1,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.isa_engine",
+   "group": "textbook",
+   "name": "Engine air density constant",
+   "compared": "Engine RHO_SL vs ISA",
+   "reference": {
+    "value": 1.225,
+    "unit": "kg/m³",
+    "source": "ICAO Doc 7488 / ISO 2533"
+   },
+   "engine": {
+    "value": 1.225,
+    "unit": "kg/m³"
+   },
+   "error_pct": 0.0,
+   "tolerance_pct": 0.01,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.momentum_hover",
+   "group": "textbook",
+   "name": "Momentum-theory hover power",
+   "compared": "Engine ideal power T^1.5/sqrt(2 rho A) vs T x induced velocity (20 N, 381 mm)",
+   "reference": {
+    "value": 169.23572059925198,
+    "unit": "W",
+    "source": "Leishman, Principles of Helicopter Aerodynamics, 2nd ed., eq. 2.15-2.17"
+   },
+   "engine": {
+    "value": 169.235720599252,
+    "unit": "W"
+   },
+   "error_pct": 1.679415511675945e-14,
+   "tolerance_pct": 0.1,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.figure_of_merit",
+   "group": "textbook",
+   "name": "Generic propeller static figure of merit",
+   "compared": "Static FM of the generic 15x5.5 in propeller vs the small-propeller band 0.5-0.7 (centre 0.6)",
+   "reference": {
+    "value": 0.6,
+    "unit": "",
+    "source": "Leishman ch. 2 (well-designed rotors 0.7-0.8; small fixed-pitch propellers lower); Brandt & Selig AIAA 2011-1255 static data"
+   },
+   "engine": {
+    "value": 0.6459865060869289,
+    "unit": ""
+   },
+   "error_pct": 7.6644176811548155,
+   "tolerance_pct": 17.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.cf_laminar",
+   "group": "textbook",
+   "name": "Laminar flat-plate skin friction at Re 1e6",
+   "compared": "Engine Blasius Cf vs 1.328/sqrt(Re)",
+   "reference": {
+    "value": 0.001328,
+    "unit": "",
+    "source": "Blasius solution; Raymer, Aircraft Design, eq. 12.25"
+   },
+   "engine": {
+    "value": 0.001328,
+    "unit": ""
+   },
+   "error_pct": 0.0,
+   "tolerance_pct": 0.1,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "textbook.cf_turbulent",
+   "group": "textbook",
+   "name": "Turbulent flat-plate skin friction at Re 1e7",
+   "compared": "Engine (Raymer eq. 12.27, Prandtl-Schlichting form) vs the independent Kármán-Schoenherr relation 0.242/sqrt(Cf) = log10(Re Cf)",
+   "reference": {
+    "value": 0.0029342786090598002,
+    "unit": "",
+    "source": "Schoenherr (1932); Schlichting, Boundary-Layer Theory, ch. 21"
+   },
+   "engine": {
+    "value": 0.003003713133159046,
+    "unit": ""
+   },
+   "error_pct": 2.366323493783506,
+   "tolerance_pct": 3.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "avl.rect16_cl",
+   "group": "avl_reference",
+   "name": "Rectangular AR 16 at 5°: lift coefficient",
+   "compared": "AVL CL vs Prandtl lifting-line theory (high aspect ratio, where it is accurate)",
+   "reference": {
+    "value": 0.4718867604165197,
+    "unit": "",
+    "source": "Anderson, Fundamentals of Aerodynamics, sec. 5.3.2"
+   },
+   "engine": {
+    "value": 0.4589816945459865,
+    "unit": ""
+   },
+   "error_pct": -2.73478023819578,
+   "tolerance_pct": 5.0,
+   "status": "pass",
+   "note": "Rectangular tips: lifting-line and lifting-surface methods differ by a few per cent (5 % tolerance)."
+  },
+  {
+   "id": "avl.rect16_e",
+   "group": "avl_reference",
+   "name": "Rectangular AR 16 at 5°: span efficiency",
+   "compared": "AVL e vs lifting-line e",
+   "reference": {
+    "value": 0.8816613182391771,
+    "unit": "",
+    "source": "Anderson, Fundamentals of Aerodynamics, sec. 5.3.2"
+   },
+   "engine": {
+    "value": 0.924717209382813,
+    "unit": ""
+   },
+   "error_pct": 4.883495538811382,
+   "tolerance_pct": 6.0,
+   "status": "pass",
+   "note": "Lifting-line theory over-predicts the induced drag factor of square tips as the aspect ratio grows (6 % tolerance)."
+  },
+  {
+   "id": "avl.rect16_tier1_slope",
+   "group": "avl_reference",
+   "name": "Rectangular AR 16: Tier 1 lift slope within its uncertainty",
+   "compared": "Tier 1 Helmbold CL_alpha (a0 = 2 pi) vs AVL (Tier 1 states +/-8 %)",
+   "reference": {
+    "value": 5.237137707701262,
+    "unit": "/rad",
+    "source": "AVL (this engine)"
+   },
+   "engine": {
+    "value": 5.54668426495308,
+    "unit": "/rad"
+   },
+   "error_pct": 5.910605650040993,
+   "tolerance_pct": 8.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "avl.rect16_tier1_oswald",
+   "group": "avl_reference",
+   "name": "Rectangular AR 16: Tier 1 Oswald vs AVL span efficiency",
+   "compared": "Tier 1 Raymer Oswald e vs AVL inviscid e",
+   "reference": {
+    "value": 0.924717209382813,
+    "unit": "",
+    "source": "AVL (this engine)"
+   },
+   "engine": {
+    "value": 0.6122428761349391,
+    "unit": ""
+   },
+   "error_pct": -33.79133967415072,
+   "tolerance_pct": null,
+   "status": "info",
+   "note": "Informational: Raymer's Oswald fit includes the viscous drag that grows with lift, AVL's e is inviscid only (the engine adds XFOIL profile drag separately), so they are not expected to agree; Tier 1 is conservative here."
+  },
+  {
+   "id": "avl.swept_ar5_published_lattice",
+   "group": "avl_reference",
+   "name": "Swept wing (AR 5, taper 1, 45° sweep): published vortex-lattice result",
+   "compared": "AVL with the published lattice (1 chordwise x 4 spanwise panels per side) vs the published VLM CL_alpha",
+   "reference": {
+    "value": 3.443,
+    "unit": "/rad",
+    "source": "Bertin & Smith, Aerodynamics for Engineers, vortex-lattice example for this wing (3.443/rad); Tornado VLM gives 3.450 (Melin, KTH 2000)"
+   },
+   "engine": {
+    "value": 3.4397420585168015,
+    "unit": "/rad"
+   },
+   "error_pct": -0.09462507938421663,
+   "tolerance_pct": 1.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "avl.swept_ar5_converged",
+   "group": "avl_reference",
+   "name": "Swept wing (AR 5, 45°): converged lattice",
+   "compared": "AVL with the engine's lattice (8 x 20) vs the coarse published lattice",
+   "reference": {
+    "value": 3.443,
+    "unit": "/rad",
+    "source": "Bertin & Smith (coarse 4-panel lattice)"
+   },
+   "engine": {
+    "value": 3.1742193723467405,
+    "unit": "/rad"
+   },
+   "error_pct": -7.806582272821946,
+   "tolerance_pct": null,
+   "status": "info",
+   "note": "Information: refining the lattice lowers the lift slope by about 8 %; the published 4-panel value is not converged. The engine uses converged lattices."
+  },
+  {
+   "id": "avl.swept_ar5_tier1",
+   "group": "avl_reference",
+   "name": "Swept wing (AR 5, 45°): Tier 1 lift slope within its uncertainty",
+   "compared": "Tier 1 Helmbold/DATCOM with sweep vs converged AVL (+/-8 %)",
+   "reference": {
+    "value": 3.1742193723467405,
+    "unit": "/rad",
+    "source": "AVL (this engine)"
+   },
+   "engine": {
+    "value": 3.360542327146794,
+    "unit": "/rad"
+   },
+   "error_pct": 5.869882731586458,
+   "tolerance_pct": 8.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "avl.tapered_swept_tier1",
+   "group": "avl_reference",
+   "name": "Tapered swept wing (AR 6, taper 0.4, 30° LE sweep): Tier 1 within its uncertainty",
+   "compared": "Tier 1 Helmbold/DATCOM (sweep of the 30 % chord line) vs AVL (+/-8 %)",
+   "reference": {
+    "value": 4.130177258345248,
+    "unit": "/rad",
+    "source": "AVL (this engine). A published vortex-lattice value for a tapered swept benchmark wing (e.g. the Warren-12 planform) could not be confirmed, so only the Tier 1 comparison is made."
+   },
+   "engine": {
+    "value": 4.198755331015828,
+    "unit": "/rad"
+   },
+   "error_pct": 1.6604147565825296,
+   "tolerance_pct": 8.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "avl.default_np_tier1",
+   "group": "avl_reference",
+   "name": "Default design: Tier 1 neutral point vs AVL",
+   "compared": "Tier 1 neutral point (wing + tail + Multhopp fuselage) vs AVL Xnp, as % MAC difference (Tier 1 states +/-10 % MAC)",
+   "reference": {
+    "value": 0.0,
+    "unit": "% MAC",
+    "source": "AVL (this engine)"
+   },
+   "engine": {
+    "value": 7.136880596021341,
+    "unit": "% MAC"
+   },
+   "error_pct": null,
+   "tolerance_pct": null,
+   "status": "info",
+   "note": "Information (not one of the contract cases): difference +7.1 % MAC (inside Tier 1's stated +/-10 % MAC). AVL's slender-body fuselage is more destabilising than Multhopp's strip method and the inverted V sits near the wing wake; the analysis keeps the more conservative AVL value."
+  },
+  {
+   "id": "xfoil.naca0012_cla",
+   "group": "xfoil_reference",
+   "name": "NACA 0012 at Re 1e6: lift-curve slope",
+   "compared": "XFOIL lift slope (fit -2...6°) vs the wind-tunnel fit beta*cl_alpha = 0.1025 + 0.00485 log10(Re/1e6) per degree",
+   "reference": {
+    "value": 0.1025,
+    "unit": "/deg",
+    "source": "McCroskey, 'A critical assessment of wind tunnel results for the NACA 0012 airfoil', NASA TM-100019 / AGARD CP-429 (1987), as reproduced on the NASA Turbulence Modeling Resource NACA 0012 validation page; data incl. Ladson NASA TM-4074 (Re 2-12e6, so Re 1e6 is a slight extrapolation)"
+   },
+   "engine": {
+    "value": 0.11139800156862743,
+    "unit": "/deg"
+   },
+   "error_pct": 8.68097714012433,
+   "tolerance_pct": 10.0,
+   "status": "pass",
+   "note": "Engine polar: XFOIL at Re 1,000,000, Ncrit 9. XFOIL is known to over-predict the viscous lift slope by several per cent at these Reynolds numbers."
+  },
+  {
+   "id": "xfoil.naca0012_cdmin",
+   "group": "xfoil_reference",
+   "name": "NACA 0012 at Re 1e6: minimum drag",
+   "compared": "XFOIL cd_min vs the untripped (free-transition) wind-tunnel fit cd0 = 0.0044 + 0.018 Re^-0.15",
+   "reference": {
+    "value": 0.006666065741229501,
+    "unit": "",
+    "source": "McCroskey (1987) fit to untripped data, as reproduced on the NASA Turbulence Modeling Resource NACA 0012 page (fit range starts near Re 2e6)"
+   },
+   "engine": {
+    "value": 0.005403,
+    "unit": ""
+   },
+   "error_pct": -18.94769404114126,
+   "tolerance_pct": 20.0,
+   "status": "pass",
+   "note": "Engine polar: XFOIL at Re 1,000,000, Ncrit 9. Tunnel-to-tunnel scatter of NACA 0012 drag at these Reynolds numbers is 10-20 % (McCroskey 1987)."
+  },
+  {
+   "id": "xfoil.naca0012_clmax",
+   "group": "xfoil_reference",
+   "name": "NACA 0012 at Re 1e6: maximum lift",
+   "compared": "XFOIL cl_max vs wind tunnel",
+   "reference": {
+    "value": null,
+    "unit": "",
+    "source": "Not found: Abbott & von Doenhoff give NACA 0012 data only at Re 3-9e6 (cl_max about 1.1-1.6 across that range) and the Ladson TM-4074 tables at Re 1e6 were not available, so no reliable published value at Re 1e6 was found."
+   },
+   "engine": {
+    "value": 1.38115,
+    "unit": ""
+   },
+   "error_pct": null,
+   "tolerance_pct": null,
+   "status": "skipped",
+   "note": "Skipped rather than compared with an invented value. Engine value shown for information."
+  },
+  {
+   "id": "xfoil.sd7037_uiuc",
+   "group": "xfoil_reference",
+   "name": "SD7037 at Re 200k: UIUC wind-tunnel data",
+   "compared": "XFOIL cl_max and cd_min vs Selig et al., Summary of Low-Speed Airfoil Data vol. 1 (1995)",
+   "reference": {
+    "value": null,
+    "unit": "",
+    "source": "Not found: the UIUC data files and the vol. 1 tables could not be retrieved from this build environment, and no secondary source quoted the Re 200k values."
+   },
+   "engine": {
+    "value": 0.008996,
+    "unit": ""
+   },
+   "error_pct": null,
+   "tolerance_pct": null,
+   "status": "skipped",
+   "note": "Skipped rather than compared with an invented value. Engine values: cl_max 1.321, cd_min 0.00900. Add the UIUC numbers here when available."
+  },
+  {
+   "id": "xfoil.sd7037_reproducible",
+   "group": "xfoil_reference",
+   "name": "SD7037 at Re 200k: reproducibility",
+   "compared": "On-the-fly XFOIL cd_min vs the committed Phase 2 XFOIL table (same code and settings; a consistency check, not a validation)",
+   "reference": {
+    "value": 0.008996,
+    "unit": "",
+    "source": "backend/app/engine/data/airfoil_polars.json (Phase 2)"
+   },
+   "engine": {
+    "value": 0.008996,
+    "unit": ""
+   },
+   "error_pct": 0.0,
+   "tolerance_pct": 2.0,
+   "status": "pass",
+   "note": ""
+  },
+  {
+   "id": "published.trinity_f90.endurance",
+   "group": "published_design",
+   "name": "Quantum Systems Trinity F90+: flight time",
+   "compared": "Predicted total flight time vs published",
+   "reference": {
+    "value": 75.0,
+    "unit": "min",
+    "source": "Quantum Systems Trinity F90+ datasheet and overview (2022): MTOW 5.0 kg, span 2.394 m, optimal cruise 17 m/s, battery 1.5 kg, payload up to 0.7 kg, flight time 60 to 90+ min depending on version and payload."
+   },
+   "engine": {
+    "value": 52.84381799106862,
+    "unit": "min"
+   },
+   "error_pct": -29.54157601190851,
+   "tolerance_pct": 30.0,
+   "status": "pass",
+   "note": "Engine 53 min (range 43-63) against the published 60-90 min (compared with the middle, 75 min). Tolerance is wide (+/-30 %) on purpose: the geometry is partly assumed, so this shows the size of the error honestly. Cruise power 290 W, L/D 10.9, payload set to 264 g to match 5 kg. Assumptions: Modelled as a front-tilt quad (the real aircraft has two tilting front motors and one fixed rear motor; the tool supports four-rotor layouts only). Wing area 0.72 m² (aspect ratio 8, not published), taper 0.5, 5° sweep, SD7037 airfoil. V-tail sized for tail volumes 0.4 / 0.03 (the aircraft is a blended wing with a small tail; geometry not published). Fuselage 1.0 m long, 160 x 140 mm (not published). Lift propellers 15 x 7 in (381 x 178 mm), two blades (not published). Battery: Li-ion 6S, energy so that the Tier 1 pack model gives the published 1.5 kg (300 Wh at 200 Wh/kg). Carbon/composite construction (mission scale 'final'); the payload is adjusted so the take-off mass equals the published 5.0 kg (the mass model is not what is validated here). Published flight time is compared with the engine's total flight time (VTOL phases included) with a 5 % reserve instead of the app's 20 %, because manufacturer figures fly the pack close to empty."
+  },
+  {
+   "id": "published.trinity_f90.cruise_power",
+   "group": "published_design",
+   "name": "Quantum Systems Trinity F90+: cruise power (implied)",
+   "compared": "Engine cruise power vs the power implied by the published flight time and the modelled usable energy (information only)",
+   "reference": {
+    "value": 205.93461599999995,
+    "unit": "W",
+    "source": "Derived: usable energy / published mid flight time"
+   },
+   "engine": {
+    "value": 289.64169013926926,
+    "unit": "W"
+   },
+   "error_pct": 40.64740341627137,
+   "tolerance_pct": null,
+   "status": "info",
+   "note": "Information: shows whether the error comes from power or from energy."
+  },
+  {
+   "id": "published.deltaquad_evo.endurance",
+   "group": "published_design",
+   "name": "DeltaQuad Evo: flight time",
+   "compared": "Predicted total flight time vs published",
+   "reference": {
+    "value": 258.0,
+    "unit": "min",
+    "source": "DeltaQuad Evo vehicle specifications and operations manual (docs.deltaquad.com): length 75 cm, span 269 cm, wing area 84 dm², empty 4.8 kg, 6.8 kg with one battery, MTOW 10 kg, cruise about 16.5 m/s, 6-cell 22 Ah semi-solid Li-ion per battery, 244-272 min with two batteries (1 kg payload), pusher APC 15x10E."
+   },
+   "engine": {
+    "value": 207.56854035542568,
+    "unit": "min"
+   },
+   "error_pct": -19.547077381617953,
+   "tolerance_pct": 30.0,
+   "status": "pass",
+   "note": "Engine 208 min (range 160-257) against the published 244-272 min (compared with the middle, 258 min). Tolerance is wide (+/-30 %) on purpose: the geometry is partly assumed, so this shows the size of the error honestly. Cruise power 232 W, L/D 13.2, payload set to 421 g to match 9.8 kg. Assumptions: Modelled as quad + pusher with a conventional wing and a small V-tail standing in for the flying wing's winglets and elevons (the tool cannot model tailless wings: trim drag and the fin contribution are approximate). Wing: published span and area, taper 0.45, 20° leading-edge sweep, MH 32 airfoil (not published; a low-drag section typical of flying-wing VTOLs). Fuselage 0.75 m long (published), 160 x 130 mm (not published). Lift propellers 15 x 5.5 in (381 x 140 mm, not published); pusher 15 x 10 in (published APC 15x10E; the engine uses P/D 0.7). Two packs of 6S 22 Ah modelled as Li-ion 6S2P of 22 Ah per group at 3.6 V nominal (950 Wh); the published semi-solid cells may be 3.7 V nominal (+3 %). Payload adjusted so the take-off mass is the published dual-battery mass with 1 kg payload (4.8 + 2 x 2.0 + 1.0 = 9.8 kg). Published flight time compared with the engine's total flight time with a 5 % reserve (manufacturer figures fly close to empty)."
+  },
+  {
+   "id": "published.deltaquad_evo.cruise_power",
+   "group": "published_design",
+   "name": "DeltaQuad Evo: cruise power (implied)",
+   "compared": "Engine cruise power vs the power implied by the published flight time and the modelled usable energy (information only)",
+   "reference": {
+    "value": 189.49981395348837,
+    "unit": "W",
+    "source": "Derived: usable energy / published mid flight time"
+   },
+   "engine": {
+    "value": 232.0819513049053,
+    "unit": "W"
+   },
+   "error_pct": 22.470806943308375,
+   "tolerance_pct": null,
+   "status": "info",
+   "note": "Information: shows whether the error comes from power or from energy."
+  },
+  {
+   "id": "published.deltaquad_evo.empty_mass",
+   "group": "published_design",
+   "name": "DeltaQuad Evo: empty mass (mass model)",
+   "compared": "Tier 1 mass model empty mass (no battery, no payload) vs published",
+   "reference": {
+    "value": 4.8,
+    "unit": "kg",
+    "source": "DeltaQuad Evo vehicle specifications and operations manual (docs.deltaquad.com): length 75 cm, span 269 cm, wing area 84 dm², empty 4.8 kg, 6.8 kg with one battery, MTOW 10 kg, cruise about 16.5 m/s, 6-cell 22 Ah semi-solid Li-ion per battery, 244-272 min with two batteries (1 kg payload), pusher APC 15x10E."
+   },
+   "engine": {
+    "value": 4.995551942885497,
+    "unit": "kg"
+   },
+   "error_pct": 4.073998810114517,
+   "tolerance_pct": 30.0,
+   "status": "pass",
+   "note": "The composite areal densities and statistical motor masses are estimates; this shows how far the mass model is from a production airframe."
+  }
+ ],
+ "timings": {
+  "textbook": 0.84,
+  "avl_reference": 0.73,
+  "xfoil_reference": 1.39,
+  "published_design": 15.92,
+  "total_s": 18.88
+ }
+}

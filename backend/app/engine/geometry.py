@@ -34,7 +34,7 @@ DESIGN_V2_DEFAULTS: dict[str, Any] = {
         "cells_series": 6,
         "cells_parallel": 1,
         "capacity_mah": 5000.0,
-        "x_mm": 380.0,
+        "x_mm": 290.0,
     },
     "allowances": {"avionics_g": 220.0, "wiring_fraction": 0.06},
 }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -48,6 +48,30 @@ class VersionCreate(BaseModel):
     @property
     def is_explicit(self) -> bool:
         return self.parameters is not None
+
+
+class PatchBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: int = Field(description="A saved version of the same project.")
+
+
+class VersionFromPatch(BaseModel):
+    """ "Try as new version": a base document plus a parameter patch, saved as a new version."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    name: str = Field(max_length=VERSION_NAME_MAX_LENGTH)
+    notes: str = Field("", max_length=10000)
+    base: Literal["draft"] | PatchBase = Field(
+        "draft", description='"draft" or {"version_id": ...}: the document the patch applies to.'
+    )
+    patch: dict[str, Any] = Field(
+        description="{dotted.path: value}; paths are design parameters (wing.span_mm) or, with "
+        "a 'mission.' prefix, mission fields."
+    )
+
+    _clean = field_validator("name")(_clean_name)
 
 
 class VersionUpdate(BaseModel):

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DesignParameters } from '../api/types';
-import { defaultParameters } from './__fixtures__/designs';
+import { newProjectParameters } from './__fixtures__/designs';
 import {
   airfoilShape,
   buildGeometry,
@@ -15,7 +15,7 @@ import {
 import { degToRad } from './units';
 
 function withWing(span: number, root: number, tip: number, sweep = 0): DesignParameters {
-  const p = defaultParameters();
+  const p = newProjectParameters();
   return { ...p, wing: { ...p.wing, span_mm: span, root_chord_mm: root, tip_chord_mm: tip, sweep_deg: sweep } };
 }
 
@@ -81,7 +81,7 @@ describe('wing planform (closed-form, hand-checked)', () => {
 
   it('exposed area removes the strip inside the fuselage', () => {
     // Default: S = 0.396 m^2; fuselage 110 mm wide; chord at y = 55 mm is 260 - 80 x 55/900 = 255.111 mm.
-    const g = buildGeometry(defaultParameters());
+    const g = buildGeometry(newProjectParameters());
     const strip = 55 * (260 + (260 - (80 * 55) / 900)) / 1e6;
     expect(g.wing.exposed_area_m2).toBeCloseTo(0.396 - strip, 10);
   });
@@ -97,7 +97,7 @@ describe('fuselage and sections', () => {
   });
 
   it('fuselage wetted area lies between the bare tube and a Raymer-style top/side estimate', () => {
-    const g = buildGeometry(defaultParameters());
+    const g = buildGeometry(newProjectParameters());
     const tube = (sectionPerimeter('rounded_rect', 110, 120) * 900) / 1e6;
     expect(g.fuselage.wetted_area_m2).toBeLessThan(tube);
     expect(g.fuselage.wetted_area_m2).toBeGreaterThan(0.7 * tube);
@@ -122,7 +122,7 @@ describe('fuselage and sections', () => {
 
 describe('tail by projection', () => {
   it('V tail: panel area span x chord / cos(angle), horizontal S cos, vertical S sin, pitch-effective S cos^2', () => {
-    const p = defaultParameters();
+    const p = newProjectParameters();
     const g = buildGeometry(p);
     const sc = 0.5 * 0.14;
     const gam = degToRad(40);
@@ -138,7 +138,7 @@ describe('tail by projection', () => {
   });
 
   it('conventional and twin-boom H tails: fins from tail height', () => {
-    const base = defaultParameters();
+    const base = newProjectParameters();
     const conv = buildGeometry({ ...base, tail: { ...base.tail, type: 'conventional' } });
     expect(conv.tail.horizontal_area_m2).toBeCloseTo(0.07, 12);
     expect(conv.tail.vertical_area_m2).toBeCloseTo(0.18 * 0.14, 12);
@@ -150,7 +150,7 @@ describe('tail by projection', () => {
 
 describe('booms, rotors and statuses', () => {
   it('places booms and motors in the Phase 2 coordinate system', () => {
-    const g = buildGeometry(defaultParameters());
+    const g = buildGeometry(newProjectParameters());
     // Boom front = x_le + x_offset = 300 - 250 = 50; motors at 50 + 40 and 50 + 660; z = wing z + 25.
     expect(g.booms[1].start).toEqual([50, 300, 0]);
     expect(g.booms[1].end).toEqual([750, 300, 0]);
@@ -162,7 +162,7 @@ describe('booms, rotors and statuses', () => {
   });
 
   it('quad + pusher adds a pusher rotor and no tilt hinge; rear tilt tilts the rear pair', () => {
-    const p = defaultParameters();
+    const p = newProjectParameters();
     const q = buildGeometry({ ...p, layout: 'quad_pusher' });
     expect(q.rotors.find((r) => r.id === 'pusher')?.axis).toEqual([-1, 0, 0]);
     expect(q.tilt_hinge_x_mm).toBeNull();
@@ -173,13 +173,13 @@ describe('booms, rotors and statuses', () => {
   });
 
   it('flags overlapping propellers', () => {
-    const p = defaultParameters();
+    const p = newProjectParameters();
     const g = buildGeometry({ ...p, motors: { ...p.motors, rear_x_mm: 300 } });
     expect(g.statuses.find((s) => s.key === 'geometry.props_fore_aft')?.level).toBe('fail');
   });
 
   it('fills schema v2 defaults for a v1 document', () => {
-    const p = defaultParameters();
+    const p = newProjectParameters();
     const v1: DesignParameters = { ...p, schema_version: 1, propulsion: undefined, battery: undefined, allowances: undefined };
     const r = withDefaults(v1);
     expect(r.propulsion.prop_diameter_mm).toBe(330);
@@ -188,7 +188,7 @@ describe('booms, rotors and statuses', () => {
   });
 
   it('render primitives: wing and tail sections, booms, props, hinges and gear', () => {
-    const g = buildGeometry(defaultParameters());
+    const g = buildGeometry(newProjectParameters());
     const names = g.render.surfaces.map((s) => s.name);
     expect(names).toEqual(['wing_right', 'wing_left', 'tail_right', 'tail_left']);
     const tip = g.render.surfaces[0].sections[1];
@@ -198,7 +198,7 @@ describe('booms, rotors and statuses', () => {
     expect(g.render.tilt_hinges).toHaveLength(2);
     expect(g.render.landing_gear.segments.length).toBeGreaterThan(0);
     expect(g.render.fuselage.nose_bay_x1_mm).toBe(180);
-    const custom = buildGeometry(defaultParameters(), { coordinates: { sd7037: [[1, 0], [0.5, 0.05], [0, 0], [0.5, -0.02], [1, 0]] } });
+    const custom = buildGeometry(newProjectParameters(), { coordinates: { sd7037: [[1, 0], [0.5, 0.05], [0, 0], [0.5, -0.02], [1, 0]] } });
     expect(custom.render.surfaces[0].sections[0]).toHaveLength(5);
   });
 });

@@ -89,7 +89,7 @@ describe('balance', () => {
   it('moving the battery forward moves the CG forward and increases the static margin', () => {
     const base = defaultInput();
     const fwd = defaultInput();
-    fwd.parameters.battery = { ...fwd.parameters.battery!, x_mm: 300 };
+    fwd.parameters.battery = { ...fwd.parameters.battery!, x_mm: fwd.parameters.battery!.x_mm - 80 };
     const a = estimate(base);
     const b = estimate(fwd);
     expect(b.balance!.cg_max_payload_x.value).toBeLessThan(a.balance!.cg_max_payload_x.value);

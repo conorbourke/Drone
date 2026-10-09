@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -75,6 +75,9 @@ class Checks(_Doc):
     battery_current_max_fraction_of_rating: float = Field(
         _S["checks"]["battery_current_max_fraction_of_rating"]
     )
+    manoeuvre_load_factor: float = Field(_S["checks"]["manoeuvre_load_factor"])
+    structural_safety_factor: float = Field(_S["checks"]["structural_safety_factor"])
+    transition_thrust_margin_min: float = Field(_S["checks"]["transition_thrust_margin_min"])
 
     @model_validator(mode="after")
     def _sane(self) -> Checks:
@@ -103,6 +106,34 @@ class Checks(_Doc):
                 "The battery current fraction must be between 0 and 1 (for example 0.8 "
                 "for 80 % of the pack's continuous rating)."
             )
+        if not 1 <= self.manoeuvre_load_factor <= 10:
+            raise ValueError(
+                "The manoeuvre load factor must be between 1 and 10 g (1 g is level flight; "
+                "small drones are usually designed for 3 to 4 g)."
+            )
+        if not 1 <= self.structural_safety_factor <= 5:
+            raise ValueError(
+                "The structural safety factor must be between 1 and 5 (1.5 is the usual "
+                "aviation value)."
+            )
+        if not 1 <= self.transition_thrust_margin_min <= 5:
+            raise ValueError(
+                "The minimum transition thrust margin must be between 1 and 5: below 1 the "
+                "motors could not hold the aircraft up during the transition."
+            )
+        return self
+
+
+class Analysis(_Doc):
+    ncrit: float = Field(_S["analysis"]["ncrit"])
+
+    @model_validator(mode="after")
+    def _sane(self) -> Analysis:
+        if not 1 <= self.ncrit <= 14:
+            raise ValueError(
+                "The XFOIL transition parameter Ncrit must be between 1 and 14 (9 is clean "
+                "air and a smooth wing)."
+            )
         return self
 
 
@@ -111,11 +142,24 @@ class Units(_Doc):
 
 
 class SettingsDocument(_Doc):
-    schema_version: Literal[1] = SETTINGS_SCHEMA_VERSION
+    schema_version: Literal[2] = SETTINGS_SCHEMA_VERSION
     printer: Printer = Field(default_factory=Printer)
     limits: Limits = Field(default_factory=Limits)
     checks: Checks = Field(default_factory=Checks)
+    analysis: Analysis = Field(default_factory=Analysis)
     units: Units = Field(default_factory=Units)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _upgrade_older(cls, data: Any) -> Any:
+        """A document written for an older schema (for example by a browser tab opened
+        before an update) is upgraded first; its new fields then take their defaults."""
+        if isinstance(data, dict) and isinstance(data.get("schema_version"), int):
+            from app.schemas.migrate import upgrade_settings
+
+            if data["schema_version"] < SETTINGS_SCHEMA_VERSION:
+                return upgrade_settings(data)
+        return data
 
 
 class SettingsMeta(BaseModel):

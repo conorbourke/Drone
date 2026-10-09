@@ -1,6 +1,6 @@
 [project]
 name = "vtol-drone-backend"
-version = "0.2.0"
+version = "0.3.0"
 description = "Backend for the VTOL drone design tool: FastAPI API, SQLite storage, static SPA serving."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -21,6 +21,11 @@ dependencies = [
     "optvl>=2.5.0",
     "numpy>=2.5.3",
     "scipy>=1.18.1",
+    "cadquery>=2.8",
+    "ezdxf>=1.4",
+    "reportlab>=4.2",
+    "trimesh>=4.5",
+    "manifold3d>=3.0",
 ]
 
 [dependency-groups]

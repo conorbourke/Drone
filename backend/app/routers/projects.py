@@ -5,14 +5,14 @@ from __future__ import annotations
 import copy
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.db import utcnow
 from app.defaults import DEFAULT_DESIGN_PARAMETERS, DEFAULT_MISSION
 from app.deps import AppSettings, CurrentUser, DbSession, current_user
 from app.imaging import remove_project_files
-from app.models import DesignVersion, Project, User
+from app.models import Analysis, DesignVersion, Project, User
 from app.routers.common import conflict, draft_payload, owned_project
 from app.schemas.project import (
     DraftIn,
@@ -149,6 +149,9 @@ def delete_project(
     """Delete a project. The DDL cascades its versions, images and readings; the image files
     are removed with the project's directory once the rows are gone."""
     project = owned_project(db, user, project_id)
+    # Analyses first: their version reference is ON DELETE RESTRICT, which SQLite checks as
+    # each version row goes, before the project cascade would reach the analyses.
+    db.execute(delete(Analysis).where(Analysis.project_id == project.id))
     db.delete(project)
     try:
         db.commit()

@@ -1,5 +1,6 @@
 /**
- * Performance (docs/ENGINE.md "Performance"): cruise power from drag, hover power from momentum
+ * Performance (docs/ENGINE.md "Performance"): cruise power from drag through the generic
+ * propeller CT(J), CP(J) model at the cruise thrust and speed, hover power from momentum
  * theory with a figure of merit, transition power, battery current and C-rate, and the mission
  * energy budget giving endurance and range. Ranges come from one-at-a-time perturbation of the
  * stated uncertainty factors, combined by root-sum-square (quantity.ts, rule 2).
@@ -12,10 +13,12 @@ import {
   G0,
   HOVER_DOWNLOAD_FRACTION,
   MISSION_PROFILE,
+  PROP_COEFF_UNCERTAINTY,
   TRANSITION_POWER_FACTOR,
   UNCERTAINTY,
 } from './constants';
 import { idealHoverPower } from './mass';
+import { propOperatingPoint, type GenericPropeller } from './propeller';
 import { oneAtATime, qRange, type QuantityText } from './quantity';
 import type { MissionSegment, Quantity } from './types';
 import { clamp } from './units';
@@ -30,8 +33,11 @@ export interface PerfInputs {
   cd0: number;
   oswald: number;
   aspectRatio: number;
-  /** Cruise propeller efficiency. */
-  etaProp: number;
+  /**
+   * The cruise propeller(s): the generic propeller model, solved at thrust = drag / count and the
+   * cruise speed for its efficiency; or a fixed efficiency (hand-calculation tests only).
+   */
+  cruiseProp: CruiseProp;
   /** Area of one lift propeller disc, m^2. */
   discArea: number;
   avionicsW: number;
@@ -41,15 +47,20 @@ export interface PerfInputs {
   capacityAh: number;
 }
 
+export type CruiseProp = { propeller: GenericPropeller; count: number } | { fixedEfficiency: number };
+
 export interface PerfFactors {
   drag: number;
   mass: number;
   energy: number;
   fmDelta: number;
   eta: number;
+  /** Cruise propeller thrust and power coefficient factors (+/-15 % each, as the server). */
+  ct: number;
+  cp: number;
 }
 
-export const NOMINAL_FACTORS: PerfFactors = { drag: 1, mass: 1, energy: 1, fmDelta: 0, eta: 1 };
+export const NOMINAL_FACTORS: PerfFactors = { drag: 1, mass: 1, energy: 1, fmDelta: 0, eta: 1, ct: 1, cp: 1 };
 
 export interface PerfCore {
   weightN: number;
@@ -58,6 +69,10 @@ export interface PerfCore {
   cd: number;
   dragN: number;
   liftToDrag: number;
+  /** Cruise propeller efficiency J CT / CP at the cruise operating point (or the fixed value). */
+  cruisePropEfficiency: number;
+  /** Cruise advance ratio J (0 with a fixed efficiency). */
+  cruisePropJ: number;
   cruisePowerW: number;
   hoverPowerW: number;
   transitionPowerW: number;
@@ -82,7 +97,11 @@ export function performanceCore(i: PerfInputs, f: PerfFactors = NOMINAL_FACTORS)
   const cdi = (cl * cl) / (Math.PI * i.oswald * i.aspectRatio);
   const cd = (i.cd0 + cdi) * f.drag;
   const drag = q * i.wingArea * cd;
-  const etaCruise = i.etaProp * ETA_MOTOR * ETA_ESC * f.eta;
+  const prop = i.cruiseProp;
+  const op = 'propeller' in prop
+    ? propOperatingPoint(prop.propeller, drag / Math.max(1, prop.count), i.speed, i.rho, f.ct, f.cp)
+    : { j: 0, efficiency: prop.fixedEfficiency };
+  const etaCruise = op.efficiency * ETA_MOTOR * ETA_ESC * f.eta;
   const cruisePower = (drag * i.speed) / etaCruise + i.avionicsW;
 
   const thrust = W * (1 + HOVER_DOWNLOAD_FRACTION);
@@ -115,6 +134,8 @@ export function performanceCore(i: PerfInputs, f: PerfFactors = NOMINAL_FACTORS)
     cd,
     dragN: drag,
     liftToDrag: cl / cd,
+    cruisePropEfficiency: op.efficiency,
+    cruisePropJ: op.j,
     cruisePowerW: cruisePower,
     hoverPowerW: hoverPower,
     transitionPowerW: transitionPower,
@@ -146,6 +167,8 @@ export function performanceWithRanges(i: PerfInputs, massRel: number) {
     energy: perturb({ energy: 1 - UNCERTAINTY.battery_energy }, { energy: 1 + UNCERTAINTY.battery_energy }),
     fm: perturb({ fmDelta: -UNCERTAINTY.figure_of_merit_abs }, { fmDelta: UNCERTAINTY.figure_of_merit_abs }),
     eta: perturb({ eta: 1 - UNCERTAINTY.propulsive_efficiency }, { eta: 1 + UNCERTAINTY.propulsive_efficiency }),
+    ct: perturb({ ct: 1 - PROP_COEFF_UNCERTAINTY }, { ct: 1 + PROP_COEFF_UNCERTAINTY }),
+    cp: perturb({ cp: 1 - PROP_COEFF_UNCERTAINTY }, { cp: 1 + PROP_COEFF_UNCERTAINTY }),
   };
   /** Build a Quantity for one output, using only the named factors. */
   const quantity = (

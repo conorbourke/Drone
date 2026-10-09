@@ -13,6 +13,7 @@ This is the reference for the instant estimates that run in the browser on every
 | `mass.ts` | Component weights, battery, motor sizing, the weight fixed-point loop, balance point |
 | `aero.ts` | Airfoil data lookup, lift-curve slope, maximum lift, stall, drag build-up, Oswald, neutral point |
 | `performance.ts` | Cruise, hover and transition power, mission energy, endurance, range, battery current |
+| `propeller.ts` | Generic propeller CT(J), CP(J) curves (a port of the server's `propulsion.py`) for the cruise propeller efficiency |
 | `checks.ts` | Input validation and the pass/warn/fail checks with plain messages |
 | `compare.ts` | The three-layout comparison |
 | `atmosphere.ts`, `units.ts`, `quantity.ts`, `constants.ts`, `types.ts` | Air, unit conversions, uncertainty rules, every constant with its source, types |
@@ -173,14 +174,23 @@ Lift-to-drag = CL/(CD₀ + CD_i).
   - Over the wing root the strips are skipped. Behind it the factor is (x/l_h)(1 − dε/dα).
   - Booms and motor pods are not included (small; Phase 3 AVL bodies).
 - Static margin = (x_np − x_cg)/c̄, reported in % MAC at both payloads. Moving the battery forward raises it (tested).
+- **Against AVL.** On the default design AVL's neutral point (server analysis) is 16 mm, 7.2 % MAC, forward of this method's. AVL models the fuselage as a slender body, which is more destabilising than Multhopp's strips on this short, wide fuselage, and it computes the downwash at the actual tail position (the inverted V dips towards the wing wake). The server notes differences of up to about 10 % MAC on short, wide fuselages and offers no simple correction to the fuselage term, so the method is unchanged and the neutral-point band is ±10 % MAC instead (Uncertainty model, rule 5). The full analysis uses AVL's value.
 
 ## Performance (`performance.ts`)
 
 - **Cruise power** = D V / (η_prop η_motor η_ESC) + avionics.
   - D = qS(CD₀ + CD_i).
-  - η_motor = 0.85 and η_ESC = 0.95 (Gundlach ch. 7 ranges 0.80–0.90 and 0.93–0.97).
-  - η_prop = 0.65 for tilt layouts, which cruise on hover-sized propellers running lightly loaded, and 0.75 for the pusher's cruise propeller (Brandt & Selig, UIUC propeller data: small propellers peak 0.55–0.80).
+  - η_motor = 0.85 and η_ESC = 0.95 (Gundlach ch. 7 ranges 0.80–0.90 and 0.93–0.97). The server's ESC is also 0.95; its motor model gives 0.87–0.88 at cruise for the generic motors, close enough that Tier 1 keeps 0.85.
+  - η_prop comes from the propeller model below, at the cruise thrust and speed, for the propellers that fly the cruise: the tilting pair (thrust = D/2 each) in front and rear tilt, the pusher (thrust = D) in quad + pusher. It is reported as `cruise_propeller_efficiency`.
   - Avionics draw 8 W for the prototype and 25 W for the final aircraft (estimate: autopilot, GPS, radios, servos).
+- **Propeller model** (`propeller.ts`, a compact port of the server's `backend/app/engine/propulsion.py`, same coefficients and sources). Fixed pitch, axial inflow (Brandt & Selig, AIAA 2011-1255; UIUC Propeller Data Site):
+  - T = CT(J) ρ n² D⁴, P = CP(J) ρ n³ D⁵, J = V/(nD), η = J CT/CP.
+  - Static coefficients from the pitch-to-diameter ratio (two blades): CT₀ = 0.040 + 0.150 (P/D) up to P/D 0.6 (0.130 + 0.050 (P/D − 0.6) above); CP₀ = 0.005 + 0.085 (P/D) + 0.06 max(0, P/D − 0.5)². More blades scale CT₀ by (B/2)^0.75 and CP₀ by (B/2)^0.9.
+  - Fall-off with advance ratio, zero thrust at J_T = 1.1 (P/D) + 0.05: CT = CT₀(1 − 0.5x − 0.5x²), CP = CP₀ max(0.05, 1 − 0.7x²), x = J/J_T.
+  - These are the server engine author's fit to the published UIUC trends for small fixed-pitch propellers (APC Slow Flyer 10×4.7: CT₀ ≈ 0.11, CP₀ ≈ 0.045, zero thrust near J 0.55, peak efficiency ≈ 0.6 near J 0.4–0.45), not a regression on the data files: ±15 % on CT and CP.
+  - Operating point: with n = V/(JD), the thrust is CT(J) ρ V² D²/J², which falls steadily from very large at small J to zero at J_T, so J is found by bisection; no motor model is needed for η_prop.
+  - The pusher's pitch is not in the schema; it is assumed 0.7 × diameter with two blades, as on the server (`PUSHER_PITCH_RATIO`).
+  - Why it matters: in cruise the tilted hover propellers carry only half the drag each and run close to their zero-thrust advance ratio. The default 330 × 140 mm propellers at 16 m/s sit at J ≈ 0.48 against J_T = 0.52, with η ≈ 0.34; the fixed 0.65 used until Phase 3 made the cruise power about 45 % too low and the endurance far too long. A pusher chosen for cruise (P/D 0.7) runs near its peak, η ≈ 0.71.
 - **Hover power** (momentum theory, Leishman ch. 2). Each rotor needs ideal power P_i = T^1.5/√(2ρA), equal to T × the induced velocity v_i = √(T/(2ρA)).
   - Thrust per rotor comes from the hover load share of each pair at the heaviest payload, × 1.03 for download on the wing and booms (estimate; Leishman notes ~10 % for tiltrotors whose wing sits under the rotor).
   - Shaft power = Σ P_i / FM with figure of merit FM = 0.65 (contract; Leishman: 0.7–0.8 for good rotors, lower for small fixed-pitch propellers).
@@ -231,9 +241,13 @@ Each range is roughly a "one standard deviation" band: the number is unlikely to
 | Mass | ±σ_M/M from rule 2 | |
 | Battery energy | ±5 % | Contract example; cell spread and temperature |
 | Figure of merit | ±0.05 | Leishman band for small rotors |
-| Propulsive efficiency (motor × ESC × propeller) | ±7 % | Estimate |
+| Motor × ESC efficiency (and the hover chain) | ±7 % | Estimate |
+| Cruise propeller CT | ±15 % | As the server (`PROP_UNCERTAINTY`): trend fit, not a regression on the UIUC files |
+| Cruise propeller CP | ±15 % | As above |
 
-5. **Other single ranges:** neutral point ±5 % MAC (estimate, Tier 1 against vortex-lattice), combined with the CG range for the static margin; CL_max ±10 % (Raymer); lift-curve slope ±8 %; CD₀ ±15 %; Oswald ±0.05.
+The drag and mass factors also move the cruise thrust, so the propeller efficiency is re-solved for each.
+
+5. **Other single ranges:** neutral point ±10 % MAC, combined with the CG range for the static margin; CL_max ±10 % (Raymer); lift-curve slope ±8 %; CD₀ ±15 %; Oswald ±0.05. The neutral-point band was ±5 % MAC in Phase 2. The Phase 3 AVL analysis put the default design's neutral point 7.2 % MAC forward of Tier 1's, and the server notes up to about 10 % MAC between AVL's slender-body fuselage and Multhopp's strips on short, wide fuselages, so ±5 % understated it (see "Neutral point and static margin"). This is an estimate, not a fitted statistic.
 
 ## Layout comparison (`compare.ts`)
 
@@ -243,14 +257,14 @@ Each range is roughly a "one standard deviation" band: the number is unlikely to
 
 Each change is listed in `adjustments`. The result gives mass, endurance, cruise and hover power, a complexity rating with reasons (tilt mechanism, extra motor, transition simplicity, stopped propellers) and the ArduPilot note. The rear-tilt note reads "Less common in ArduPilot than front tilt" (owner decision, Phase 2).
 
-In Tier 1, front tilt and rear tilt give the same numbers once re-balanced: the same parts and two stopped propellers either way. Their real differences are propeller wash over the wing, transition behaviour and ArduPilot support, which Phase 3's transition model and the complexity rating cover. Quad + pusher comes out a little heavier (extra motor, ESC and propeller against the tilt mechanism) and has more cruise drag (four stopped propellers).
+In Tier 1, front tilt and rear tilt give the same numbers once re-balanced: the same parts and two stopped propellers either way. Their real differences are propeller wash over the wing, transition behaviour and ArduPilot support, which Phase 3's transition model and the complexity rating cover. Quad + pusher comes out a little heavier (extra motor, ESC and propeller against the tilt mechanism) and has more cruise drag (four stopped propellers), but it needs much less cruise power: its pusher runs near peak efficiency (≈ 0.7) while the tilted hover propellers run lightly loaded (≈ 0.34 on the default design). The server analysis agrees (default design: 110 W against 204 W).
 
 ## Golden fixtures
 
 `shared/fixtures/tier1_cases.json` holds three cases, each with its full parameters and computed geometry numbers:
-- `default_prototype`
-- `final_24kg`: lengths × (24/2.5)^⅓, 35 mm booms, Li-ion 12S8P, 20 m/s, 1.5–4 kg payload. This is a test starting point; the engine re-runs everything.
-- `quad_pusher`
+- `default_prototype`: the new-project default, battery at 290 mm.
+- `final_24kg`: lengths × (24/2.5)^⅓ of the Phase 2 document (battery 380 mm → 807.6 mm), 35 mm booms, Li-ion 12S8P, 20 m/s, 1.5–4 kg payload. This is a test starting point; the engine re-runs everything.
+- `quad_pusher`: the default with the quad + pusher layout (battery 290 mm, not re-balanced).
 
 The geometry numbers are wing, tail, fuselage, booms, rotors, hinge and gear. `frontend/src/engine/fixtures.test.ts` rebuilds the geometry from the stored parameters and compares to 0.1 %. Run `UPDATE_FIXTURES=1 npx vitest run src/engine/fixtures.test.ts` after an intended geometry change; Phase 3's Python port must then follow.
 
@@ -258,19 +272,42 @@ The geometry numbers are wing, tail, fuselage, booms, rotors, hinge and gear. `f
 
 These are printed by `ENGINE_SUMMARY=1 npx vitest run src/engine/summary.test.ts --disableConsoleIntercept`. They use the hand-written test airfoil values, so the app's numbers will differ slightly once the XFOIL tables are loaded.
 
-| | Default prototype (front tilt) | 24 kg final scale (front tilt) |
-|---|---|---|
-| Take-off mass (heaviest camera) | 3.33 kg (2.98–3.69) | 22.1 kg (20.0–24.3) |
-| Battery | 0.77 kg, 111 Wh LiPo 6S1P | 7.8 kg, 1555 Wh Li-ion 12S8P |
-| CG (heaviest / lightest camera) | 359 / 381 mm (27 / 37 % MAC) | 736 / 805 mm |
-| Static margin (heaviest / lightest) | 13.7 % / 3.9 % MAC | 19.7 % / 5.0 % MAC |
-| Stall speed | 11.2 m/s (10.4–12.0) | 13.0 m/s (12.1–13.9) |
-| CD₀, L/D | 0.044, 9.1 | 0.035, 10.5 |
-| Cruise power | 117 W (99–136) at 16 m/s | 810 W (676–947) at 20 m/s |
-| Hover power | 417 W (342–499) | 3.3 kW (2.8–4.0) |
-| Wing-flight endurance | 36 min (29–43) | 79 min (65–95) |
+| | Default prototype (front tilt) | Quad + pusher | 24 kg final scale (front tilt) |
+|---|---|---|---|
+| Take-off mass (heaviest camera) | 3.39 kg (3.03–3.76) | 3.36 kg (3.00–3.72) | 22.1 kg (20.0–24.3) |
+| Battery | 0.77 kg at 290 mm, 111 Wh LiPo 6S1P | same | 7.8 kg, 1555 Wh Li-ion 12S8P |
+| CG (heaviest / lightest camera) | 339 / 359 mm (18 / 27 % MAC) | 373 / 396 mm | 736 / 805 mm |
+| Static margin (heaviest / lightest) | 22.7 % / 13.8 % MAC | 7.5 % / −2.7 % MAC | 19.7 % / 5.0 % MAC |
+| Stall speed | 11.3 m/s (10.4–12.1) | | |
+| CD₀, L/D | 0.045, 9.2 | 0.055, 7.7 | 0.035, 10.5 |
+| Cruise propeller efficiency | 0.34 at J 0.48 | 0.71 at J 0.54 | 0.30 at J 0.48 |
+| Cruise power | 218 W (179–260) at 16 m/s | 128 W (96–164) | 1.72 kW (1.41–2.04) at 20 m/s |
+| Hover power | 432 W (354–516) | 420 W (344–502) | 3.3 kW (2.8–4.0) |
+| Wing-flight endurance | 19.0 min (15.3–23.3) | 32.7 min (24.0–42.6) | 37 min (30–45) |
 
-The default "2.5 kg" starting values come out at about 3.3 kg once every part is counted: lift motors around 100 g each, sized for 2:1 thrust, plus a 400 g camera and a 770 g battery. The engine flags this against the 2.5 kg target. Plausibility against published small QuadPlanes and against the 24 kg class is discussed in the Phase 2 report.
+The default "2.5 kg" starting values come out at about 3.4 kg once every part is counted: lift motors around 100 g each, sized for 2:1 thrust, plus a 400 g camera and a 770 g battery. The engine flags this against the 2.5 kg target. Plausibility against published small QuadPlanes and against the 24 kg class is discussed in the Phase 2 report.
+
+Until Phase 3 these numbers used a fixed cruise propeller efficiency (0.65 tilt, 0.75 pusher): 117 W and 36 min for the default, 810 W and 79 min at 24 kg. The tilt-layout endurances roughly halved with the propeller model, which is the main lesson: hover-sized propellers are poor cruise propellers.
+
+**Default battery position.** New projects put the battery at 290 mm (it was 380 mm). At 380 mm AVL gives the default design a static margin of −2.5 % MAC with the lightest camera (unstable), and the server recommended moving the battery about 90 mm forward. At 290 mm both engines give a positive margin at both payloads: AVL 16.7 % / 7.5 % MAC, Tier 1 22.7 % / 13.8 % (Tier 1 flags the heaviest-camera value as above the 20 % maximum; its neutral point is the further aft of the two, and AVL's is inside the band). Quad + pusher with the same battery position is still unstable with the lightest camera in AVL (1.5 % / −9.1 % MAC); the layout comparison re-balances it by moving the battery.
+
+## Tier 1 vs Tier 2
+
+The instant numbers (Tier 1, in the browser on every edit) and the full analysis (Tier 2, Analyse on the server: AVL, XFOIL, the motor and propeller model, the battery model and the transition sweep) share the geometry and the mass model, so mass and balance agree exactly. They differ where Tier 1 uses a textbook shortcut. The analysis panel lists each difference with its reason (`tier1_comparison` in the result). On the default design (battery 290 mm, sea level, 16 m/s):
+
+| | Tier 1 | Tier 2 (fast mode) | Why |
+|---|---|---|---|
+| Cruise power | 218 W | 204 W | Same propeller curves; Tier 1's CD₀ is about 11 % higher (flat-plate friction × form factor for the wing and tail against XFOIL strip-integrated profile drag) and its motor efficiency 0.85 against the motor model's 0.88 |
+| Wing-flight endurance | 19.0 min | 20.7 min | Follows the cruise power; Tier 2 also includes battery sag and the modelled transition |
+| Static margin (heaviest / lightest) | 22.7 / 13.8 % MAC | 16.7 / 7.5 % MAC | AVL's neutral point is about 16 mm (7 % MAC) further forward (slender-body fuselage, downwash at the real tail position) |
+| Hover power | 432 W | 417 W | Figure of merit 0.65 and motor 0.85 against the propeller's static coefficients and the motor model |
+
+Quad + pusher (battery 290 mm): Tier 1 128 W and 32.7 min against Tier 2 111 W and 38.6 min. The pusher propeller efficiency is the same in both (0.71); the difference is the drag (Tier 1 4.28 N against 3.79 N), which near the propeller's peak efficiency passes straight into the power.
+
+When to trust which:
+- Use Tier 1 for direction and size while editing: which way a change moves mass, balance, drag and endurance, and roughly by how much. Since the propeller model was added its cruise power is no longer optimistic; it is now slightly pessimistic because of its drag build-up.
+- Use Tier 2 for decisions: stability (AVL neutral point), cruise power and endurance, transition margins, battery current and structure. Expect Tier 1 cruise power and endurance within about 10–15 % of Tier 2, and Tier 1 static margin up to about 10 % MAC higher (it sits forward of AVL's neutral point on short, wide fuselages, which is why its band is ±10 % MAC).
+- The numbers differ most for designs far from the default: unusual fuselages (neutral point), very different propeller pitch or cruise speed (propeller operating point), or a heavy reliance on the tail's lift.
 
 ## What Phase 3 replaces
 
@@ -280,7 +317,7 @@ The default "2.5 kg" starting values come out at about 3.3 kg once every part is
 | Raymer Oswald fit, CL²/(πeA) | AVL induced drag (CD_i, span efficiency) at the trimmed cruise point |
 | Neutral point from wing + tail + Multhopp fuselage; downwash 2CL_α/(πA) | AVL neutral point (Xnp), Cm_α, stability derivatives, trim elevator |
 | Flat-plate skin friction × form factors for wing and tail profile drag | XFOIL profile drag strip-integrated with AVL's local CL |
-| Fixed η_prop, FM 0.65, η_motor 0.85 | Motor model (Kv, R, I₀) matched to CT(J), CP(J) propeller curves at hover and cruise separately |
+| FM 0.65, η_motor 0.85 (the cruise η_prop already uses the same generic CT(J), CP(J) curves as the server) | Motor model (Kv, R, I₀) matched to CT(J), CP(J) propeller curves at hover and cruise separately, with battery sag |
 | Transition = 1.25 × hover for 15 s | Transition speed sweep with tilt schedule or pusher thrust, thrust margin, peak power |
 | Nominal pack voltage, typical C ratings | Battery model with internal resistance, voltage sag, peak current against continuous and burst ratings |
 | Bending-sized spar caps or a guessed tube | Spar and boom bending checks at load factor × safety factor for the chosen tube |
@@ -308,7 +345,8 @@ The default "2.5 kg" starting values come out at about 3.3 kg once every part is
 - Wing twist and incidence do not affect Tier 1 numbers.
 - Flaps and control-surface deflections are not modelled.
 - Dihedral does not change lift.
-- Booms, motor pods and the tail tube do not enter the neutral point.
+- Booms, motor pods and the tail tube do not enter the neutral point, and the fuselage term (Multhopp) is less destabilising than AVL's slender body on short, wide fuselages: hence the ±10 % MAC band.
+- The cruise propeller model has no motor: the motor and ESC efficiencies are fixed, and whether the motor can reach the cruise rpm is only checked in the full analysis.
 - No propeller-wash effects on the wing or tail.
 - Front tilt and rear tilt differ only in the complexity rating.
 - Equation and chapter references follow the editions above. Raymer's chapter 12 numbering is stable across recent editions, but check your copy.

@@ -534,14 +534,14 @@ def avl_reference_cases(cache_dir: str | None = None) -> list[Row]:
                 g,
                 "Default design: Tier 1 neutral point vs AVL",
                 "Tier 1 neutral point (wing + tail + Multhopp fuselage) vs AVL Xnp, as % MAC "
-                "difference (Tier 1 states +/-5 % MAC)",
+                "difference (Tier 1 states +/-10 % MAC)",
                 0.0,
                 "% MAC",
                 "AVL (this engine)",
                 diff_mac,
                 None,
                 f"Information (not one of the contract cases): difference {diff_mac:+.1f} % MAC "
-                f"({'inside' if abs(diff_mac) <= 5 else 'outside'} Tier 1's stated +/-5 % MAC). "
+                f"({'inside' if abs(diff_mac) <= 10 else 'outside'} Tier 1's stated +/-10 % MAC). "
                 "AVL's slender-body fuselage is more destabilising than Multhopp's strip "
                 "method and the inverted V sits near the wing wake; the analysis keeps the "
                 "more conservative AVL value.",

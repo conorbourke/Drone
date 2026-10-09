@@ -24,8 +24,13 @@ describe('compareLayouts', () => {
       expect(x.hover_power.value).toBeGreaterThan(0);
       expect(x.ardupilot_note.length).toBeGreaterThan(20);
     }
-    // The pusher layout stops all four lift propellers, so it cruises with more drag.
-    expect(pusher.cruise_power.value).toBeGreaterThan(front.cruise_power.value);
+    // The pusher layout stops all four lift propellers, so it cruises with more drag, but its
+    // cruise propeller is far more efficient than the lightly loaded tilted hover propellers
+    // (propeller model, as the server analysis), so it needs less cruise power.
+    const drag = (l: (typeof c)[number]['layout'], parameters = defaultInput().parameters) =>
+      estimate({ ...defaultInput(), parameters: { ...parameters, layout: l } }).aero!.drag_cruise.value;
+    expect(drag('quad_pusher')).toBeGreaterThan(drag('front_tilt'));
+    expect(pusher.cruise_power.value).toBeLessThan(front.cruise_power.value);
   });
 
   it('re-balances each layout to the current balance point and moves the tilt axis for rear tilt', () => {

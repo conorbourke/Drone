@@ -39,7 +39,7 @@ export const DESIGN_V2_DEFAULTS = {
   tail_v_angle_deg: 40,
   tail_airfoil: 'naca0009',
   propulsion: { prop_diameter_mm: 330, prop_pitch_mm: 140, prop_blades: 2 },
-  battery: { chemistry: 'lipo' as BatteryChemistry, cells_series: 6, cells_parallel: 1, capacity_mah: 5000, x_mm: 380 },
+  battery: { chemistry: 'lipo' as BatteryChemistry, cells_series: 6, cells_parallel: 1, capacity_mah: 5000, x_mm: 290 },
   allowances: { avionics_g: 220, wiring_fraction: 0.06 },
 } as const;
 
@@ -222,12 +222,20 @@ export const ETA_MOTOR_MAX = 0.8;
 /** ESC efficiency. Source: [Gundlach] ch. 7 (0.93-0.97); 0.95 used. */
 export const ETA_ESC = 0.95;
 /**
- * Cruise propeller efficiency. Tilt layouts cruise on hover-sized propellers running lightly loaded;
- * the pusher has a propeller chosen for cruise. Source: [Brandt] (small propellers peak 0.55-0.80).
- * ESTIMATE until Phase 3 propeller model.
+ * The cruise propeller efficiency is no longer a fixed value: it comes from the generic CT(J),
+ * CP(J) propeller model (propeller.ts, a port of the server's backend/app/engine/propulsion.py)
+ * at the cruise thrust and speed. Tilt layouts cruise on the two tilted hover propellers, which
+ * run lightly loaded near their zero-thrust advance ratio (efficiency ~0.3 for the default
+ * 330 x 140 mm propeller at 16 m/s); quad + pusher cruises on the pusher.
+ *
+ * Pusher pitch-to-diameter ratio (the schema has no pusher pitch): 0.7, a typical cruise propeller
+ * (e.g. 10x7). ASSUMPTION, the same as the server's PUSHER_PITCH_RATIO.
  */
-export const ETA_PROP_CRUISE_TILT = 0.65;
-export const ETA_PROP_CRUISE_PUSHER = 0.75;
+export const PUSHER_PITCH_RATIO = 0.7;
+/** Pusher blade count (the schema has none). ASSUMPTION, as the server. */
+export const PUSHER_BLADES = 2;
+/** Propeller CT and CP uncertainty, +/-15 % each (the server's PROP_UNCERTAINTY: trend fit to [Brandt] / UIUC data, not a regression on the files). */
+export const PROP_COEFF_UNCERTAINTY = 0.15;
 /** Extra thrust to overcome the wing and boom download in the propeller wash. ESTIMATE ([Leishman] ch. 2: tiltrotor download ~10 %; quadplane props are mostly clear of the wing). */
 export const HOVER_DOWNLOAD_FRACTION = 0.03;
 /** Transition power as a multiple of hover power. Contract value (Phase 2 section 5), to be replaced by the Phase 3 transition model. */
@@ -365,10 +373,16 @@ export const UNCERTAINTY = {
   cl_max: 0.1,
   /** Figure of merit +/-0.05 absolute around 0.65 ([Leishman] ch. 2 band for small rotors). */
   figure_of_merit_abs: 0.05,
-  /** Combined motor x ESC x propeller efficiency, +/-7 %. ESTIMATE. */
+  /** Motor x ESC efficiency (and the hover propulsion chain), +/-7 %. ESTIMATE. The cruise propeller has its own +/-15 % on CT and CP (PROP_COEFF_UNCERTAINTY). */
   propulsive_efficiency: 0.07,
-  /** Neutral point position, +/-5 % of the MAC (Tier 1 vs vortex-lattice agreement, typical). ESTIMATE. */
-  neutral_point_mac: 0.05,
+  /**
+   * Neutral point position, +/-10 % of the MAC. ESTIMATE, widened from 5 % after the Phase 3 AVL
+   * comparison: on the default design AVL's neutral point is 16 mm (7.2 % MAC) forward of Tier 1's
+   * (AVL's slender-body fuselage is more destabilising than Multhopp's strips, and the inverted V
+   * sits near the wing wake); the server notes differences of up to ~10 % MAC on short, wide
+   * fuselages (backend/app/engine/analysis.py). docs/ENGINE.md "Uncertainty model".
+   */
+  neutral_point_mac: 0.1,
   /** Lift-curve slope, +/-8 % (Helmbold/DATCOM vs wind-tunnel data, [Raymer] 12.4). */
   lift_slope: 0.08,
 };

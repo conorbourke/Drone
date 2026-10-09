@@ -8,7 +8,7 @@ import { AIRFOIL_SHAPE_FALLBACK } from '../constants';
 import { buildGeometry, withDefaults } from '../geometry';
 import type { Geometry } from '../types';
 import { roundSig } from '../units';
-import { defaultMission, defaultParameters, finalScaleMission, finalScaleParameters, quadPusherParameters } from './designs';
+import { defaultMission, newProjectParameters, finalScaleMission, finalScaleParameters, quadPusherParameters } from './designs';
 
 type Num = number | null;
 type Tree = { [k: string]: Num | Num[] | Tree | Tree[] | string };
@@ -78,7 +78,7 @@ interface Case {
 }
 
 const CASES: Case[] = [
-  { name: 'default_prototype', description: 'Phase 2 default: 2.5 kg target, 1.8 m span, front tilt, inverted V tail (schema v2 defaults).', parameters: defaultParameters(), mission: defaultMission() },
+  { name: 'default_prototype', description: 'New-project default: 2.5 kg target, 1.8 m span, front tilt, inverted V tail, battery at 290 mm (schema v2 defaults).', parameters: newProjectParameters(), mission: defaultMission() },
   { name: 'final_24kg', description: 'Final-scale case: default lengths x (24/2.5)^(1/3), 35 mm booms, Li-ion 12S8P, 24 kg target.', parameters: finalScaleParameters(), mission: finalScaleMission() },
   { name: 'quad_pusher', description: 'Default design as quad + pusher.', parameters: quadPusherParameters(), mission: defaultMission() },
 ];

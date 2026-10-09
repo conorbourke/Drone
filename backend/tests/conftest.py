@@ -36,6 +36,7 @@ def make_settings(data_dir: Path, **overrides: object) -> Settings:
         "app_secret_key": SecretStr(SECRET),
         "app_data_dir": data_dir,
         "backup_enabled": False,
+        "validation_on_startup": False,
         "app_static_dir": data_dir / "no-static-here",
     }
     values.update(overrides)
@@ -72,6 +73,9 @@ def _clean_tables(app: FastAPI, settings: Settings) -> Iterator[None]:
     shutil.rmtree(settings.files_dir, ignore_errors=True)
     with app.state.session_factory() as db:
         for table in (
+            "assistant_messages",
+            "assistant_threads",
+            "analyses",
             "image_readings",
             "images",
             "design_versions",

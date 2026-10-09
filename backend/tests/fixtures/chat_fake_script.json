@@ -1,0 +1,57 @@
+{
+  "description": "Scripted assistant conversation for pytest and Playwright (CLAUDE_FAKE_CHAT_FILE, never used in production). Every owner message replays it: one run_quick_analysis call with a 6000 mAh battery (20 % more capacity), then an answer that quotes the before and after numbers from the tool result together with one propose_change, then a closing sentence.",
+  "responses": [
+    {
+      "stop_reason": "tool_use",
+      "content": [
+        {
+          "type": "text",
+          "text": "I'll check that with a quick analysis of the draft with a 6000 mAh battery."
+        },
+        {
+          "type": "tool_use",
+          "name": "run_quick_analysis",
+          "input": {
+            "parameter_changes": [
+              {
+                "path": "battery.capacity_mah",
+                "value": 6000
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "stop_reason": "tool_use",
+      "content": [
+        {
+          "type": "text",
+          "text": "The quick analysis gives a wing-flight endurance of {{run_quick_analysis.after.key_numbers.endurance_cruise}} with the 6000 mAh battery, against {{run_quick_analysis.before.key_numbers.endurance_cruise}} now. Take-off mass becomes {{run_quick_analysis.after.key_numbers.takeoff_mass}} (was {{run_quick_analysis.before.key_numbers.takeoff_mass}}). Keep flights within visual line of sight (EU Open category A3)."
+        },
+        {
+          "type": "tool_use",
+          "name": "propose_change",
+          "input": {
+            "summary": "Increase the battery capacity from 5000 mAh to 6000 mAh (quick analysis above).",
+            "changes": [
+              {
+                "path": "battery.capacity_mah",
+                "value": 6000
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "stop_reason": "end_turn",
+      "content": [
+        {
+          "type": "text",
+          "text": "Press \"Try as new version\" to save it as a new version and run a full analysis on it."
+        }
+      ]
+    }
+  ]
+}

@@ -15,7 +15,7 @@
   "cases": [
     {
       "name": "default_prototype",
-      "description": "Phase 2 default: 2.5 kg target, 1.8 m span, front tilt, inverted V tail (schema v2 defaults).",
+      "description": "New-project default: 2.5 kg target, 1.8 m span, front tilt, inverted V tail, battery at 290 mm (schema v2 defaults).",
       "parameters": {
         "schema_version": 2,
         "layout": "front_tilt",
@@ -85,7 +85,7 @@
           "cells_series": 6,
           "cells_parallel": 1,
           "capacity_mah": 5000,
-          "x_mm": 380
+          "x_mm": 290
         },
         "allowances": {
           "avionics_g": 220,
@@ -493,7 +493,7 @@
           "cells_series": 6,
           "cells_parallel": 1,
           "capacity_mah": 5000,
-          "x_mm": 380
+          "x_mm": 290
         },
         "allowances": {
           "avionics_g": 220,

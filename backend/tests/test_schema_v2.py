@@ -49,9 +49,20 @@ def v1_document() -> dict[str, Any]:
     return doc
 
 
+def _upgraded_defaults() -> dict:
+    """What a v1 default document reads back as: today's defaults, except that the 1->2
+    upgrader keeps the battery position it was written with (380 mm)."""
+    expected = copy.deepcopy(DEFAULT_DESIGN_PARAMETERS)
+    expected["battery"]["x_mm"] = 380.0
+    return expected
+
+
 def test_defaults_are_version_2_with_new_fields() -> None:
     assert DEFAULT_DESIGN_PARAMETERS["schema_version"] == 2
-    for path, (value, _unit) in NEW_FIELDS.items():
+    # New projects place the battery 90 mm further forward than the v1->v2 upgrader does (stable at
+    # both payloads per the Phase 3 AVL analysis); the upgrader keeps the value it was written with.
+    expected_new = {**NEW_FIELDS, "battery.x_mm": (290.0, "mm")}
+    for path, (value, _unit) in expected_new.items():
         assert _get(DEFAULT_DESIGN_PARAMETERS, path) == value, path
 
 
@@ -112,7 +123,7 @@ def test_stored_v1_rows_read_back_as_v2(app: FastAPI, auth_client: TestClient) -
         pid, vid = project.id, version.id
 
     draft = auth_client.get(f"/api/projects/{pid}/draft").json()
-    assert draft["parameters"] == DEFAULT_DESIGN_PARAMETERS
+    assert draft["parameters"] == _upgraded_defaults()
     got = auth_client.get(f"/api/versions/{vid}").json()
     assert got["parameters"]["schema_version"] == 2
     assert got["parameters"]["battery"]["capacity_mah"] == 5000.0
@@ -132,7 +143,7 @@ def test_put_draft_accepts_a_v1_document(auth_client: TestClient, project: dict)
     body = {"parameters": v1_document(), "mission": project["draft"]["mission"]}
     response = auth_client.put(f"/api/projects/{project['id']}/draft", json=body)
     assert response.status_code == 200, response.text
-    assert response.json()["parameters"] == DEFAULT_DESIGN_PARAMETERS
+    assert response.json()["parameters"] == _upgraded_defaults()
 
 
 def test_new_field_validation(auth_client: TestClient, project: dict) -> None:

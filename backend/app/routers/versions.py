@@ -5,13 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update
+from fastapi.responses import JSONResponse
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import utcnow
 from app.deps import CurrentUser, DbSession, current_user
-from app.models import DesignVersion, Project
+from app.models import Analysis, DesignVersion, Project
+from app.patching import PatchError, apply_patch
 from app.routers.common import (
     conflict,
     current_mission,
@@ -25,7 +27,9 @@ from app.schemas.project import DraftOut
 from app.schemas.version import (
     VERSION_NAME_MAX_LENGTH,
     DuplicateRequest,
+    PatchBase,
     VersionCreate,
+    VersionFromPatch,
     VersionListItem,
     VersionOut,
     VersionUpdate,
@@ -143,6 +147,51 @@ def create_version(
     return VersionOut(**version_payload(version))
 
 
+@router.post(
+    "/projects/{project_id}/versions/from-patch",
+    response_model=VersionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_version_from_patch(
+    project_id: int, body: VersionFromPatch, db: DbSession, user: CurrentUser
+) -> VersionOut:
+    """ "Try as new version": apply a parameter patch (a recommendation, a scale result or an
+    assistant proposal) to the draft or a saved version and save the result as a new version.
+    Lineage: the parent is the base version, or the version the draft is based on. The draft
+    itself is left untouched."""
+    project = owned_project(db, user, project_id)
+    if isinstance(body.base, PatchBase):
+        base = db.get(DesignVersion, body.base.version_id)
+        if base is None or base.project_id != project.id:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="The base version does not belong to this project.",
+            )
+        parameters, mission = current_parameters(base.parameters), current_mission(base.mission)
+        parent_id: int | None = base.id
+    else:
+        parameters = current_parameters(project.draft_parameters)
+        mission = current_mission(project.draft_mission)
+        parent_id = project.draft_based_on_version_id
+    try:
+        parameters, mission = apply_patch(parameters, mission, body.patch)
+    except PatchError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from None
+    if _name_taken(db, project.id, body.name):
+        raise _name_conflict(body.name)
+    version = _insert_version(
+        db,
+        project,
+        name=body.name,
+        notes=body.notes,
+        parameters=parameters,
+        mission=mission,
+        parent_version_id=parent_id,
+    )
+    _commit_or_conflict(db, body.name)
+    return VersionOut(**version_payload(version))
+
+
 @router.get("/versions/{version_id}", response_model=VersionOut)
 def get_version(version_id: int, db: DbSession, user: CurrentUser) -> VersionOut:
     return VersionOut(**version_payload(owned_version(db, user, version_id)))
@@ -227,11 +276,36 @@ def restore_version(version_id: int, db: DbSession, user: CurrentUser) -> DraftO
     return DraftOut(**draft_payload(project))
 
 
-@router.delete("/versions/{version_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_version(version_id: int, db: DbSession, user: CurrentUser) -> None:
+@router.delete(
+    "/versions/{version_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    responses={409: {"description": "The version still has analyses (or later records)"}},
+)
+def delete_version(
+    version_id: int, db: DbSession, user: CurrentUser, with_analyses: bool = False
+) -> Any:
     """Delete a version. The DDL clears the draft pointer and any child's parent pointer
-    (ON DELETE SET NULL); a later-phase RESTRICT reference turns into a 409."""
+    (ON DELETE SET NULL). Analyses reference versions with ON DELETE RESTRICT: without
+    ``with_analyses=true`` a version that has analyses answers 409 with a plain message and
+    ``analyses`` (the count); with it, the analyses are deleted first, then the version."""
     version = owned_version(db, user, version_id)
+    count = db.scalar(
+        select(func.count()).select_from(Analysis).where(Analysis.version_id == version.id)
+    )
+    if count and not with_analyses:
+        noun = "analysis" if count == 1 else "analyses"
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "detail": f"Version {version.number} has {count} saved {noun}. Delete "
+                f"{'it' if count == 1 else 'them'} together with the version, or keep the "
+                "version.",
+                "analyses": count,
+            },
+        )
+    if count:
+        db.execute(delete(Analysis).where(Analysis.version_id == version.id))
     db.delete(version)
     try:
         db.commit()

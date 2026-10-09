@@ -35,6 +35,7 @@ const COMPLEXITY: Record<Layout, { rating: 'low' | 'medium' | 'high'; score: num
       'Tilt mechanism: two servos and hinges that must be stiff, slop-free and strong enough for full thrust.',
       'Transition needs the tilt schedule tuned in ArduPilot.',
       'No extra motor: the front motors also pull in cruise, while the rear pair stops.',
+      'In cruise the tilted hover propellers are lightly loaded and run close to the speed where their thrust falls to zero, so they are much less efficient than a dedicated pusher propeller.',
     ],
   },
   rear_tilt: {
@@ -44,6 +45,7 @@ const COMPLEXITY: Record<Layout, { rating: 'low' | 'medium' | 'high'; score: num
       'Tilt mechanism: two servos and hinges that must be stiff, slop-free and strong enough for full thrust.',
       'Transition needs the tilt schedule tuned, with fewer reference builds to copy (less common in ArduPilot).',
       'No extra motor: the rear motors push in cruise, while the front pair stops.',
+      'In cruise the tilted hover propellers are lightly loaded and run close to the speed where their thrust falls to zero, so they are much less efficient than a dedicated pusher propeller.',
     ],
   },
   quad_pusher: {

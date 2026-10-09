@@ -187,3 +187,66 @@ class ImageReading(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     usage: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class Analysis(TimestampMixin, Base):
+    """One full analysis or scale-to-weight job and its result (Phase 3).
+
+    ``version_id`` is ``ON DELETE RESTRICT`` (Phase 1 policy): a version with analyses cannot be
+    deleted silently; ``DELETE /api/versions/{vid}`` answers 409 unless ``with_analyses=true``.
+    """
+
+    __tablename__ = "analyses"
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("design_versions.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    inputs: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    inputs_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    progress: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    stage: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    reused_from_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class AssistantThread(TimestampMixin, Base):
+    """The assistant conversation of one project (one thread per project)."""
+
+    __tablename__ = "assistant_threads"
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+
+
+class AssistantMessage(TimestampMixin, Base):
+    """One Messages API turn, stored exactly as sent or received (``content`` is the full list
+    of content blocks, thinking and tool blocks included) so the conversation continues
+    append-only. ``meta`` holds what the UI shows beside it (tool-call labels, proposals,
+    stop reason, usage); it is never sent to Claude."""
+
+    __tablename__ = "assistant_messages"
+
+    thread_id: Mapped[int] = mapped_column(
+        ForeignKey("assistant_threads.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
+    meta: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

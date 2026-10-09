@@ -297,6 +297,8 @@ export interface MissionSegment {
 
 export interface PerformanceResult {
   cruise_power: Quantity;
+  /** Cruise propeller efficiency J CT / CP from the generic propeller model (heaviest camera). */
+  cruise_propeller_efficiency: Quantity;
   hover_power: Quantity;
   transition_power: Quantity;
   hover_disc_loading: Quantity;

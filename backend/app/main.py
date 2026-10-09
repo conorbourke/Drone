@@ -26,8 +26,22 @@ from app.backup import BackupManager
 from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory, sqlite_path
 from app.deps import current_user
+from app.jobs import AnalysisWorker, recover_analyses, validation_report_path
 from app.models import User
-from app.routers import airfoils, auth, images, parts, projects, readings, schema, system, versions
+from app.routers import (
+    airfoils,
+    analyses,
+    assistant,
+    auth,
+    images,
+    parts,
+    projects,
+    readings,
+    schema,
+    system,
+    validation,
+    versions,
+)
 from app.routers import settings as settings_router
 from app.security import SESSION_COOKIE, AuthState
 
@@ -222,6 +236,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if interrupted:
         log.warning("Marked %d interrupted image reading(s) as failed", interrupted)
     app.state.reading_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="reading")
+    # Analyses, scale jobs and the validation suite run strictly one at a time on their own
+    # worker thread (see app.jobs), separate from the image readings.
+    failed, queued = recover_analyses(app.state.session_factory)
+    if failed:
+        log.warning("Marked %d interrupted analysis(es) as failed", failed)
+    worker = AnalysisWorker(app.state.session_factory, settings)
+    worker.start()
+    app.state.analysis_worker = worker
+    for analysis_id in queued:
+        worker.submit_analysis(analysis_id)
+    if queued:
+        log.info("Re-queued %d analysis(es)", len(queued))
+    if settings.validation_on_startup and not validation_report_path(settings).is_file():
+        log.info("No validation report yet: running the validation suite in the background")
+        worker.submit_validation("startup")
     manager: BackupManager = app.state.backups
     manager.ensure_dir()
     scheduler: asyncio.Task[None] | None = None
@@ -251,6 +280,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         executor: ThreadPoolExecutor = app.state.reading_executor
         app.state.reading_executor = None
         await asyncio.to_thread(executor.shutdown, wait=True, cancel_futures=True)
+        # The running analysis stops at its next progress report and goes back to the queue;
+        # the AVL/XFOIL subprocess is stopped too.
+        app.state.analysis_worker = None
+        await asyncio.to_thread(worker.stop)
         app.state.engine.dispose()
 
 
@@ -313,6 +346,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(airfoils.router)
     app.include_router(images.router)
     app.include_router(readings.router)
+    app.include_router(analyses.router)
+    app.include_router(validation.router)
+    app.include_router(assistant.router)
 
     @app.api_route(
         "/api/{path:path}",

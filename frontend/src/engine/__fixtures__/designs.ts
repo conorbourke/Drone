@@ -1,6 +1,6 @@
 /**
- * Test designs: the Phase 1/2 default 2.5 kg front-tilt prototype (backend app/defaults.py plus
- * the schema v2 defaults), a 24 kg final-scale version and a quad + pusher variant. The final
+ * Test designs: the default 2.5 kg front-tilt prototype (backend app/defaults.py plus the schema
+ * v2 defaults), a 24 kg final-scale version and a quad + pusher variant. The final
  * scale case is a test starting point (lengths x (24/2.5)^(1/3), then battery, boom tube,
  * payload and speed chosen by hand); the engine re-runs the full analysis on it.
  */
@@ -9,6 +9,24 @@ import type { DesignParameters, Mission, Settings } from '../../api/types';
 import type { EngineInput } from '../types';
 import { TEST_AIRFOILS } from './airfoils';
 
+/**
+ * The new-project default battery position (backend app/defaults.py, DESIGN_V2_DEFAULTS): 290 mm,
+ * moved 90 mm forward from the Phase 1/2 value of 380 mm after the Phase 3 AVL analysis found the
+ * default design unstable with the lightest camera (static margin -2.5 % MAC at 380 mm).
+ */
+export const DEFAULT_BATTERY_X_MM = 290;
+
+/** The current new-project default design (backend app/defaults.py). Engine tests and the golden fixture use this. */
+export function newProjectParameters(): DesignParameters {
+  const p = defaultParameters();
+  return { ...p, battery: { ...p.battery!, x_mm: DEFAULT_BATTERY_X_MM } };
+}
+
+/**
+ * The Phase 1/2 default document, with the battery at 380 mm. Kept unchanged because the drawing
+ * and handle tests outside the engine (src/lib) are pinned to its numbers; engine tests use
+ * newProjectParameters().
+ */
 export function defaultParameters(): DesignParameters {
   return {
     schema_version: 2,
@@ -82,7 +100,7 @@ export function scaleLengths(p: DesignParameters, k: number): DesignParameters {
 export const FINAL_SCALE_FACTOR = Math.cbrt(24 / 2.5);
 
 export function finalScaleParameters(): DesignParameters {
-  const p = scaleLengths(defaultParameters(), FINAL_SCALE_FACTOR);
+  const p = scaleLengths(defaultParameters(), FINAL_SCALE_FACTOR); // the Phase 2 document (battery 380 mm scaled), unchanged test case
   return {
     ...p,
     booms: { ...p.booms, diameter_mm: 35 },
@@ -104,11 +122,11 @@ export function finalScaleMission(): Mission {
 }
 
 export function quadPusherParameters(): DesignParameters {
-  return { ...defaultParameters(), layout: 'quad_pusher' };
+  return { ...newProjectParameters(), layout: 'quad_pusher' };
 }
 
 export function defaultInput(): EngineInput {
-  return { parameters: defaultParameters(), mission: defaultMission(), settings: defaultSettings(), airfoils: TEST_AIRFOILS };
+  return { parameters: newProjectParameters(), mission: defaultMission(), settings: defaultSettings(), airfoils: TEST_AIRFOILS };
 }
 
 export function finalScaleInput(): EngineInput {

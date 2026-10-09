@@ -121,7 +121,7 @@ export function applyHandle(
     case 'fuselage_length': {
       // Pulling the nose forward lengthens the fuselage; everything measured from the nose
       // moves back by the same amount so the rest of the aircraft stays where it is.
-      const battery = num(start, 'battery.x_mm', 380);
+      const battery = num(start, 'battery.x_mm', 290);
       const pusher = num(start, 'pusher.x_mm', 1);
       const minShift = -Math.min(xle, battery, pusher - 1);
       value = fit(s - delta.dx, Math.max(1, s + minShift), Infinity);

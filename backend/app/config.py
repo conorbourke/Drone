@@ -84,12 +84,23 @@ class Settings(BaseSettings):
     claude_model: str = Field(
         default="claude-opus-5-5",
         min_length=1,
-        description="Claude model used for image reading.",
+        description="Claude model used for image reading and the assistant.",
     )
     claude_fake_response_file: Path | None = Field(
         default=None,
         description="Test seam: outside production, image reading returns this JSON file "
         "instead of calling the Claude API. Ignored when APP_ENV=production.",
+    )
+    claude_fake_chat_file: Path | None = Field(
+        default=None,
+        description="Test seam: outside production, the assistant replays this scripted JSON "
+        "conversation (tool calls and answers) instead of calling the Claude API. Ignored "
+        "when APP_ENV=production.",
+    )
+    validation_on_startup: bool = Field(
+        default=True,
+        description="Run the validation suite once in the background at startup when no "
+        "report exists yet. Tests set this to false.",
     )
     backup_hour_utc: int = Field(
         default=3, ge=0, le=23, description="Hour (UTC) of the daily in-app database backup."
@@ -176,6 +187,13 @@ class Settings(BaseSettings):
         if self.is_production:
             return None
         return self.claude_fake_response_file
+
+    @property
+    def fake_claude_chat_file(self) -> Path | None:
+        """The assistant's scripted test-seam file, only outside production."""
+        if self.is_production:
+            return None
+        return self.claude_fake_chat_file
 
     @property
     def version(self) -> str:

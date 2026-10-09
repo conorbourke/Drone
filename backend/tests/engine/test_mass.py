@@ -20,7 +20,8 @@ def _case(name: str) -> dict[str, Any]:
 
 @pytest.mark.parametrize(
     ("name", "mass_kg", "cg_max", "cg_min"),
-    [("default_prototype", 3.33, 359, 381), ("final_24kg", 22.1, 736, 805)],
+    # Tier 1 reference outputs (docs/ENGINE.md); default battery at 290 mm since the Phase 3 review.
+    [("default_prototype", 3.39, 339, 359), ("final_24kg", 22.1, 736, 805)],
 )
 def test_matches_tier1_reference_outputs(
     name: str, mass_kg: float, cg_max: float, cg_min: float, engine_settings: dict[str, Any]
