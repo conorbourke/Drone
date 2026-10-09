@@ -501,3 +501,70 @@ export interface HealthResponse {
   version: string;
   db: string;
 }
+
+// ---------- Reference images and Claude image readings (docs/phases/PHASE2.md section 4) ----------
+
+export type ImageView = 'front' | 'side' | 'top' | 'three_quarter' | 'other';
+
+/** Row of GET /api/projects/{id}/images and the 201 body of the upload. */
+export interface ReferenceImage {
+  id: number;
+  filename: string;
+  view: ImageView;
+  width_px: number;
+  height_px: number;
+  size_bytes: number;
+  /** Where the browser loads the file: /api/images/{id}/file. */
+  url: string;
+  created_at: string;
+}
+
+/** The real dimension a reading scales the image proportions by. */
+export interface ReadingReference {
+  parameter: 'wing.span_mm' | 'fuselage.length_mm';
+  value_mm: number;
+}
+
+/** One proposed parameter value. */
+export interface ProposedValue {
+  value: number | string;
+  unit: string | null;
+  /** 0-1. */
+  confidence: number;
+  note: string;
+}
+
+/** What Claude proposes after reading the images (values already converted to mm and clamped). */
+export interface ReadingProposal {
+  layout: Layout;
+  layout_confidence: number;
+  layout_reason: string;
+  /** Keyed by design dotted path ("wing.span_mm"). Parameters not visible are omitted. */
+  parameters: Record<string, ProposedValue>;
+  unmapped_notes: string[];
+  warnings: string[];
+}
+
+export type ReadingStatus = 'running' | 'ok' | 'refused' | 'error';
+
+/** GET /api/image-readings/{id}; POST answers 202 with status "running". */
+export interface ImageReading {
+  id: number;
+  project_id: number;
+  model: string;
+  reference: ReadingReference;
+  image_ids: number[];
+  status: ReadingStatus;
+  proposal: ReadingProposal | null;
+  error: string | null;
+  usage: Record<string, unknown> | null;
+  created_at: string;
+}
+
+/** GET /api/image-readings/status. */
+export interface ReadingAvailability {
+  available: boolean;
+  model: string;
+  /** Plain message when not available (missing API key). */
+  message: string | null;
+}

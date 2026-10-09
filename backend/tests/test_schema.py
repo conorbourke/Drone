@@ -9,7 +9,10 @@ from app.schemas.migrate import upgrade_mission, upgrade_parameters, upgrade_set
 from app.schemas.mission import Mission
 from app.schemas.settings import SettingsDocument
 
-REAR_TILT_NOTE = "Less common in ArduPilot; support to be confirmed in Phase 2"
+REAR_TILT_NOTE = (
+    "Less common in ArduPilot than front tilt. ArduPilot supports it through Q_TILT_MASK; "
+    "check your setup in a simulator before flying."
+)
 
 
 def test_design_schema_from_field_metadata(auth_client: TestClient) -> None:

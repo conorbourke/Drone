@@ -1,16 +1,27 @@
-"""Claude image readings: read a project's reference images and propose parameters."""
+"""Claude image readings: read a project's reference images and propose parameters.
+
+A reading at effort "high" with four images can take a minute, longer than a proxy may keep a
+request open. ``POST`` therefore stores the reading with ``status: "running"`` and returns 202
+at once; the Claude call runs on the app's single-worker reading executor (created in the
+lifespan, see ``app.main``) with its own database session, and the browser polls
+``GET /api/image-readings/{id}`` until the status is ``ok``, ``refused`` or ``error``. A missing
+API key is still answered synchronously with a plain 503.
+"""
 
 from __future__ import annotations
 
 import logging
+from concurrent.futures import Executor
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.assistant import vision
 from app.assistant.proposal import build_proposal
+from app.config import Settings
 from app.deps import AppSettings, CurrentUser, DbSession, current_user
 from app.imaging import stored_path
 from app.models import Image, ImageReading
@@ -27,6 +38,12 @@ REFUSAL_MESSAGE = (
     "Claude declined to read these images. Nothing was changed. Try different pictures of the "
     "aircraft, or enter the dimensions by hand."
 )
+INTERRUPTED_MESSAGE = (
+    "The reading was interrupted because the server restarted. Nothing was changed. Run it again."
+)
+UNEXPECTED_MESSAGE = (
+    "Something went wrong while reading the images. Nothing was changed. Try again."
+)
 
 
 def reading_out(reading: ImageReading) -> ReadingOut:
@@ -42,6 +59,76 @@ def reading_out(reading: ImageReading) -> ReadingOut:
         usage=reading.usage,
         created_at=reading.created_at,
     )
+
+
+def mark_interrupted_readings(session_factory: sessionmaker[Session]) -> int:
+    """At startup: readings left "running" by a previous process can never finish."""
+    with session_factory() as db:
+        result = db.execute(
+            update(ImageReading)
+            .where(ImageReading.status == "running")
+            .values(status="error", error=INTERRUPTED_MESSAGE)
+        )
+        db.commit()
+        return int(getattr(result, "rowcount", 0) or 0)
+
+
+def run_reading(
+    session_factory: sessionmaker[Session],
+    settings: Settings,
+    reading_id: int,
+    images: list[vision.VisionImage],
+    reference_parameter: str,
+    reference_value_mm: float,
+    draft_parameters: dict[str, Any],
+) -> None:
+    """Background job: call Claude and store the outcome on the reading row.
+
+    Runs on the reading executor's thread with its own session. Never raises: every outcome,
+    including an unexpected bug, ends with the row out of ``running``.
+    """
+    outcome: dict[str, Any]
+    try:
+        result = vision.read_images(settings, images, reference_parameter)
+    except vision.VisionError as exc:  # includes VisionNotConfigured
+        outcome = {"status": "error", "error": str(exc)}
+    except OSError:
+        log.exception("Could not prepare images for Claude")
+        outcome = {
+            "status": "error",
+            "error": "The stored images could not be read. Upload them again.",
+        }
+    except Exception:
+        log.exception("Image reading failed unexpectedly")
+        outcome = {"status": "error", "error": UNEXPECTED_MESSAGE}
+    else:
+        outcome = {"model": result.model, "usage": result.usage}
+        if result.status == "refused":
+            category = result.refusal_category
+            outcome["status"] = "refused"
+            outcome["error"] = REFUSAL_MESSAGE + (f" (category: {category})" if category else "")
+        else:
+            assert result.answer is not None
+            try:
+                outcome["proposal"] = build_proposal(
+                    result.answer, reference_parameter, reference_value_mm, draft_parameters
+                )
+                outcome["status"] = "ok"
+            except Exception:
+                log.exception("Could not build the proposal from Claude's answer")
+                outcome["status"] = "error"
+                outcome["error"] = UNEXPECTED_MESSAGE
+
+    try:
+        with session_factory() as db:
+            reading = db.get(ImageReading, reading_id)
+            if reading is None:  # the project was deleted while Claude was reading
+                return
+            for key, value in outcome.items():
+                setattr(reading, key, value)
+            db.commit()
+    except Exception:
+        log.exception("Could not store the result of image reading %s", reading_id)
 
 
 @router.get("/image-readings/status")
@@ -66,15 +153,25 @@ def list_readings(project_id: int, db: DbSession, user: CurrentUser) -> list[Rea
     return [reading_out(r) for r in rows]
 
 
+@router.get("/image-readings/{reading_id}", response_model=ReadingOut)
+def get_reading(reading_id: int, db: DbSession, user: CurrentUser) -> ReadingOut:
+    """One reading; the browser polls this while the status is ``running``."""
+    reading = db.get(ImageReading, reading_id)
+    if reading is None or reading.owner_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Reading not found.")
+    return reading_out(reading)
+
+
 @router.post(
     "/projects/{project_id}/image-readings",
     response_model=ReadingOut,
-    status_code=status.HTTP_201_CREATED,
-    responses={200: {"description": "Claude declined (status refused)"}},
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={503: {"description": "No Claude API key configured"}},
 )
 def create_reading(
     project_id: int,
     body: ReadingCreate,
+    request: Request,
     db: DbSession,
     user: CurrentUser,
     settings: AppSettings,
@@ -110,8 +207,13 @@ def create_reading(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"detail": vision.MISSING_KEY_MESSAGE},
         )
+    executor: Executor | None = getattr(request.app.state, "reading_executor", None)
+    if executor is None:  # only outside the lifespan (never in a running server)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": "The server is starting up. Try again in a moment."},
+        )
 
-    reference = body.reference.model_dump()
     images = [
         vision.VisionImage(
             view=i.view, path=stored_path(settings.images_dir, i.project_id, i.storage_name)
@@ -122,52 +224,33 @@ def create_reading(
         owner_id=user.id,
         project_id=project.id,
         model=settings.claude_model,
-        reference=reference,
+        reference=body.reference.model_dump(),
         image_ids=[i.id for i in chosen],
-        status="error",
-    )
-    try:
-        result = vision.read_images(settings, images, body.reference.parameter)
-    except vision.VisionNotConfigured:
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"detail": vision.MISSING_KEY_MESSAGE},
-        )
-    except vision.VisionError as exc:
-        reading.error = str(exc)
-        db.add(reading)
-        db.commit()
-        return JSONResponse(status_code=status.HTTP_502_BAD_GATEWAY, content={"detail": str(exc)})
-    except OSError:
-        log.exception("Could not prepare images for Claude")
-        reading.error = "The stored images could not be read. Upload them again."
-        db.add(reading)
-        db.commit()
-        return JSONResponse(
-            status_code=status.HTTP_502_BAD_GATEWAY, content={"detail": reading.error}
-        )
-
-    reading.model = result.model
-    reading.usage = result.usage
-    if result.status == "refused":
-        reading.status = "refused"
-        category = result.refusal_category
-        reading.error = REFUSAL_MESSAGE + (f" (category: {category})" if category else "")
-        db.add(reading)
-        db.commit()
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=reading_out(reading).model_dump(mode="json"),
-        )
-
-    assert result.answer is not None
-    reading.status = "ok"
-    reading.proposal = build_proposal(
-        result.answer,
-        body.reference.parameter,
-        body.reference.value_mm,
-        current_parameters(project.draft_parameters),
+        status="running",
     )
     db.add(reading)
     db.commit()
-    return reading_out(reading)
+    db.refresh(reading)
+    try:
+        executor.submit(
+            run_reading,
+            request.app.state.session_factory,
+            settings,
+            reading.id,
+            images,
+            body.reference.parameter,
+            body.reference.value_mm,
+            current_parameters(project.draft_parameters),
+        )
+    except RuntimeError:  # executor already shut down: the server is stopping
+        reading.status = "error"
+        reading.error = INTERRUPTED_MESSAGE
+        db.commit()
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": "The server is restarting. Try again in a moment."},
+        )
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content=reading_out(reading).model_dump(mode="json"),
+    )

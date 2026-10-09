@@ -19,6 +19,9 @@ export default defineConfig({
     assetsDir: 'assets',
     sourcemap: false,
     emptyOutDir: true,
+    // three.js lives in its own lazily loaded chunk (the 3D view, ~570 kB, ~140 kB gzip);
+    // the warning threshold is raised just above it so a growing main bundle still warns.
+    chunkSizeWarningLimit: 600,
   },
   test: {
     environment: 'node',

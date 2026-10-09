@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ImageView = Literal["front", "side", "top", "three_quarter", "other"]
 ReferenceParameter = Literal["wing.span_mm", "fuselage.length_mm"]
-ReadingStatus = Literal["ok", "refused", "error"]
+ReadingStatus = Literal["running", "ok", "refused", "error"]
 
 IMAGE_VIEW_OPTIONS = [
     {"value": "front", "label": "Front"},

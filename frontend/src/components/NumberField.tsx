@@ -7,6 +7,7 @@
  */
 import { useId, useState } from 'react';
 import type { FieldMeta } from '../api/types';
+import type { SliderRange } from '../lib/ranges';
 import { Explain } from './Explain';
 
 interface NumberFieldProps {
@@ -18,6 +19,8 @@ interface NumberFieldProps {
   disabled?: boolean;
   /** Inline validation message from the server, if any. */
   error?: string | null;
+  /** Show a slider under the box over this range (data-testid="slider-<path>"). */
+  slider?: SliderRange | null;
 }
 
 function toText(value: number): string {
@@ -33,7 +36,7 @@ function explainText(meta: FieldMeta): string {
   return parts.filter(Boolean).join('\n\n');
 }
 
-export function NumberField({ path, meta, value, onChange, disabled, error }: NumberFieldProps) {
+export function NumberField({ path, meta, value, onChange, disabled, error, slider }: NumberFieldProps) {
   const id = useId();
   const [text, setText] = useState(() => toText(value));
   const [lastValue, setLastValue] = useState(value);
@@ -83,6 +86,23 @@ export function NumberField({ path, meta, value, onChange, disabled, error }: Nu
         />
         {meta.unit ? <span className="field-unit">{meta.unit}</span> : null}
       </div>
+      {slider ? (
+        <input
+          type="range"
+          className="field-slider"
+          data-testid={`slider-${path}`}
+          aria-label={`${meta.label} slider`}
+          min={slider.min}
+          max={slider.max}
+          step={slider.step}
+          value={Number.isFinite(value) ? value : slider.min}
+          disabled={disabled}
+          onChange={(event) => {
+            const parsed = Number(event.target.value);
+            if (Number.isFinite(parsed)) onChange(isInteger ? Math.round(parsed) : parsed);
+          }}
+        />
+      ) : null}
       {error ? (
         <p id={`${id}-error`} className="field-error">
           {error}

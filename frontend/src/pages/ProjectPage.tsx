@@ -95,6 +95,11 @@ function ProjectWorkspace({ project }: { project: Project }) {
   const tab = parseTab(searchParams.get('tab'));
   const draft = useDraft(project.id, project.draft);
 
+  // A new tab starts at the top of the page.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [tab]);
+
   // Versions list.
   const [versions, setVersions] = useState<VersionSummary[] | null>(null);
   const [versionsError, setVersionsError] = useState<string | null>(null);
@@ -122,15 +127,16 @@ function ProjectWorkspace({ project }: { project: Project }) {
     setNextVersionNumber((current) => Math.max(current ?? 0, version.number + 1));
   }, []);
 
-  // Limits for the MTOW banner.
-  const [limits, setLimits] = useState<Settings['limits'] | null>(null);
+  // Settings: limits for the MTOW banner, thresholds for the engine checks.
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const limits = settings?.limits ?? null;
   useEffect(() => {
     const controller = new AbortController();
     api<SettingsResponse>('/api/settings', { signal: controller.signal })
-      .then((response) => setLimits(response.settings.limits))
+      .then((response) => setSettings(response.settings))
       .catch((caught: unknown) => {
         if (isAbortError(caught) || isAuthError(caught)) return;
-        toast.error(`Could not load the mass limits: ${errorMessage(caught)}`);
+        toast.error(`Could not load the settings (mass limits and check thresholds): ${errorMessage(caught)}`);
       });
     return () => controller.abort();
   }, [toast]);
@@ -242,7 +248,7 @@ function ProjectWorkspace({ project }: { project: Project }) {
   let content;
   switch (tab) {
     case 'design':
-      content = <DesignTab doc={draft.doc} update={draft.update} fieldErrors={draft.fieldErrors} />;
+      content = <DesignTab doc={draft.doc} update={draft.update} fieldErrors={draft.fieldErrors} settings={settings} />;
       break;
     case 'parts':
       content = <PartsTab />;
@@ -254,7 +260,15 @@ function ProjectWorkspace({ project }: { project: Project }) {
       content = <FlightDataTab />;
       break;
     default:
-      content = <InputsTab doc={draft.doc} update={draft.update} fieldErrors={draft.fieldErrors} />;
+      content = (
+        <InputsTab
+          doc={draft.doc}
+          update={draft.update}
+          fieldErrors={draft.fieldErrors}
+          projectId={project.id}
+          settings={settings}
+        />
+      );
   }
 
   return (

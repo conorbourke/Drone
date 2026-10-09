@@ -186,3 +186,41 @@ export function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return 'Something went wrong.';
 }
+
+/**
+ * Send a multipart form (file uploads). Same headers, credentials, error parsing and 401
+ * handling as `api`; the browser sets the multipart Content-Type with its boundary.
+ */
+export async function apiUpload<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'X-Requested-With': 'fetch' },
+      body: form,
+      credentials: 'include',
+      signal,
+      cache: 'no-store',
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new ApiError(0, 'Could not reach the server. Check your connection and try again.', [], false);
+  }
+  let parsed: unknown = null;
+  if ((response.headers.get('content-type') ?? '').includes('application/json')) {
+    try {
+      parsed = await response.json();
+    } catch {
+      parsed = null;
+    }
+  }
+  if (!response.ok) {
+    const error =
+      response.status === 413 && !(parsed && typeof parsed === 'object' && 'detail' in parsed)
+        ? new ApiError(413, 'The file is too large (at most 15 MB).')
+        : parseErrorBody(response.status, parsed, response.statusText);
+    if (response.status === 401) unauthorizedHandler?.();
+    throw error;
+  }
+  return parsed as T;
+}

@@ -14,6 +14,10 @@
  *                            preinstalled Chromium build 1194 exists there or under
  *                            /opt/pw-browsers, it is used directly through executablePath
  *   CI                       when set: never reuse a running server, one retry, no `.only`
+ *
+ * The backend gets CLAUDE_FAKE_RESPONSE_FILE (absolute path of
+ * backend/tests/fixtures/vision_fake_response.json), so "Read images with Claude" answers with
+ * that canned reading and never calls the API.
  */
 import { defineConfig, devices } from '@playwright/test';
 import fs from 'node:fs';
@@ -28,6 +32,8 @@ const PORT = Number(process.env.E2E_PORT ?? 4173);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const DATA_DIR = process.env.E2E_DATA_DIR ?? path.join(os.tmpdir(), 'vtol-e2e-data');
 const STATIC_DIR = path.join(repoRoot, 'frontend', 'dist');
+/** Canned Claude answer: the backend returns it instead of calling the API (never in production). */
+const CLAUDE_FAKE_RESPONSE_FILE = path.join(repoRoot, 'backend', 'tests', 'fixtures', 'vision_fake_response.json');
 
 /** Owner password the backend is started with; the specs sign in with it. */
 export const TEST_PASSWORD = 'test-password';
@@ -109,6 +115,7 @@ export default defineConfig({
       APP_DATA_DIR: DATA_DIR,
       BACKUP_ENABLED: 'false',
       PORT: String(PORT),
+      CLAUDE_FAKE_RESPONSE_FILE,
     },
   },
 });

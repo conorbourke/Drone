@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'rea
 import { SchemaProvider } from './api/schema';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ToastProvider } from './components/Toast';
+import { ComparePage } from './pages/ComparePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProjectPage } from './pages/ProjectPage';
@@ -43,6 +44,7 @@ export function App() {
             <Route element={<RequireAuth />}>
               <Route path="/" element={<ProjectsPage />} />
               <Route path="/projects/:id" element={<ProjectPage />} />
+              <Route path="/projects/:id/compare" element={<ComparePage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />

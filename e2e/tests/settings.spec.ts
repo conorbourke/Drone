@@ -33,7 +33,7 @@ test.describe('Settings page', () => {
     await test.step('an impossible value is refused with a plain message and not stored', async () => {
       await page.getByTestId('setting-limits.warn_mtow_kg').fill('29');
       await page.getByTestId('settings-save').click();
-      await expect(page.getByText(/Mass limits/)).toBeVisible();
+      await expect(page.getByText(/Mass limits: The warning threshold/)).toBeVisible();
       await page.reload();
       await expect(page.getByTestId('setting-limits.warn_mtow_kg')).toHaveValue('23');
     });

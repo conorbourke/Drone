@@ -7,6 +7,7 @@ import contextlib
 import logging
 import re
 from collections.abc import AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -194,6 +195,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if getattr(app.state, "auth", None) is None:
         app.state.auth = AuthState.from_settings(settings)
     _ensure_owner(app)
+    # Claude image readings run one at a time off the request path (see app.routers.readings).
+    # Rows a previous process left "running" can never finish, so they are closed first.
+    interrupted = readings.mark_interrupted_readings(app.state.session_factory)
+    if interrupted:
+        log.warning("Marked %d interrupted image reading(s) as failed", interrupted)
+    app.state.reading_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="reading")
     manager: BackupManager = app.state.backups
     manager.ensure_dir()
     scheduler: asyncio.Task[None] | None = None
@@ -218,6 +225,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             scheduler.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await scheduler
+        # Drop queued readings and let the one in progress store its result (bounded by the
+        # Claude request timeout) before the database engine goes away.
+        executor: ThreadPoolExecutor = app.state.reading_executor
+        app.state.reading_executor = None
+        await asyncio.to_thread(executor.shutdown, wait=True, cancel_futures=True)
         app.state.engine.dispose()
 
 

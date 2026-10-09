@@ -3,6 +3,7 @@
  * duplicate, rename or delete them. Also shows which version the draft is based on.
  */
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import type { FormEvent } from 'react';
 import { ApiError, api, errorMessage, isAuthError } from '../api/client';
 import type { DesignVersion, Draft, VersionSummary } from '../api/types';
@@ -36,6 +37,8 @@ interface VersionsPanelProps {
   onVersionDeleted: (versionId: number) => void;
 }
 
+const MAX_COMPARE = 3;
+
 type Dialog =
   | { kind: 'none' }
   | { kind: 'save' }
@@ -63,6 +66,16 @@ export function VersionsPanel({
   const [formError, setFormError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const navigate = useNavigate();
+  // Version numbers ticked for comparison (two or three).
+  const [compareSet, setCompareSet] = useState<number[]>([]);
+  const comparable = compareSet.filter((n) => versions?.some((v) => v.number === n));
+  const toggleCompare = (n: number, on: boolean) =>
+    setCompareSet((list) => (on ? [...list.filter((x) => x !== n), n].slice(-MAX_COMPARE) : list.filter((x) => x !== n)));
+  const openCompare = () => {
+    const list = [...comparable].sort((a, b) => a - b);
+    navigate(`/projects/${projectId}/compare?versions=${list.join(',')}`);
+  };
 
   const closeDialog = () => {
     if (busy) return;
@@ -254,6 +267,15 @@ export function VersionsPanel({
               data-version-id={version.id}
             >
               <div className="version-item-head">
+                <input
+                  type="checkbox"
+                  className="version-compare-check"
+                  data-testid="versions-compare-select"
+                  data-version-number={version.number}
+                  aria-label={`Compare v${version.number} ${version.name}`}
+                  checked={comparable.includes(version.number)}
+                  onChange={(event) => toggleCompare(version.number, event.target.checked)}
+                />
                 <span className="version-number" title="Version number: a permanent label within this project">
                   v{version.number}
                 </span>
@@ -281,6 +303,23 @@ export function VersionsPanel({
           ))}
         </ul>
       )}
+
+      {versions && versions.length >= 2 ? (
+        <div className="versions-compare-row">
+          <button
+            type="button"
+            className="button button-sm"
+            data-testid="versions-compare"
+            disabled={comparable.length < 2}
+            onClick={openCompare}
+          >
+            Compare{comparable.length >= 2 ? ` ${comparable.length} versions` : ''}
+          </button>
+          <span className="small muted">
+            {comparable.length < 2 ? 'Tick two or three versions to compare them.' : `v${[...comparable].sort((a, b) => a - b).join(', v')}`}
+          </span>
+        </div>
+      ) : null}
 
       <Modal
         open={dialog.kind === 'save' || dialog.kind === 'rename'}

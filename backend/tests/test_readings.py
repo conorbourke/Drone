@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import json
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -14,6 +15,7 @@ import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from sqlalchemy import text
 
 from app.assistant import vision
 from app.assistant.proposal import build_proposal, normalise_layout
@@ -67,6 +69,26 @@ def _read(client: TestClient, pid: int, **body: Any):
     return client.post(f"/api/projects/{pid}/image-readings", json={"reference": SPAN_REF, **body})
 
 
+def _finish(client: TestClient, response: Any, timeout_s: float = 10.0) -> dict[str, Any]:
+    """The POST answers 202 with a running reading; poll it the way the browser does."""
+    assert response.status_code == 202, response.text
+    reading = response.json()
+    assert reading["status"] == "running"
+    assert reading["proposal"] is None and reading["error"] is None
+    deadline = time.monotonic() + timeout_s
+    while reading["status"] == "running":
+        assert time.monotonic() < deadline, "reading did not finish"
+        time.sleep(0.02)
+        polled = client.get(f"/api/image-readings/{reading['id']}")
+        assert polled.status_code == 200, polled.text
+        reading = polled.json()
+    return reading
+
+
+def _read_done(client: TestClient, pid: int, **body: Any) -> dict[str, Any]:
+    return _finish(client, _read(client, pid, **body))
+
+
 # --- through the API with the fake response -------------------------------------------------
 
 
@@ -75,9 +97,7 @@ def test_reading_with_fake_response(
 ) -> None:
     pid = project["id"]
     ids = _images(auth_client, pid)
-    response = _read(auth_client, pid)
-    assert response.status_code == 201, response.text
-    reading = response.json()
+    reading = _read_done(auth_client, pid)
     assert reading["status"] == "ok" and reading["error"] is None
     assert reading["image_ids"] == ids
     assert reading["reference"] == {"parameter": "wing.span_mm", "value_mm": 2000.0}
@@ -126,9 +146,9 @@ def test_readings_newest_first_and_image_choice(
 ) -> None:
     pid = project["id"]
     ids = _images(auth_client, pid, 3)
-    first = _read(auth_client, pid, image_ids=[ids[2], ids[0]]).json()
+    first = _read_done(auth_client, pid, image_ids=[ids[2], ids[0]])
     assert first["image_ids"] == [ids[2], ids[0]]
-    second = _read(auth_client, pid).json()
+    second = _read_done(auth_client, pid)
     listed = auth_client.get(f"/api/projects/{pid}/image-readings").json()
     assert [r["id"] for r in listed] == [second["id"], first["id"]]
 
@@ -148,7 +168,7 @@ def test_reading_needs_one_to_four_project_images(
     foreign = _images(auth_client, other["id"], 1)
     wrong = _read(auth_client, pid, image_ids=[ids[0], foreign[0]])
     assert wrong.status_code == 422
-    assert _read(auth_client, pid, image_ids=ids[:4]).status_code == 201
+    assert _read_done(auth_client, pid, image_ids=ids[:4])["status"] == "ok"
 
 
 def test_reference_validation(auth_client: TestClient, project: dict, with_fake: Path) -> None:
@@ -172,7 +192,7 @@ def test_fuselage_length_as_reference(
         f"/api/projects/{pid}/image-readings",
         json={"reference": {"parameter": "fuselage.length_mm", "value_mm": 960}},
     )
-    p = response.json()["proposal"]["parameters"]
+    p = _finish(auth_client, response)["proposal"]["parameters"]
     assert p["fuselage.length_mm"]["value"] == 960 and p["fuselage.length_mm"]["confidence"] == 1
     assert p["wing.span_mm"]["value"] == 2000  # 960 / 0.48
     assert p["wing.span_mm"]["confidence"] == 0.75
@@ -185,9 +205,7 @@ def test_refusal_from_fake(
     monkeypatch.setattr(settings, "claude_fake_response_file", FAKE_REFUSAL)
     pid = project["id"]
     _images(auth_client, pid, 1)
-    response = _read(auth_client, pid)
-    assert response.status_code == 200
-    body = response.json()
+    body = _read_done(auth_client, pid)
     assert body["status"] == "refused"
     assert body["proposal"] is None
     assert body["error"].startswith("Claude declined")
@@ -260,10 +278,10 @@ def test_sdk_request_shape_and_success(
     monkeypatch.setattr(vision, "_send", fake_send)
     pid = project["id"]
     _images(auth_client, pid, 2)
-    response = _read(auth_client, pid)
-    assert response.status_code == 201, response.text
-    assert response.json()["usage"] == {"input_tokens": 5123, "output_tokens": 812}
-    assert response.json()["proposal"]["parameters"]["wing.root_chord_mm"]["value"] == 260
+    done = _read_done(auth_client, pid)
+    assert done["status"] == "ok", done
+    assert done["usage"] == {"input_tokens": 5123, "output_tokens": 812}
+    assert done["proposal"]["parameters"]["wing.root_chord_mm"]["value"] == 260
 
     (kwargs,) = calls
     assert kwargs["model"] == "claude-opus-5-5"
@@ -304,10 +322,9 @@ def test_sdk_refusal_is_stored(
     )
     pid = project["id"]
     _images(auth_client, pid, 1)
-    response = _read(auth_client, pid)
-    assert response.status_code == 200
-    assert response.json()["status"] == "refused"
-    assert response.json()["error"].endswith("(category: cyber)")
+    done = _read_done(auth_client, pid)
+    assert done["status"] == "refused"
+    assert done["error"].endswith("(category: cyber)")
 
 
 @pytest.mark.parametrize(
@@ -319,7 +336,7 @@ def test_sdk_refusal_is_stored(
         (lambda: _message(None), "empty"),
     ],
 )
-def test_sdk_bad_answers_are_502(
+def test_sdk_bad_answers_are_stored_errors(
     auth_client: TestClient,
     project: dict,
     with_key: str,
@@ -330,9 +347,9 @@ def test_sdk_bad_answers_are_502(
     monkeypatch.setattr(vision, "_send", lambda client, **kw: message())
     pid = project["id"]
     _images(auth_client, pid, 1)
-    response = _read(auth_client, pid)
-    assert response.status_code == 502
-    assert expected in response.json()["detail"]
+    done = _read_done(auth_client, pid)
+    assert done["status"] == "error" and done["proposal"] is None
+    assert expected in done["error"]
     stored = auth_client.get(f"/api/projects/{pid}/image-readings").json()[0]
     assert stored["status"] == "error" and expected in stored["error"]
 
@@ -365,7 +382,7 @@ def _status_error(cls: type[anthropic.APIStatusError], code: int) -> anthropic.A
         ),
     ],
 )
-def test_sdk_errors_become_plain_502(
+def test_sdk_errors_become_plain_messages(
     auth_client: TestClient,
     project: dict,
     with_key: str,
@@ -380,9 +397,11 @@ def test_sdk_errors_become_plain_502(
     pid = project["id"]
     _images(auth_client, pid, 1)
     response = _read(auth_client, pid)
-    assert response.status_code == 502
-    assert expected in response.json()["detail"]
     assert with_key not in response.text
+    done = _finish(auth_client, response)
+    assert done["status"] == "error"
+    assert expected in done["error"]
+    assert with_key not in json.dumps(done)
     listed = auth_client.get(f"/api/projects/{pid}/image-readings")
     assert with_key not in listed.text
 
@@ -465,3 +484,96 @@ def test_inconsistent_values_produce_a_warning(fake_answer: dict) -> None:
     )
     assert any("would not pass the design checks" in w for w in proposal["warnings"])
     assert any("extend past the end of the fuselage" in w for w in proposal["warnings"])
+
+
+# --- background execution -------------------------------------------------------------------
+
+
+def _drain(client: TestClient) -> None:
+    """Wait until the single reading worker has finished everything queued so far."""
+    client.app.state.reading_executor.submit(lambda: None).result(timeout=10)  # type: ignore[attr-defined]
+
+
+def test_reading_runs_in_the_background(
+    auth_client: TestClient,
+    project: dict,
+    with_key: str,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_answer: dict,
+) -> None:
+    import threading
+
+    release = threading.Event()
+
+    def slow_send(client: anthropic.Anthropic, **kwargs: Any) -> Any:
+        assert release.wait(10)
+        return _message(json.dumps(fake_answer))
+
+    monkeypatch.setattr(vision, "_send", slow_send)
+    pid = project["id"]
+    _images(auth_client, pid, 1)
+    response = _read(auth_client, pid)
+    assert response.status_code == 202
+    rid = response.json()["id"]
+    # The request returned while Claude is still "thinking".
+    assert auth_client.get(f"/api/image-readings/{rid}").json()["status"] == "running"
+    assert auth_client.get(f"/api/projects/{pid}/image-readings").json()[0]["status"] == "running"
+    release.set()
+    _drain(auth_client)
+    done = auth_client.get(f"/api/image-readings/{rid}").json()
+    assert done["status"] == "ok" and done["proposal"]["layout"] == "front_tilt"
+
+
+def test_project_deleted_while_reading(
+    auth_client: TestClient,
+    project: dict,
+    with_key: str,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_answer: dict,
+) -> None:
+    import threading
+
+    release = threading.Event()
+
+    def slow_send(client: anthropic.Anthropic, **kwargs: Any) -> Any:
+        assert release.wait(10)
+        return _message(json.dumps(fake_answer))
+
+    monkeypatch.setattr(vision, "_send", slow_send)
+    pid = project["id"]
+    _images(auth_client, pid, 1)
+    rid = _read(auth_client, pid).json()["id"]
+    assert auth_client.delete(f"/api/projects/{pid}").status_code == 204
+    release.set()
+    _drain(auth_client)  # the job finds no row and stops quietly
+    assert auth_client.get(f"/api/image-readings/{rid}").status_code == 404
+
+
+def test_get_reading_not_found(auth_client: TestClient) -> None:
+    response = auth_client.get("/api/image-readings/987654")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Reading not found."}
+
+
+def test_running_readings_are_closed_at_startup(
+    app: Any, auth_client: TestClient, project: dict
+) -> None:
+    from app.models import ImageReading
+    from app.routers.readings import INTERRUPTED_MESSAGE, mark_interrupted_readings
+
+    with app.state.session_factory() as db:
+        user_id = db.execute(text("SELECT id FROM users LIMIT 1")).scalar_one()
+        row = ImageReading(
+            owner_id=user_id,
+            project_id=project["id"],
+            model="claude-opus-5-5",
+            reference=SPAN_REF,
+            image_ids=[],
+            status="running",
+        )
+        db.add(row)
+        db.commit()
+        rid = row.id
+    assert mark_interrupted_readings(app.state.session_factory) == 1
+    stored = auth_client.get(f"/api/image-readings/{rid}").json()
+    assert stored["status"] == "error" and stored["error"] == INTERRUPTED_MESSAGE

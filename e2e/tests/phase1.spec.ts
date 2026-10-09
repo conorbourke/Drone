@@ -79,7 +79,7 @@ test.describe('Phase 1 acceptance', () => {
       const layout = byId(page, 'field-layout');
       await expect(layout).toHaveValue('front_tilt');
       await layout.selectOption('rear_tilt');
-      await expect(page.getByText('Less common in ArduPilot; support to be confirmed in Phase 2').first()).toBeVisible();
+      await expect(page.getByText('Less common in ArduPilot than front tilt. ArduPilot supports it through Q_TILT_MASK; check your setup in a simulator before flying.').first()).toBeVisible();
       await layout.selectOption('front_tilt');
       await expectSaved(page);
       await expect(layout).toHaveValue('front_tilt');

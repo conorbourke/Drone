@@ -34,7 +34,8 @@ LAYOUT_OPTIONS = [
     {
         "value": "rear_tilt",
         "label": "Rear tilt",
-        "note": "Less common in ArduPilot; support to be confirmed in Phase 2",
+        "note": "Less common in ArduPilot than front tilt. ArduPilot supports it through "
+        "Q_TILT_MASK; check your setup in a simulator before flying.",
     },
     {
         "value": "quad_pusher",

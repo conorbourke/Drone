@@ -50,6 +50,16 @@
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.08);
   --shadow-md: 0 6px 20px rgba(16, 24, 40, 0.14);
   --shadow-lg: 0 16px 48px rgba(16, 24, 40, 0.22);
+
+  /* Data-viz series (categorical slots 1-3 of the reference palette; validated all-pairs). */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --handle: #eb6834;
+  --handle-active: #b3261e;
+  --drawing-fill: #e9eef4;
+  --drawing-wing: #dde6f0;
+  --drawing-stroke: #5b6774;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -81,6 +91,15 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --handle: #f08a5d;
+    --handle-active: #ffd166;
+    --drawing-fill: #252e39;
+    --drawing-wing: #2c3744;
+    --drawing-stroke: #a4afbc;
   }
 }
 
@@ -112,4 +131,13 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --handle: #f08a5d;
+  --handle-active: #ffd166;
+  --drawing-fill: #252e39;
+  --drawing-wing: #2c3744;
+  --drawing-stroke: #a4afbc;
 }
