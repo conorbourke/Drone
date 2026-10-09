@@ -10,7 +10,7 @@ import secrets
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BCRYPT_MAX_PASSWORD_BYTES = 72
@@ -27,7 +27,11 @@ def _default_data_dir() -> Path:
 class Settings(BaseSettings):
     """Runtime configuration. Every field maps to the upper-cased environment variable."""
 
-    model_config = SettingsConfigDict(extra="ignore", case_sensitive=False)
+    # hide_input_in_errors: a validation failure must never echo the password or the
+    # secret key into the startup log.
+    model_config = SettingsConfigDict(
+        extra="ignore", case_sensitive=False, hide_input_in_errors=True
+    )
 
     app_env: Literal["development", "test", "production"] = Field(
         default="development",
@@ -153,6 +157,25 @@ class Settings(BaseSettings):
         return self.app_version or __version__
 
 
+class ConfigurationError(SystemExit):
+    """Raised (as a clean process exit) when the environment is not usable."""
+
+
+def _plain_messages(exc: ValidationError) -> list[str]:
+    messages: list[str] = []
+    for err in exc.errors(include_url=False, include_input=False):
+        msg = str(err.get("msg", ""))
+        msg = msg.removeprefix("Value error, ")
+        messages.append(msg)
+    return messages
+
+
 def get_settings() -> Settings:
-    """Build settings from the current environment (used by CLI entry points and Alembic)."""
-    return Settings()
+    """Build settings from the current environment (used by the app, CLI entry points and
+    Alembic). On a misconfiguration the process exits with the plain messages only: no
+    traceback and never the offending values."""
+    try:
+        return Settings()
+    except ValidationError as exc:
+        lines = ["Configuration error:"] + [f"  - {m}" for m in _plain_messages(exc)]
+        raise ConfigurationError("\n".join(lines)) from None

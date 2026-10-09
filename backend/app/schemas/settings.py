@@ -11,7 +11,7 @@ from app.defaults import SETTINGS_SCHEMA_VERSION
 
 
 class _Doc(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class Volume(_Doc):
@@ -127,3 +127,8 @@ class SettingsMeta(BaseModel):
 class SettingsResponse(BaseModel):
     settings: SettingsDocument
     meta: dict[str, SettingsMeta]
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Plain-language notes, for example stored values that no longer fit the "
+        "current defaults and were reset.",
+    )

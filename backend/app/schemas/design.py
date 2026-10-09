@@ -42,7 +42,8 @@ LAYOUT_OPTIONS = [
 
 
 class _Doc(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # allow_inf_nan=False: NaN/Infinity are not JSON and would come back as null.
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class Wing(_Doc):

@@ -13,7 +13,7 @@ Scale = Literal["prototype", "final"]
 
 
 class Mission(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     schema_version: Literal[1] = Field(
         MISSION_SCHEMA_VERSION, description="Version of this document's layout."

@@ -9,6 +9,8 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
@@ -18,7 +20,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app import __version__
 from app.backup import BackupManager
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory, sqlite_path
 from app.deps import current_user
 from app.models import User
@@ -29,6 +31,9 @@ from app.security import AuthState
 log = logging.getLogger("app")
 
 STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+# The largest legitimate /api body is a settings or draft document (a few kB). Phase 2
+# uploads will get their own, larger limit on their own route.
+MAX_API_BODY_BYTES = 1_000_000
 STATIC_ROOT_FILES: dict[str, str] = {
     "favicon.svg": "image/svg+xml",
     "manifest.webmanifest": "application/manifest+json",
@@ -63,6 +68,42 @@ class SecurityHeadersMiddleware:
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
+
+
+class ApiBodyLimitMiddleware:
+    """Refuses oversized /api request bodies before they are read into memory."""
+
+    def __init__(self, app: ASGIApp, limit: int = MAX_API_BODY_BYTES) -> None:
+        self.app = app
+        self.limit = limit
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope.get("path", "").startswith("/api"):
+            headers = {k: v for k, v in scope["headers"]}
+            length = headers.get(b"content-length")
+            if length is not None:
+                try:
+                    declared = int(length)
+                except ValueError:
+                    declared = self.limit + 1
+                if declared > self.limit:
+                    response = JSONResponse(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        content={
+                            "detail": "The request body is too large "
+                            f"(limit {self.limit // 1000} kB)."
+                        },
+                    )
+                    await response(scope, receive, send)
+                    return
+            elif b"chunked" in headers.get(b"transfer-encoding", b"").lower():
+                response = JSONResponse(
+                    status_code=status.HTTP_411_LENGTH_REQUIRED,
+                    content={"detail": "API requests must declare their Content-Length."},
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
 
 
 class RequireFetchHeaderMiddleware:
@@ -164,7 +205,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
-    settings = settings or Settings()
+    settings = settings or get_settings()
     app = FastAPI(
         title="VTOL Drone Designer",
         version=settings.version,
@@ -186,7 +227,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.static_dir = resolve_static_dir(settings)
 
     app.add_middleware(RequireFetchHeaderMiddleware)
+    app.add_middleware(ApiBodyLimitMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, production=settings.is_production)
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        # FastAPI's default handler echoes the offending input, which (for NaN or Infinity)
+        # cannot itself be serialised as JSON. The UI only needs loc and msg.
+        errors = [
+            {key: value for key, value in err.items() if key not in ("input", "ctx", "url")}
+            for err in exc.errors()
+        ]
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content={"detail": jsonable_encoder(errors)},
+        )
 
     @app.exception_handler(IntegrityError)
     async def _integrity_error(_request: Request, exc: IntegrityError) -> JSONResponse:

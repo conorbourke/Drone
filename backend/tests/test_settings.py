@@ -16,7 +16,8 @@ def test_get_settings_returns_defaults_with_meta(auth_client: TestClient) -> Non
     response = auth_client.get("/api/settings")
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"settings", "meta"}
+    assert set(body) == {"settings", "meta", "warnings"}
+    assert body["warnings"] == []
     assert body["settings"] == DEFAULT_SETTINGS
     assert body["settings"]["schema_version"] == 1
     paths = set(body["meta"])

@@ -43,6 +43,7 @@ def _project_out(db: DbSession, project: Project) -> ProjectOut:
         updated_at=project.updated_at,
         draft=DraftOut(**draft_payload(project)),
         version_count=_version_count(db, project.id),
+        next_version_number=project.next_version_number,
     )
 
 
@@ -83,6 +84,7 @@ def list_projects(db: DbSession, user: CurrentUser) -> list[ProjectListItem]:
                 updated_at=p.updated_at,
                 version_count=counts.get(p.id, 0),
                 latest_version={"id": v.id, "number": v.number, "name": v.name} if v else None,
+                next_version_number=p.next_version_number,
             )
         )
     return out

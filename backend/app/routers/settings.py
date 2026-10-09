@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import copy
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.defaults import DEFAULT_SETTINGS, SETTINGS_META, SETTINGS_SCHEMA_VERSION
@@ -15,6 +17,7 @@ from app.schemas.migrate import upgrade_settings
 from app.schemas.settings import SettingsDocument, SettingsMeta, SettingsResponse
 
 router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(current_user)])
+log = logging.getLogger("app.settings")
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -53,7 +56,66 @@ def flatten(doc: dict[str, Any], prefix: str = "") -> dict[str, Any]:
     return out
 
 
-def build_response(merged: dict[str, Any]) -> SettingsResponse:
+def prune_unknown(defaults: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    """Drop override keys that no longer exist in the defaults (retired settings)."""
+    out: dict[str, Any] = {}
+    for key, value in overrides.items():
+        if key not in defaults:
+            continue
+        default = defaults[key]
+        if isinstance(value, dict) and isinstance(default, dict):
+            sub = prune_unknown(default, value)
+            if sub:
+                out[key] = sub
+        elif not isinstance(default, dict):
+            out[key] = value
+    return out
+
+
+def _drop_path(overrides: dict[str, Any], path: list[str]) -> bool:
+    """Remove ``path`` (a list of keys) from the nested overrides; True when something went."""
+    if not path:
+        return False
+    node: Any = overrides
+    for key in path[:-1]:
+        node = node.get(key) if isinstance(node, dict) else None
+        if not isinstance(node, dict):
+            return False
+    if isinstance(node, dict) and path[-1] in node:
+        del node[path[-1]]
+        return True
+    return False
+
+
+def resilient_merge(overrides: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Merge stored overrides over the defaults so that the result always validates.
+
+    Defaults may change between phases while the owner's overrides stay stored. An override
+    that no longer fits (an unknown key, or a value that now breaks an invariant) is dropped
+    and reported, instead of making every GET /api/settings fail with a 500 the owner could
+    never repair from the browser.
+    """
+    overrides = prune_unknown(DEFAULT_SETTINGS, copy.deepcopy(overrides))
+    dropped: list[str] = []
+    for _ in range(20):
+        merged = deep_merge(DEFAULT_SETTINGS, overrides)
+        try:
+            SettingsDocument.model_validate(merged)
+            return merged, dropped
+        except ValidationError as exc:
+            progressed = False
+            for err in exc.errors(include_url=False):
+                path = [p for p in err.get("loc", ()) if isinstance(p, str)]
+                if path and _drop_path(overrides, path):
+                    dropped.append(".".join(path))
+                    progressed = True
+            if not progressed:
+                break
+    dropped.append("*")
+    return copy.deepcopy(DEFAULT_SETTINGS), dropped
+
+
+def build_response(merged: dict[str, Any], warnings: list[str] | None = None) -> SettingsResponse:
     document = SettingsDocument.model_validate(merged)
     flat = flatten(document.model_dump(exclude={"schema_version"}))
     flat_defaults = flatten({k: v for k, v in DEFAULT_SETTINGS.items() if k != "schema_version"})
@@ -65,7 +127,7 @@ def build_response(merged: dict[str, Any]) -> SettingsResponse:
         )
         for path, value in flat.items()
     }
-    return SettingsResponse(settings=document, meta=meta)
+    return SettingsResponse(settings=document, meta=meta, warnings=warnings or [])
 
 
 def _stored_overrides(db: DbSession, owner_id: int) -> tuple[AppSettings | None, dict[str, Any]]:
@@ -80,7 +142,21 @@ def _stored_overrides(db: DbSession, owner_id: int) -> tuple[AppSettings | None,
 @router.get("", response_model=SettingsResponse)
 def get_settings(db: DbSession, user: CurrentUser) -> SettingsResponse:
     _, overrides = _stored_overrides(db, user.id)
-    return build_response(deep_merge(DEFAULT_SETTINGS, overrides))
+    merged, dropped = resilient_merge(overrides)
+    warnings: list[str] = []
+    if dropped:
+        log.warning("Stored settings no longer validate; reset to defaults: %s", dropped)
+        if "*" in dropped:
+            warnings.append(
+                "Your saved settings no longer fit this version and were reset "
+                "to the defaults. Review them and save again."
+            )
+        else:
+            warnings.append(
+                "Some saved values no longer fit this version and were reset to their "
+                f"defaults: {', '.join(dropped)}. Review them and save again."
+            )
+    return build_response(merged, warnings)
 
 
 @router.put("", response_model=SettingsResponse)

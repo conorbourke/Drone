@@ -10,7 +10,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.db import TZDateTime, utcnow
@@ -64,7 +73,10 @@ class Project(TimestampMixin, Base):
 
 class DesignVersion(TimestampMixin, Base):
     __tablename__ = "design_versions"
-    __table_args__ = (UniqueConstraint("project_id", "number", name="uq_versions_project_number"),)
+    __table_args__ = (
+        UniqueConstraint("project_id", "number", name="uq_versions_project_number"),
+        UniqueConstraint("project_id", "name", name="uq_versions_project_name"),
+    )
 
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
@@ -93,8 +105,8 @@ class Part(TimestampMixin, Base):
     category: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     manufacturer: Mapped[str] = mapped_column(String(200), nullable=False)
     model: Mapped[str] = mapped_column(String(200), nullable=False)
-    mass_g: Mapped[float] = mapped_column(nullable=False)
-    price_eur_estimate: Mapped[float | None] = mapped_column(nullable=True)
+    mass_g: Mapped[float] = mapped_column(Float, nullable=False)
+    price_eur_estimate: Mapped[float | None] = mapped_column(Float, nullable=True)
     spec: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     source: Mapped[str] = mapped_column(Text, nullable=False, default="")
     verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -119,7 +131,7 @@ class PartListing(TimestampMixin, Base):
     supplier_name: Mapped[str] = mapped_column(String(200), nullable=False)
     country: Mapped[str] = mapped_column(String(2), nullable=False)
     url: Mapped[str] = mapped_column(Text, nullable=False)
-    price_eur: Mapped[float | None] = mapped_column(nullable=True)
+    price_eur: Mapped[float | None] = mapped_column(Float, nullable=True)
     in_stock: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
 

@@ -85,6 +85,7 @@ def upgrade() -> None:
             ondelete="SET NULL",
         ),
         sa.UniqueConstraint("project_id", "number", name="uq_versions_project_number"),
+        sa.UniqueConstraint("project_id", "name", name="uq_versions_project_name"),
     )
     op.create_index("ix_design_versions_project_id", "design_versions", ["project_id"])
     op.create_index("ix_design_versions_owner_id", "design_versions", ["owner_id"])

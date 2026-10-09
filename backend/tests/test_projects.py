@@ -59,6 +59,7 @@ def test_list_projects_ordered_with_counts(auth_client: TestClient) -> None:
         "created_at",
         "updated_at",
         "version_count",
+        "next_version_number",
         "latest_version",
     }
 
@@ -75,6 +76,7 @@ def test_get_patch_delete_project(auth_client: TestClient, project: dict) -> Non
         "updated_at",
         "draft",
         "version_count",
+        "next_version_number",
     }
 
     patched = auth_client.patch(f"/api/projects/{pid}", json={"name": "Renamed"})

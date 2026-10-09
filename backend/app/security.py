@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import threading
 import time
 from collections import deque
@@ -49,6 +50,30 @@ def password_fingerprint(password_hash: str) -> str:
     """First 16 hex chars of sha256(hash): stored in the cookie so a password change
     invalidates every session without storing the hash itself."""
     return hashlib.sha256(password_hash.encode("ascii")).hexdigest()[:16]
+
+
+def session_fingerprint(settings: Settings) -> str:
+    """The value the cookie must carry to be accepted, stable across restarts.
+
+    With ``APP_PASSWORD_HASH`` the hash itself is fixed, so sha256(hash) is used. With
+    ``APP_PASSWORD`` the bcrypt hash is re-salted on every start, so it cannot be the
+    fingerprint: an HMAC of the password under the secret key is deterministic for the
+    same (secret, password) pair and changes when either one changes, which is exactly
+    when every device must be signed out.
+    """
+    if settings.app_password_hash and settings.app_password_hash.get_secret_value():
+        return password_fingerprint(settings.app_password_hash.get_secret_value())
+    if settings.app_password and settings.app_password.get_secret_value():
+        digest = hmac.new(
+            settings.secret_key.encode("utf-8"),
+            settings.app_password.get_secret_value().encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return digest[:16]
+    raise RuntimeError(
+        "No owner password configured. Set APP_PASSWORD (or APP_PASSWORD_HASH) in the "
+        "server environment."
+    )
 
 
 def active_password_hash(settings: Settings) -> str:
@@ -123,8 +148,17 @@ class LoginRateLimiter:
     def record_failure(self, ip: str) -> None:
         now = time.monotonic()
         with self._lock:
+            self._sweep(now)
             self._by_ip.setdefault(ip, deque()).append(now)
             self._global.append(now)
+
+    def _sweep(self, now: float) -> None:
+        """Drop every per-IP bucket whose newest failure is outside the window, so an IP
+        that failed once and never returned does not keep its bucket forever."""
+        cutoff = now - self.window
+        stale = [ip for ip, bucket in self._by_ip.items() if not bucket or bucket[-1] < cutoff]
+        for ip in stale:
+            del self._by_ip[ip]
 
     def record_success(self, ip: str) -> None:
         with self._lock:
@@ -162,6 +196,6 @@ class AuthState:
         password_hash = active_password_hash(settings)
         return cls(
             password_hash=password_hash,
-            fingerprint=password_fingerprint(password_hash),
+            fingerprint=session_fingerprint(settings),
             signer=SessionSigner(settings.secret_key),
         )

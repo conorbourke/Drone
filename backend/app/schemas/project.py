@@ -50,6 +50,9 @@ class ProjectListItem(BaseModel):
     latest_version: LatestVersion | None = Field(
         description="The highest-numbered saved version, or null when none exists."
     )
+    next_version_number: int = Field(
+        description="The number the next saved version will get (never reused after a delete)."
+    )
 
 
 class DraftIn(BaseModel):
@@ -76,3 +79,6 @@ class ProjectOut(BaseModel):
     updated_at: datetime
     draft: DraftOut
     version_count: int
+    next_version_number: int = Field(
+        description="The number the next saved version will get (never reused after a delete)."
+    )

@@ -70,18 +70,17 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           set -euo pipefail
-          # Values are passed on stdin as KEY=value lines, never on the command line.
-          tmp=$(mktemp)
-          {
-            printf 'APP_SECRET_KEY=%s\n' "$APP_SECRET_KEY"
-            printf 'APP_PASSWORD=%s\n' "$APP_PASSWORD"
-            if [ -n "${ANTHROPIC_API_KEY:-}" ]; then printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"; fi
-          } > "$tmp"
+          # Each value is passed as one quoted KEY=VALUE argument straight from the environment, so
+          # characters such as '#', quotes, spaces or '=' reach Fly unchanged. (The `secrets import`
+          # line format is a dotenv-style parser that would strip quotes and cut at '#'.)
+          args=("APP_SECRET_KEY=$APP_SECRET_KEY" "APP_PASSWORD=$APP_PASSWORD")
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            args+=("ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
+          fi
           set +e
-          out=$(flyctl secrets import --stage --app "$FLY_APP_NAME" < "$tmp" 2>&1)
+          out=$(flyctl secrets set --stage --app "$FLY_APP_NAME" "${args[@]}" 2>&1)
           rc=$?
           set -e
-          rm -f "$tmp"
           if [ $rc -ne 0 ]; then
             # flyctl exits non-zero when nothing changed; that is the normal case after the first deploy.
             if printf '%s' "$out" | grep -qi 'no change'; then

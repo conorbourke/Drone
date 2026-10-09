@@ -15,7 +15,7 @@ from app.schemas.introspect import field_list
 
 
 class _Spec(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class ThrustPoint(_Spec):
@@ -74,6 +74,14 @@ class EscSpec(_Spec):
     bec_v: float | None = Field(None, gt=0, description="Built-in BEC output voltage, if any.")
     telemetry: bool = Field(description="Whether the ESC reports telemetry to the autopilot.")
 
+    @model_validator(mode="after")
+    def _ranges(self) -> EscSpec:
+        if self.lipo_cells_max < self.lipo_cells_min:
+            raise ValueError("lipo_cells_max must be at least lipo_cells_min.")
+        if self.burst_current_a < self.continuous_current_a:
+            raise ValueError("burst_current_a must be at least continuous_current_a.")
+        return self
+
 
 class ServoSpec(_Spec):
     torque_kg_cm: float = Field(gt=0, description="Stall torque.")
@@ -85,6 +93,12 @@ class ServoSpec(_Spec):
     length_mm: float = Field(gt=0, description="Case length.")
     height_mm: float = Field(gt=0, description="Case height.")
     digital: bool = Field(description="Digital (true) or analogue (false) servo.")
+
+    @model_validator(mode="after")
+    def _voltage(self) -> ServoSpec:
+        if self.voltage_max_v < self.voltage_min_v:
+            raise ValueError("voltage_max_v must be at least voltage_min_v.")
+        return self
 
 
 class BatterySpec(_Spec):
@@ -99,6 +113,12 @@ class BatterySpec(_Spec):
     width_mm: float = Field(gt=0, description="Pack width.")
     height_mm: float = Field(gt=0, description="Pack height.")
     connector: str = Field(description="Main connector, e.g. XT60, XT90.")
+
+    @model_validator(mode="after")
+    def _discharge(self) -> BatterySpec:
+        if self.discharge_c_burst < self.discharge_c_continuous:
+            raise ValueError("discharge_c_burst must be at least discharge_c_continuous.")
+        return self
 
 
 class CellSpec(_Spec):
@@ -119,6 +139,12 @@ class AutopilotSpec(_Spec):
     imu_count: int = Field(ge=1, description="Number of inertial measurement units.")
     voltage_in_min_v: float = Field(gt=0, description="Minimum supply voltage.")
     voltage_in_max_v: float = Field(gt=0, description="Maximum supply voltage.")
+
+    @model_validator(mode="after")
+    def _voltage(self) -> AutopilotSpec:
+        if self.voltage_in_max_v < self.voltage_in_min_v:
+            raise ValueError("voltage_in_max_v must be at least voltage_in_min_v.")
+        return self
 
 
 class GpsSpec(_Spec):

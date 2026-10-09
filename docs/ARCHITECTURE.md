@@ -78,7 +78,7 @@ All tables have integer primary key `id`, `created_at`, `updated_at`. All dateti
 
 - `users`: `email` (unique), `password_hash` (nullable; the single owner authenticates against env, but the column exists for later), `display_name`, `is_owner` (bool).
 - `projects`: `owner_id` FK users, `name`, `description`, `draft_parameters` (JSON), `draft_mission` (JSON), `draft_based_on_version_id` (nullable FK design_versions, `ON DELETE SET NULL` at DDL level), `draft_updated_at`, `next_version_number` (int, default 1). Unique `(owner_id, name)`.
-- `design_versions`: `project_id` FK projects (`ON DELETE CASCADE`), `owner_id`, `name`, `notes`, `number` (permanent per-project label: `POST /versions` and `/duplicate` read and increment `projects.next_version_number` in the same transaction as the insert, so numbers are monotonic and never reused after a delete), `parameters` (JSON), `mission` (JSON), `parent_version_id` (nullable self FK, `ON DELETE SET NULL`). Unique `(project_id, number)`. `id` remains the target of every foreign key; `number` is only a label.
+- `design_versions`: `project_id` FK projects (`ON DELETE CASCADE`), `owner_id`, `name`, `notes`, `number` (permanent per-project label: `POST /versions` and `/duplicate` read and increment `projects.next_version_number` in the same transaction as the insert, so numbers are monotonic and never reused after a delete), `parameters` (JSON), `mission` (JSON), `parent_version_id` (nullable self FK, `ON DELETE SET NULL`). Unique `(project_id, number)` and unique `(project_id, name)` at DDL level, so the one-name-per-project rule holds under concurrent saves; `/duplicate` retries with the next `(copy N)` suffix when it loses such a race. `id` remains the target of every foreign key; `number` is only a label.
 - `parts`: `category` (string enum, see Parts), `manufacturer`, `model` (name), `mass_g`, `price_eur_estimate` (nullable), `spec` (JSON validated against the category schema), `source` (text: where the spec came from), `verified` (bool, false for placeholders), `notes`. Unique `(category, manufacturer, model)`.
 - `part_listings`: `part_id` FK parts (cascade), `supplier_name`, `country` (`IE` or `UK`), `url`, `price_eur` (nullable), `in_stock` (nullable bool), `last_checked_at` (nullable datetime).
 - `app_settings`: `owner_id` FK users (unique), `data` (JSON, full settings document, see Settings).
@@ -157,17 +157,19 @@ The document carries `schema_version: 1`. Each threshold has a `description` and
 ### Authentication (`app/security.py`, `app/routers/auth.py`)
 
 - Single owner. Password verified against bcrypt hash derived from env at startup. Timing-safe.
-- On success set cookie `vtol_session`: `itsdangerous.URLSafeTimedSerializer(secret, salt="session")` token containing `{"uid": user.id, "pw": sha256(active_password_hash)[:16]}`; `HttpOnly`, `SameSite=Lax`, `Secure` when `APP_ENV=production`, `Path=/`, max age 30 days. Server checks `max_age` and the `pw` fingerprint on every request, so changing the password or the secret signs out every device (documented in `docs/DEPLOYMENT.md`).
+- On success set cookie `vtol_session`: `itsdangerous.URLSafeTimedSerializer(secret, salt="session")` token containing `{"uid": user.id, "pw": fingerprint}`; `HttpOnly`, `SameSite=Lax`, `Secure` when `APP_ENV=production`, `Path=/`, max age 30 days. The fingerprint must be stable across restarts (a deploy must not sign the owner out): with `APP_PASSWORD_HASH` it is `sha256(hash)[:16]`; with `APP_PASSWORD` (whose bcrypt hash is re-salted on every start) it is `HMAC-SHA256(secret_key, password)[:16]`. Either way, changing the password or the secret signs out every device (documented in `docs/DEPLOYMENT.md`). The server checks `max_age` and the fingerprint on every request.
 - Passwords longer than 72 bytes (byte length, not characters) are rejected before bcrypt is called (401, counted as a failed attempt) because bcrypt 5 raises on them.
 - Scope: every `/api` route requires `current_user` except `POST /api/auth/login` and `GET /api/health`. Enforce it as router-level `dependencies=[Depends(current_user)]` on every router, and ship a pytest that walks `app.routes` and asserts 401 for every `/api` path outside that allowlist.
 - Headers: one middleware adds `Cache-Control: no-store` on `/api/*`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, and `Strict-Transport-Security: max-age=31536000` when `APP_ENV=production`. No `CORSMiddleware`: the SPA is same-origin and Vite proxies `/api` in development.
+- Request bodies: `/api` requests with `Content-Length` above 1 MB are refused with 413 before the body is read, and chunked bodies without a length get 411 (the largest legitimate body is a settings or draft document; Phase 2 uploads get their own route and limit).
+- Misconfiguration at startup (missing secret or password in production, a password over 72 bytes) exits with the plain messages only: `Settings` hides input values in validation errors and `get_settings()` converts them to a clean process exit, so the Fly log never shows a secret.
 - Rate limit: 5 failed logins per 15 minutes per client IP, plus a global bucket of 30 failures per 15 minutes across all IPs (in-memory; resets on restart, which is acceptable). Client IP is the `Fly-Client-IP` header when `APP_ENV=production` (set by Fly's proxy from its own view of the connection), else `request.client.host`. Never parse `X-Forwarded-For`: its leftmost entries are client-supplied. Respond 429 with a plain message.
 - CSRF: cookie is SameSite=Lax; additionally every state-changing `/api` request must carry header `X-Requested-With: fetch` (frontend client sets it) or it is rejected with 403. GET never mutates.
 - `GET /api/auth/me` returns the user or 401. Unauthenticated API calls return 401 JSON `{detail: "..."}`; the SPA redirects to `/login`.
 
 ### API (all JSON, prefix `/api`)
 
-Errors: FastAPI default `{detail: ...}`; validation errors 422 with field messages. IDs are integers. Timestamps ISO 8601 UTC.
+Errors: FastAPI default `{detail: ...}`; validation errors 422 with `detail: [{type, loc, msg}]` (the offending input is not echoed back, so a NaN or Infinity in a request can never break the error response). Documents reject non-finite numbers (`allow_inf_nan=False`). IDs are integers. Timestamps ISO 8601 UTC.
 
 Auth
 - `POST /api/auth/login` body `{password}` → 200 `{user: {id, email, display_name}}`; 401 on wrong password; 429 when rate limited.
@@ -175,9 +177,9 @@ Auth
 - `GET /api/auth/me` → `{id, email, display_name}` or 401.
 
 Projects (all require auth; only the owner's rows)
-- `GET /api/projects` → `[{id, name, description, created_at, updated_at, version_count, latest_version: {id, number, name} | null}]` ordered by `updated_at` desc.
+- `GET /api/projects` → `[{id, name, description, created_at, updated_at, version_count, latest_version: {id, number, name} | null, next_version_number}]` ordered by `updated_at` desc.
 - `POST /api/projects` body `{name, description?}` → 201 project with draft initialised from defaults. 409 if the name exists.
-- `GET /api/projects/{id}` → `{id, name, description, created_at, updated_at, draft: {parameters, mission, based_on_version_id, updated_at}, version_count}`.
+- `GET /api/projects/{id}` → `{id, name, description, created_at, updated_at, draft: {parameters, mission, based_on_version_id, updated_at}, version_count, next_version_number}` (the UI uses `next_version_number` for the suggested name of the next version).
 - `PATCH /api/projects/{id}` body `{name?, description?}` → project.
 - `DELETE /api/projects/{id}` → 204 (cascades versions).
 - `GET /api/projects/{id}/draft` → `{parameters, mission, based_on_version_id, updated_at}`.
@@ -196,11 +198,11 @@ Parts
 - `GET /api/parts/categories` → `[{key, label, description, fields: [{name, label, unit, type, required, description}]}]`.
 - `GET /api/parts?category=motor&q=text` → list of parts with listings.
 - `POST /api/parts` body `{category, manufacturer, model, mass_g, price_eur_estimate?, spec, source?, verified?, notes?, listings?: [...]}` → 201. 422 if spec fails the category schema.
-- `GET /api/parts/{id}`, `PATCH /api/parts/{id}`, `DELETE /api/parts/{id}`.
+- `GET /api/parts/{id}`, `PATCH /api/parts/{id}` (an explicit `null` for a non-nullable field is a 422, not a conflict; `manufacturer`, `model` and `supplier_name` are stripped and may not be blank), `DELETE /api/parts/{id}`.
 - `POST /api/parts/{id}/listings`, `DELETE /api/parts/listings/{lid}`.
 
 Settings
-- `GET /api/settings` → `{settings: {...}, meta: {"<dotted.path>": {description, source, is_default}}}`.
+- `GET /api/settings` → `{settings: {...}, meta: {"<dotted.path>": {description, source, is_default}}, warnings: [...]}`. Stored overrides that no longer fit the current defaults (a retired key, or a value that now breaks an invariant) are dropped for that path and reported in `warnings` instead of failing the request, so the Settings page can always load.
 - `PUT /api/settings` body full settings document → same shape (only values that differ from the defaults are stored).
 
 System

@@ -5,13 +5,24 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Country = Literal["IE", "UK"]
 
 
+def _required_text(value: str) -> str:
+    """Strip surrounding whitespace and refuse blank identity strings, so that 'Acme' and
+    'Acme ' are the same part and a part can never be nameless."""
+    value = value.strip()
+    if not value:
+        raise ValueError("This field cannot be blank.")
+    return value
+
+
 class ListingCreate(BaseModel):
     supplier_name: str = Field(max_length=200, description="Shop name.")
+
+    _clean_supplier = field_validator("supplier_name")(_required_text)
     country: Country = Field(description="IE (Ireland) or UK.")
     url: str = Field(max_length=2000, description="Product page link.")
     price_eur: float | None = Field(None, ge=0, description="Price in euro, if known.")
@@ -53,6 +64,8 @@ class PartBase(BaseModel):
     verified: bool = Field(False, description="False for placeholders and unchecked data.")
     notes: str = Field("", max_length=10000, description="Free-text notes.")
 
+    _clean_identity = field_validator("manufacturer", "model")(_required_text)
+
 
 class PartCreate(PartBase):
     category: str = Field(description="Category key, see GET /api/parts/categories.")
@@ -60,7 +73,36 @@ class PartCreate(PartBase):
     listings: list[ListingCreate] = Field(default_factory=list, description="Supplier listings.")
 
 
+# Columns that are NOT NULL in the database: an explicit null in a PATCH is a client error
+# (422), not a uniqueness conflict.
+_NON_NULLABLE_PART_FIELDS = (
+    "category",
+    "manufacturer",
+    "model",
+    "mass_g",
+    "spec",
+    "source",
+    "verified",
+    "notes",
+)
+
+
 class PartUpdate(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_explicit_nulls(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            nulls = [k for k in _NON_NULLABLE_PART_FIELDS if k in data and data[k] is None]
+            if nulls:
+                raise ValueError(
+                    f"{', '.join(nulls)} cannot be null; omit the field to leave it unchanged."
+                )
+        return data
+
+    _clean_identity = field_validator("manufacturer", "model")(
+        lambda v: None if v is None else _required_text(v)
+    )
+
     category: str | None = None
     manufacturer: str | None = Field(None, max_length=200)
     model: str | None = Field(None, max_length=200)

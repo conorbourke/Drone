@@ -23,6 +23,7 @@ from app.routers.common import (
 )
 from app.schemas.project import DraftOut
 from app.schemas.version import (
+    VERSION_NAME_MAX_LENGTH,
     DuplicateRequest,
     VersionCreate,
     VersionListItem,
@@ -163,13 +164,18 @@ def update_version(
 
 
 def _copy_name(db: Session, project_id: int, base_name: str) -> str:
-    """'<name> (copy)', then '<name> (copy 2)', '<name> (copy 3)', ... until unused."""
-    candidate = f"{base_name} (copy)"
-    n = 2
-    while _name_taken(db, project_id, candidate):
-        candidate = f"{base_name} (copy {n})"
+    """'<name> (copy)', then '<name> (copy 2)', '<name> (copy 3)', ... until unused.
+
+    The base is shortened so the result always fits the 200-character name limit.
+    """
+    n = 1
+    while True:
+        suffix = " (copy)" if n == 1 else f" (copy {n})"
+        base = base_name[: VERSION_NAME_MAX_LENGTH - len(suffix)].rstrip()
+        candidate = f"{base}{suffix}"
+        if not _name_taken(db, project_id, candidate):
+            return candidate
         n += 1
-    return candidate
 
 
 @router.post(
@@ -182,23 +188,31 @@ def duplicate_version(
 ) -> VersionOut:
     source = owned_version(db, user, version_id)
     project = owned_project(db, user, source.project_id)
-    if body is not None and body.name is not None:
-        name = body.name
-        if _name_taken(db, project.id, name):
-            raise _name_conflict(name)
-    else:
-        name = _copy_name(db, project.id, source.name)
-    copy = _insert_version(
-        db,
-        project,
-        name=name,
-        notes=source.notes,
-        parameters=current_parameters(source.parameters),
-        mission=current_mission(source.mission),
-        parent_version_id=source.id,
-    )
-    _commit_or_conflict(db, name)
-    return VersionOut(**version_payload(copy))
+    explicit_name = body.name if body is not None else None
+    if explicit_name is not None and _name_taken(db, project.id, explicit_name):
+        raise _name_conflict(explicit_name)
+    # Two overlapping duplicates of the same version can pick the same "(copy N)" name;
+    # the unique constraint catches that and the loser simply takes the next suffix.
+    for _attempt in range(5):
+        name = explicit_name or _copy_name(db, project.id, source.name)
+        copy = _insert_version(
+            db,
+            project,
+            name=name,
+            notes=source.notes,
+            parameters=current_parameters(source.parameters),
+            mission=current_mission(source.mission),
+            parent_version_id=source.id,
+        )
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            if explicit_name is not None:
+                raise _name_conflict(explicit_name) from None
+            continue
+        return VersionOut(**version_payload(copy))
+    raise conflict("Could not find an unused name for the copy. Please try again.")
 
 
 @router.post("/versions/{version_id}/restore", response_model=DraftOut)

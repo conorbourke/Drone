@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.schemas.design import DesignParameters
 from app.schemas.mission import Mission
 
+VERSION_NAME_MAX_LENGTH = 200
+
 
 def _clean_name(value: str) -> str:
     value = value.strip()
@@ -19,7 +21,10 @@ def _clean_name(value: str) -> str:
 
 
 class VersionCreate(BaseModel):
-    name: str = Field(max_length=200, description="Version name, unique within the project.")
+    name: str = Field(
+        max_length=VERSION_NAME_MAX_LENGTH,
+        description="Version name, unique within the project.",
+    )
     notes: str = Field("", max_length=10000, description="Free-text notes.")
     parameters: DesignParameters | None = Field(
         None,
@@ -46,7 +51,7 @@ class VersionCreate(BaseModel):
 
 
 class VersionUpdate(BaseModel):
-    name: str | None = Field(None, max_length=200)
+    name: str | None = Field(None, max_length=VERSION_NAME_MAX_LENGTH)
     notes: str | None = Field(None, max_length=10000)
 
     _clean = field_validator("name")(lambda v: None if v is None else _clean_name(v))
@@ -55,7 +60,7 @@ class VersionUpdate(BaseModel):
 class DuplicateRequest(BaseModel):
     name: str | None = Field(
         None,
-        max_length=200,
+        max_length=VERSION_NAME_MAX_LENGTH,
         description="Name for the copy. Defaults to '<name> (copy)', de-duplicated.",
     )
 
