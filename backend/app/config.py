@@ -103,6 +103,24 @@ class Settings(BaseSettings):
         "returns this JSON file instead of calling Claude with web search. Ignored when "
         "APP_ENV=production.",
     )
+    export_timeout_s: float = Field(
+        default=600.0,
+        gt=0,
+        description="Phase 5: hard time limit of one file export (the CAD child process is "
+        "killed after it). Default 10 minutes.",
+    )
+    export_memory_limit_mb: float = Field(
+        default=1500.0,
+        gt=0,
+        description="Phase 5: the CAD child process is killed when its resident memory goes "
+        "above this (the machine has 2 GB; the API process keeps the rest).",
+    )
+    export_fake_generator: str | None = Field(
+        default=None,
+        description="Test seam: outside production, file exports call this 'module:function' "
+        "(same signature as app.cad.generate_files) in the child process instead of the CAD "
+        "kernel. Ignored when APP_ENV=production.",
+    )
     validation_on_startup: bool = Field(
         default=True,
         description="Run the validation suite once in the background at startup when no "
@@ -186,6 +204,17 @@ class Settings(BaseSettings):
     @property
     def images_dir(self) -> Path:
         return self.files_dir / "images"
+
+    @property
+    def exports_dir(self) -> Path:
+        return self.files_dir / "exports"
+
+    @property
+    def fake_export_generator(self) -> str | None:
+        """The export generator test seam, only outside production."""
+        if self.is_production:
+            return None
+        return self.export_fake_generator
 
     @property
     def fake_claude_response_file(self) -> Path | None:

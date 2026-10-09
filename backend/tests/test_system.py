@@ -42,7 +42,7 @@ def test_system_info(auth_client: TestClient, settings: Settings) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["version"] == __version__
-    assert body["phase"] == PHASE == 3
+    assert body["phase"] == PHASE == 5
     assert body["environment"] == "test"
     assert body["data_dir"] == str(settings.app_data_dir)
     assert set(body["backup"]) == {"enabled", "last_run_at", "next_run_at", "count"}

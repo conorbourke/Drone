@@ -15,6 +15,10 @@ daemon thread drains a priority queue:
   search, :func:`app.suppliers.refresh_part`), queued by "refresh all in this parts list". One
   item per part, so an analysis queued meanwhile runs before the next part; the state lives
   on the part row (``listings_refresh_status`` / ``_message``).
+* ``export`` (priority 2, Phase 5, first come first served with refreshes): one "Generate
+  files" row of the ``exports`` table. The CAD kernel runs in a child process
+  (:func:`app.exports.run_export_job`) so OpenCascade's memory goes back to the OS when it
+  ends; progress, the time limit and the memory guard are handled there.
 
 Image readings keep their own single-worker executor (``app.routers.readings``), so a long
 analysis never holds up a reading for more than the shared CPU does.
@@ -138,10 +142,12 @@ class _Progress:
         session_factory: sessionmaker[Session],
         analysis_id: int,
         stop: threading.Event,
+        model: Any = Analysis,
     ) -> None:
         self.session_factory = session_factory
-        self.analysis_id = analysis_id
+        self.analysis_id = analysis_id  # the row id (an analysis, or an export)
         self.stop = stop
+        self.model = model
         self.last_write = 0.0
         self.last_stage = ""
         self.progress = 0.0
@@ -173,7 +179,7 @@ class _Progress:
 
     def write(self, **values: Any) -> None:
         with self.session_factory() as db:
-            db.execute(update(Analysis).where(Analysis.id == self.analysis_id).values(**values))
+            db.execute(update(self.model).where(self.model.id == self.analysis_id).values(**values))
             db.commit()
 
 
@@ -413,6 +419,7 @@ class AnalysisWorker:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._current: tuple[str, int] | None = None
+        self._cancel = threading.Event()  # cancels the running export (its row was deleted)
 
     # -- control -------------------------------------------------------------------------
 
@@ -466,13 +473,24 @@ class AnalysisWorker:
             raise RuntimeError("worker stopped")
         self._queue.put((2, next(self._seq), "refresh", part_id))
 
-    def queue_position(self, analysis_id: int) -> int | None:
-        """How many jobs run before this analysis (0 = it is next or running)."""
+    def submit_export(self, export_id: int) -> None:
+        if self._stop.is_set():
+            raise RuntimeError("worker stopped")
+        self._queue.put((2, next(self._seq), "export", export_id))
+
+    def cancel_export(self, export_id: int) -> None:
+        """Stop the export if it is the running job (its row is being deleted). A queued one
+        is skipped when its turn comes, because the row is gone."""
+        if self._current == ("export", export_id):
+            self._cancel.set()
+
+    def queue_position(self, ident: int, kind: str = "analysis") -> int | None:
+        """How many jobs run before this one (0 = it is next or running)."""
         with self._queue.mutex:
             items = sorted(self._queue.queue)
-        ids = [i for (_p, _s, kind, i) in items if kind == "analysis"]
-        if analysis_id in ids:
-            ahead = ids.index(analysis_id)
+        keys = [(k, i) for (_p, _s, k, i) in items if k != "stop"]
+        if (kind, ident) in keys:
+            ahead = keys.index((kind, ident))
             return ahead + (1 if self._current is not None else 0)
         return None
 
@@ -483,6 +501,7 @@ class AnalysisWorker:
             _prio, _seq, kind, ident = self._queue.get()
             if kind == "stop" or self._stop.is_set():
                 break
+            self._cancel.clear()
             self._current = (kind, ident)
             try:
                 if kind == "analysis":
@@ -491,6 +510,12 @@ class AnalysisWorker:
                     run_validation_job(self.settings, self.validation, self._stop)
                 elif kind == "refresh":
                     run_refresh_job(self.settings, self.session_factory, ident)
+                elif kind == "export":
+                    from app.exports import run_export_job
+
+                    run_export_job(
+                        self.session_factory, self.settings, ident, self._stop, self._cancel
+                    )
             except BaseException:  # never let the worker thread die
                 log.exception("Job %s %s crashed the worker loop", kind, ident)
             finally:

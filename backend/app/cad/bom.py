@@ -362,6 +362,27 @@ def consumable_rows() -> list[dict[str, Any]]:
     ]
 
 
+#: Phase 4 parts-list roles (``app.engine.selection.ROLE_ORDER``) and the generic BOM rows each
+#: one replaces, so a selected part is never counted twice.
+SELECTION_COVERS: dict[str, tuple[str, ...]] = {
+    "lift_prop": ("lift_propeller",),
+    "cruise_motor": ("pusher_motor",),
+    "pusher_prop": ("pusher_propeller",),
+    "esc": ("lift_esc", "pusher_esc"),
+    "autopilot": ("avionics",),
+    "gps": ("avionics",),
+    "radio": ("avionics",),
+    "telemetry": ("avionics",),
+}
+#: Selected tube roles and the cut-list rows (by item prefix) that are cut from them: those rows
+#: keep the cut length but carry no mass or price (the selection line has both).
+SELECTED_TUBE_CUTS: dict[str, tuple[str, ...]] = {
+    "spar_tube": ("Wing spar tube",),
+    "wing_spar": ("Wing spar tube",),
+    "boom_tube": ("Boom", "Tail boom"),
+}
+
+
 def build_bom(
     model: CadModel,
     parts: list[dict[str, Any]],
@@ -373,11 +394,23 @@ def build_bom(
     sel = [x for x in selection or [] if isinstance(x, dict)]
     sel_rows = selection_rows(sel)
     roles = {str(x.get("role")) for x in sel}
+    covered = roles | {c for r in roles for c in SELECTION_COVERS.get(r, ())}
+    cut_rows = tube_rows(tubes, extra_rods)
+    for role, prefixes in SELECTED_TUBE_CUTS.items():
+        if role not in roles:
+            continue
+        for r in cut_rows:
+            if r["category"] == "carbon tube" and str(r["item"]).startswith(prefixes):
+                r["unit mass g"] = r["line mass g"] = ""
+                r["unit price €"] = r["line price €"] = ""
+                r["notes"] = f"cut from the selected tube ({role} line); {r['notes']}".replace(
+                    "; price estimate", ""
+                )
     rows = (
         sel_rows
-        + generic_rows(model, roles)
+        + generic_rows(model, covered)
         + printed_rows(parts)
-        + tube_rows(tubes, extra_rods)
+        + cut_rows
         + hardware_rows(hardware)
         + consumable_rows()
     )

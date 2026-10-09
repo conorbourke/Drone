@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import utcnow
-from app.deps import CurrentUser, DbSession, current_user
+from app.deps import AppSettings, CurrentUser, DbSession, current_user
+from app.exports import delete_exports, remove_export_files
 from app.models import Analysis, DesignVersion, Project
 from app.parts_service import copy_selection
 from app.patching import PatchError, apply_patch
@@ -297,7 +298,12 @@ def restore_version(version_id: int, db: DbSession, user: CurrentUser) -> DraftO
     responses={409: {"description": "The version still has analyses (or later records)"}},
 )
 def delete_version(
-    version_id: int, db: DbSession, user: CurrentUser, with_analyses: bool = False
+    version_id: int,
+    request: Request,
+    db: DbSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    with_analyses: bool = False,
 ) -> Any:
     """Delete a version. The DDL clears the draft pointer and any child's parent pointer
     (ON DELETE SET NULL). Analyses reference versions with ON DELETE RESTRICT: without
@@ -320,6 +326,11 @@ def delete_version(
         )
     if count:
         db.execute(delete(Analysis).where(Analysis.version_id == version.id))
+    # Exports are reproducible and never block the delete (ON DELETE CASCADE); their rows go
+    # here so a running one is stopped, and their files once the delete is committed.
+    export_ids = delete_exports(
+        db, settings, getattr(request.app.state, "analysis_worker", None), version_id=version.id
+    )
     db.delete(version)
     try:
         db.commit()
@@ -329,3 +340,5 @@ def delete_version(
             f"Version {version.number} is still referenced by other records (for example "
             "flight logs or calibrations) and cannot be deleted."
         ) from None
+    for export_id in export_ids:
+        remove_export_files(settings, export_id)

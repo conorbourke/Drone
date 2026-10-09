@@ -1,6 +1,6 @@
 [project]
 name = "vtol-drone-backend"
-version = "0.3.0"
+version = "0.5.0"
 description = "Backend for the VTOL drone design tool: FastAPI API, SQLite storage, static SPA serving."
 readme = "README.md"
 requires-python = ">=3.12"

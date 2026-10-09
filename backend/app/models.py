@@ -311,3 +311,43 @@ class PartSelection(TimestampMixin, Base):
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class Export(TimestampMixin, Base):
+    """One "Generate files" job of a project's draft or version and its manifest (Phase 5).
+
+    The files live under ``{APP_DATA_DIR}/files/{files_dir}`` (``exports/{id}``); deleting the
+    row through the API, its version or its project removes that directory. ``version_id`` is
+    ``ON DELETE CASCADE``, not the Phase 1 RESTRICT policy: exports are reproducible from the
+    version, so they must never block deleting it (migration 0005).
+    """
+
+    __tablename__ = "exports"
+    __table_args__ = {"sqlite_autoincrement": True}  # ids name directories: never reused
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("design_versions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    source: Mapped[str] = mapped_column(String(20), nullable=False)  # draft | version
+    inputs: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    inputs_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # queued|running|done|error
+    progress: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    stage: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    manifest: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    files_dir: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    total_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    peak_rss_mb: Mapped[float | None] = mapped_column(Float, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    reused_from_id: Mapped[int | None] = mapped_column(
+        ForeignKey("exports.id", ondelete="SET NULL"), nullable=True
+    )

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import copy
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.db import utcnow
 from app.defaults import DEFAULT_DESIGN_PARAMETERS, DEFAULT_MISSION
 from app.deps import AppSettings, CurrentUser, DbSession, current_user
+from app.exports import delete_exports, remove_export_files
 from app.imaging import remove_project_files
 from app.models import Analysis, DesignVersion, Project, User
 from app.routers.common import conflict, draft_payload, owned_project
@@ -144,14 +145,17 @@ def update_project(
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
-    project_id: int, db: DbSession, user: CurrentUser, settings: AppSettings
+    project_id: int, request: Request, db: DbSession, user: CurrentUser, settings: AppSettings
 ) -> None:
-    """Delete a project. The DDL cascades its versions, images and readings; the image files
-    are removed with the project's directory once the rows are gone."""
+    """Delete a project. The DDL cascades its versions, images, readings and exports; the image
+    and export files are removed once the rows are gone (a running export is stopped)."""
     project = owned_project(db, user, project_id)
     # Analyses first: their version reference is ON DELETE RESTRICT, which SQLite checks as
     # each version row goes, before the project cascade would reach the analyses.
     db.execute(delete(Analysis).where(Analysis.project_id == project.id))
+    export_ids = delete_exports(
+        db, settings, getattr(request.app.state, "analysis_worker", None), project_id=project.id
+    )
     db.delete(project)
     try:
         db.commit()
@@ -161,6 +165,8 @@ def delete_project(
             "This project cannot be deleted because other records still refer to it."
         ) from None
     remove_project_files(settings.images_dir, project_id)
+    for export_id in export_ids:
+        remove_export_files(settings, export_id)
 
 
 @router.get("/{project_id}/draft", response_model=DraftOut)

@@ -26,6 +26,7 @@ from app.backup import BackupManager
 from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory, sqlite_path
 from app.deps import current_user
+from app.exports import recover_exports
 from app.jobs import (
     AnalysisWorker,
     recover_analyses,
@@ -38,6 +39,7 @@ from app.routers import (
     analyses,
     assistant,
     auth,
+    exports,
     images,
     parts,
     parts_list,
@@ -256,6 +258,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         worker.submit_analysis(analysis_id)
     if queued:
         log.info("Re-queued %d analysis(es)", len(queued))
+    # Phase 5 file exports: the same worker, the CAD in a child process (app.exports).
+    failed_exports, queued_exports = recover_exports(app.state.session_factory, settings)
+    if failed_exports:
+        log.warning("Marked %d interrupted export(s) as failed", failed_exports)
+    for export_id in queued_exports:
+        worker.submit_export(export_id)
     if settings.validation_on_startup and not validation_report_path(settings).is_file():
         log.info("No validation report yet: running the validation suite in the background")
         worker.submit_validation("startup")
@@ -358,6 +366,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(analyses.router)
     app.include_router(validation.router)
     app.include_router(assistant.router)
+    app.include_router(exports.router)
 
     @app.api_route(
         "/api/{path:path}",

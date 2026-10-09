@@ -503,6 +503,10 @@ def _selection_by_role(parts_selection: Any) -> dict[str, dict[str, Any]]:
     for item in parts_selection or []:
         if isinstance(item, dict) and item.get("role"):
             out[str(item["role"])] = item
+    # Phase 4 parts-list role names (app.engine.selection.ROLE_ORDER) for the same components.
+    for phase4, cad in (("cruise_motor", "pusher_motor"), ("spar_tube", "wing_spar")):
+        if phase4 in out and cad not in out:
+            out[cad] = out[phase4]
     return out
 
 
@@ -581,7 +585,8 @@ def _spar_tube(
         spec = item.get("spec") or {}
         od = spec.get("outer_mm") or spec.get("outer_diameter_mm")
         if od:
-            wall = spec.get("wall_mm") or 1.0
+            inner = spec.get("inner_diameter_mm")
+            wall = spec.get("wall_mm") or ((float(od) - float(inner)) / 2 if inner else 1.0)
             return {"outer_mm": float(od), "wall_mm": float(wall), "source": "Phase 4 selection"}
     struct = (analysis or {}).get("structure") or {}
     sizing = struct.get("spar_sizing") or {}
@@ -1018,7 +1023,7 @@ def build_model(
     # Battery and payload volumes (assembly only).
     pack_mass = ms["pack"]["mass_g"]
     bspec = sel_spec("battery")
-    if bspec and bspec.get("length_mm"):
+    if bspec and all(bspec.get(k) for k in ("length_mm", "width_mm", "height_mm")):
         bl, bw, bh = float(bspec["length_mm"]), float(bspec["width_mm"]), float(bspec["height_mm"])
     else:
         vol = pack_mass / 2.2 * 1000  # mm^3 at ~2.2 g/cm^3 pack density (estimate)
