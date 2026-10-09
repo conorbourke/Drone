@@ -108,7 +108,7 @@ export function ComparePage() {
     return loaded.versions.map((v) => ({
       version: v,
       geometry: buildGeometry(v.parameters, { airfoils }),
-      estimates: estimate({ parameters: v.parameters, mission: v.mission, settings: loaded.settings, airfoils }),
+      estimates: estimate({ parameters: v.parameters, mission: v.mission, settings: loaded.settings, airfoils, partsMasses: v.parts_selection?.masses_g ?? null }),
     }));
   }, [loaded, airfoils]);
 

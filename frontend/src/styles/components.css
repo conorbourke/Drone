@@ -2794,3 +2794,496 @@ polyline.shape-gear {
     display: none;
   }
 }
+
+/* ======================= Phase 4: parts list, totals, budget, upgrades ======================= */
+
+.parts-source {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.parts-source select {
+  min-height: 30px;
+  max-width: 220px;
+}
+
+.parts-updating {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.parts-refresh-all {
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: var(--space-2) 0;
+}
+
+.parts-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  transition: opacity 0.2s;
+}
+
+.parts-stale {
+  opacity: 0.55;
+}
+
+.parts-system {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.parts-system-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.parts-system-title .small {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.parts-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  min-width: 0;
+}
+
+.parts-line-locked {
+  border-left: 3px solid var(--color-info);
+}
+
+.parts-line-unfilled {
+  border-style: dashed;
+  background: var(--color-surface-2);
+}
+
+.parts-line-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-4);
+  align-items: start;
+}
+
+.parts-line-ident {
+  min-width: 0;
+}
+
+.parts-line-role {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.parts-line-part {
+  font-weight: 650;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.parts-line-figures {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: var(--space-4);
+  margin: 0;
+  text-align: right;
+}
+
+.parts-line-figures > div {
+  min-width: 0;
+}
+
+.parts-line-figures dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.parts-line-figures dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.parts-line-unit {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.parts-line-supplier {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.parts-supplier-link {
+  font-weight: 600;
+}
+
+.country-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.country-flag svg {
+  border-radius: 2px;
+  flex: none;
+}
+
+.parts-flags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.parts-flag-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.parts-flag-item .pill {
+  flex: none;
+}
+
+.parts-line-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.parts-reasoning {
+  border-top: 1px dashed var(--color-border);
+  padding-top: var(--space-2);
+}
+
+.parts-reasoning ul {
+  margin: 0;
+  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.parts-consumable-items summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.parts-consumable-items ul {
+  margin: var(--space-1) 0 0;
+  padding-left: 1.2em;
+}
+
+.parts-catalogue summary .pill {
+  margin-left: var(--space-1);
+}
+
+.parts-catalogue-body {
+  color: var(--color-text);
+}
+
+.parts-catalogue-head h3 {
+  margin: var(--space-3) 0 0;
+  font-size: 1rem;
+}
+
+.parts-masses-note {
+  margin: var(--space-2) 0;
+}
+
+.parts-mass-pill {
+  margin-left: 6px;
+  padding: 0 6px;
+  font-size: 0.7rem;
+}
+
+/* ---------- Budget meter: fill carries the status, track is a lighter step of the same hue ---------- */
+.budget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.budget-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.budget-figure {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.budget-head .status-badge {
+  align-self: center;
+}
+
+.budget-track {
+  position: relative;
+  height: 12px;
+  border-radius: 4px;
+  overflow: visible;
+  margin-top: var(--space-1);
+}
+
+.budget-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  max-width: 100%;
+}
+
+.budget-under {
+  background: var(--color-ok-soft);
+}
+
+.budget-under .budget-fill {
+  background: var(--color-ok);
+}
+
+.budget-near {
+  background: var(--color-warn-soft);
+}
+
+.budget-near .budget-fill {
+  background: var(--color-warn);
+}
+
+.budget-over {
+  background: var(--color-error-soft);
+}
+
+.budget-over .budget-fill {
+  background: var(--color-error);
+}
+
+.budget-limit {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--color-text);
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+.budget-scale {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+.parts-totals-kv {
+  margin: var(--space-3) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.parts-uk-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+/* ---------- Upgrades ---------- */
+.upgrade-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.upgrade-item {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.upgrade-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.upgrade-role {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.upgrade-name {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.upgrade-figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, max-content));
+  gap: var(--space-1) var(--space-5);
+  margin: 0;
+}
+
+.upgrade-figures dt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.upgrade-figures dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.upgrade-trade {
+  margin: 0;
+}
+
+/* ---------- Replace dialog ---------- */
+.alt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.alt-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.alt-infeasible {
+  background: var(--color-surface-2);
+}
+
+.alt-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.alt-name {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.alt-reason {
+  margin: var(--space-1) 0 0;
+}
+
+.alt-deltas {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.alt-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+@media (max-width: 720px) {
+  .parts-line-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .parts-line-figures {
+    text-align: left;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .parts-line-figures dd {
+    white-space: normal;
+  }
+
+  .parts-flag-item {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .upgrade-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .alt-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .alt-action {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .parts-source select {
+    max-width: 160px;
+  }
+}

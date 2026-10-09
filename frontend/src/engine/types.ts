@@ -10,8 +10,11 @@ import type {
   DesignParameters,
   Layout,
   Mission,
+  PartsMasses,
   Settings,
 } from '../api/types';
+
+export type { PartsMasses };
 
 /** One engine output number with its uncertainty range and explanation. */
 export interface Quantity {
@@ -51,6 +54,13 @@ export interface EngineInput {
   settings: Settings;
   /** May be empty while the airfoil list is loading; the engine then uses stated fallbacks. */
   airfoils: AirfoilSummaryMap;
+  /**
+   * Phase 4, optional: masses of the selected catalogue parts (the draft or version payload's
+   * `parts_selection.masses_g`). Each key present replaces the matching statistical mass:
+   * lift motor, propeller, ESC, tilt servo (+20 g hinge hardware per side), pusher motor and
+   * propeller, battery pack, avionics, spar and boom tubes (g per metre).
+   */
+  partsMasses?: PartsMasses | null;
 }
 
 // ---------- Geometry ----------
@@ -214,6 +224,8 @@ export interface MassComponent {
   x_mm: number;
   source: string;
   explain: string;
+  /** Phase 4: true when the mass comes from a selected catalogue part, not a statistical relation. */
+  from_parts?: boolean;
 }
 
 export interface MassResult {
@@ -232,6 +244,8 @@ export interface MassResult {
   lift_motor_mass_g: number;
   lift_motor_max_thrust_n: number;
   pusher_motor_max_power_w: number;
+  /** Phase 4: labels of the components whose masses came from selected parts (empty without parts). */
+  parts_used: string[];
 }
 
 export interface BalanceResult {

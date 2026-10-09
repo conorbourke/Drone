@@ -20,6 +20,9 @@
  * that canned reading and never calls the API, and CLAUDE_FAKE_CHAT_FILE (absolute path of
  * backend/tests/fixtures/chat_fake_script.json), so the assistant replays a scripted
  * conversation (one run_quick_analysis tool call, an answer quoting it, a proposal).
+ * CLAUDE_FAKE_SUPPLIER_FILE (absolute path of e2e/fixtures/supplier_fake.json) makes "Check prices
+ * now" on the Parts tab answer with a canned empty result (no listings, so no shop link is ever
+ * contacted) instead of calling Claude with web search.
  * VALIDATION_ON_STARTUP=false keeps the validation suite from running at startup; the
  * Validation page then shows the committed snapshot (docs/validation/latest.json).
  */
@@ -40,6 +43,8 @@ const STATIC_DIR = path.join(repoRoot, 'frontend', 'dist');
 const CLAUDE_FAKE_RESPONSE_FILE = path.join(repoRoot, 'backend', 'tests', 'fixtures', 'vision_fake_response.json');
 /** Scripted assistant conversation (never in production). */
 const CLAUDE_FAKE_CHAT_FILE = path.join(repoRoot, 'backend', 'tests', 'fixtures', 'chat_fake_script.json');
+/** Canned supplier lookup (no listings found) for "Check prices now" (never in production). */
+const CLAUDE_FAKE_SUPPLIER_FILE = path.join(here, 'fixtures', 'supplier_fake.json');
 
 /** Owner password the backend is started with; the specs sign in with it. */
 export const TEST_PASSWORD = 'test-password';
@@ -123,6 +128,7 @@ export default defineConfig({
       PORT: String(PORT),
       CLAUDE_FAKE_RESPONSE_FILE,
       CLAUDE_FAKE_CHAT_FILE,
+      CLAUDE_FAKE_SUPPLIER_FILE,
       VALIDATION_ON_STARTUP: 'false',
     },
   },

@@ -63,6 +63,64 @@ export function ServerMetric({
   );
 }
 
+type TransitionBlock = NonNullable<AnalysisResult['transition']>;
+
+/** Forward (top-speed) thrust margin over the wing-borne part of the sweep, with its plain explanation. */
+function TopSpeedChart({ tr }: { tr: TransitionBlock }) {
+  const top = tr.top_speed!;
+  const pts = tr.points
+    .filter((p) => typeof p.forward_thrust_margin === 'number')
+    .map((p) => ({ x: p.speed_mps, y: p.forward_thrust_margin as number }));
+  const tilted = top.propeller !== 'pusher';
+  const explain = [
+    `Forward thrust the ${top.propeller ?? 'cruise propellers'} can give at full throttle, divided by the drag (plus the force to keep accelerating below cruise speed), once the wing carries the weight. Below 1.0 the aircraft cannot fly that fast; the engine warns below ${fmt(top.required_margin, 2)} because the propeller model is uncertain by about ±15 %.`,
+    tilted
+      ? 'Hover propellers have a low pitch. Tilted forward at speed, the air arrives so fast that each blade meets it at a small angle and the thrust falls towards zero, however hard the motor works. That is what usually limits the top speed of a tilt-rotor with hover propellers.'
+      : 'The pusher propeller unloads as the airspeed rises: at high advance ratio its thrust falls towards zero.',
+    top.advance_ratio_at_sweep_end !== null && top.zero_thrust_advance_ratio !== null
+      ? `At ${fmt(top.sweep_end_speed_mps, 1)} m/s the propellers run at advance ratio J = ${fmt(top.advance_ratio_at_sweep_end, 2)}; their thrust reaches zero near J = ${fmt(top.zero_thrust_advance_ratio, 2)}.`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+  const topText =
+    top.top_speed_mps !== null
+      ? `The margin reaches 1.0 at about ${fmt(top.top_speed_mps, 1)} m/s${top.top_speed_beyond_sweep ? ' (beyond the plotted range)' : ''}: the top speed.`
+      : 'The margin stays above 1.0 up to twice the sweep end.';
+  return (
+    <div data-testid="analysis-top-speed">
+      <h4 className="chart-title">
+        Top-speed thrust margin <Explain label="top-speed thrust margin" text={explain} />
+      </h4>
+      <p className="small muted">
+        Lowest {fmt(top.margin_min, 2)} at {fmt(top.margin_min_speed_mps, 1)} m/s
+        {top.margin_at_sweep_end !== null && Math.abs((top.margin_min_speed_mps ?? NaN) - top.sweep_end_speed_mps) > 0.05
+          ? `; ${fmt(top.margin_at_sweep_end, 2)} at ${fmt(top.sweep_end_speed_mps, 1)} m/s (1.3 x cruise)`
+          : top.margin_at_sweep_end !== null
+            ? ' (1.3 x cruise, the end of the sweep)'
+            : ''}
+        . {topText}
+      </p>
+      <LineChart
+        testId="chart-top-speed-margin"
+        ariaLabel="Forward thrust margin against airspeed in wing-borne flight"
+        points={pts}
+        xLabel="Airspeed"
+        xUnit="m/s"
+        yLabel="Forward thrust margin"
+        yUnit="×"
+        formatY={(y) => fmt(y, 2)}
+        formatX={(x) => fmt(x, 1)}
+        markX={top.margin_min_speed_mps}
+        references={[
+          { y: 1, label: '1.0: cannot fly faster', tone: 'critical' },
+          { y: top.required_margin, label: `wanted ${fmt(top.required_margin, 2)}`, tone: 'warning' },
+        ]}
+      />
+    </div>
+  );
+}
+
 const HEADLINE: Array<{ key: string; label?: string; rangeFirst?: boolean; digits?: number }> = [
   { key: 'takeoff_mass', label: 'Take-off mass' },
   { key: 'endurance_cruise', label: 'Wing-flight endurance', rangeFirst: true, digits: 0 },
@@ -75,6 +133,7 @@ const HEADLINE: Array<{ key: string; label?: string; rangeFirst?: boolean; digit
   { key: 'static_margin_min_payload', label: 'Static margin, lightest camera', digits: 1 },
   { key: 'hover_thrust_to_weight', label: 'Hover thrust-to-weight', digits: 2 },
   { key: 'transition_min_margin', label: 'Transition thrust margin', digits: 2 },
+  { key: 'top_speed_thrust_margin', label: 'Top-speed thrust margin', digits: 2 },
   { key: 'peak_current', label: 'Peak battery current', digits: 1 },
 ];
 
@@ -338,7 +397,11 @@ export function AnalysisResultView({ result, afterChecks }: { result: AnalysisRe
           <Section
             title="Transition"
             testId="analysis-transition"
-            note={`From hover to cruise speed. Lowest thrust margin ${fmt(tr.min_thrust_margin, 2)} at ${fmt(tr.min_margin_speed_mps, 1)} m/s; peak power ${fmt(tr.peak_power_w, 0)} W (${fmt(tr.peak_current_a, 1)} A).${tr.speed_wing_80pct_mps ? ` The wing carries 80 % of the weight from ${fmt(tr.speed_wing_80pct_mps, 1)} m/s.` : ''}`}
+            note={`${
+              tr.transition_end_speed_mps !== undefined
+                ? `From hover to ${fmt(tr.transition_end_speed_mps, 1)} m/s, where the wing carries the full weight (with a 10 % speed buffer) and the propellers are fully tilted.`
+                : 'From hover to cruise speed.'
+            } Lowest thrust margin ${fmt(tr.min_thrust_margin, 2)} at ${fmt(tr.min_margin_speed_mps, 1)} m/s; peak power ${fmt(tr.peak_power_w, 0)} W (${fmt(tr.peak_current_a, 1)} A).${tr.speed_wing_80pct_mps ? ` The wing carries 80 % of the weight from ${fmt(tr.speed_wing_80pct_mps, 1)} m/s.` : ''}`}
           >
             <h4 className="chart-title">
               Thrust margin{' '}
@@ -350,7 +413,7 @@ export function AnalysisResultView({ result, afterChecks }: { result: AnalysisRe
             <LineChart
               testId="chart-transition-margin"
               ariaLabel="Thrust margin against airspeed through the transition"
-              points={tr.points.map((p) => ({ x: p.speed_mps, y: p.thrust_margin }))}
+              points={tr.points.filter((p) => p.thrust_margin !== null).map((p) => ({ x: p.speed_mps, y: p.thrust_margin ?? NaN }))}
               xLabel="Airspeed"
               xUnit="m/s"
               yLabel="Thrust margin"
@@ -371,6 +434,9 @@ export function AnalysisResultView({ result, afterChecks }: { result: AnalysisRe
                   : []),
               ]}
             />
+            {tr.top_speed && tr.points.some((p) => typeof p.forward_thrust_margin === 'number') ? (
+              <TopSpeedChart tr={tr} />
+            ) : null}
             <h4 className="chart-title">Battery power</h4>
             <LineChart
               testId="chart-transition-power"

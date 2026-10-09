@@ -169,6 +169,7 @@ const GROUP_LABELS: Record<string, string> = {
   limits: 'Mass limits',
   checks: 'Check thresholds',
   analysis: 'Analysis',
+  budget: 'Budget',
   units: 'Units',
 };
 
@@ -506,6 +507,26 @@ export function SettingsPage() {
                 </SettingRow>
               );
             })}
+          </section>
+
+          <section className="card" aria-labelledby="budget-heading">
+            <div className="card-header">
+              <h2 id="budget-heading">Budget</h2>
+            </div>
+            <p className="card-note">
+              The Parts tab compares the cost of the recommended parts list with this amount.
+            </p>
+            <SettingRow path="budget.prototype_eur" meta={meta} label="Prototype budget" unit="€" error={rowError('budget.prototype_eur')}>
+              <NumberInput
+                label={`${labelFor(meta, 'budget.prototype_eur', 'Prototype budget')} (€)`}
+                value={settings.budget?.prototype_eur ?? 5000}
+                onChange={(next) => update('budget.prototype_eur', next)}
+                onInvalid={(invalid) => setNumberInvalid('budget.prototype_eur', invalid)}
+                step={50}
+                invalid={!!rowError('budget.prototype_eur') || !!highlighted['budget.prototype_eur']}
+                testId="setting-budget.prototype_eur"
+              />
+            </SettingRow>
           </section>
 
           <section className="card" aria-labelledby="units-heading">

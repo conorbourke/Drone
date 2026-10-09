@@ -8,6 +8,7 @@ export { compareLayouts, LAYOUTS, LAYOUT_LABELS, ARDUPILOT_NOTES } from './compa
 export { buildGeometry, withDefaults, naca4Coordinates, airfoilShape } from './geometry';
 export type { BuildGeometryOptions, ResolvedParameters } from './geometry';
 export { DESIGN_V2_DEFAULTS } from './constants';
+export { PARTS_MASS_LABELS, partMass } from './mass';
 export type {
   AeroResult,
   AirfoilSummaryMap,
@@ -23,6 +24,7 @@ export type {
   MassComponent,
   MassResult,
   MissionSegment,
+  PartsMasses,
   PerformanceResult,
   Quantity,
   RenderPrimitives,

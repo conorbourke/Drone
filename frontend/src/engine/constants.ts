@@ -349,6 +349,14 @@ export const MOTOR_MOUNT_FRACTION = 0.2;
 /** Tilt mechanism per tilting side: servo + hinge + bearings = 25 g + 0.25 x (motor + prop). ESTIMATE, +/-50 %. */
 export const TILT_MECH_FIXED_G = 25;
 export const TILT_MECH_FRACTION = 0.25;
+/** Phase 4: relative uncertainty of a selected catalogue part's mass (manufacturer figure, unverified). Same as the server (app/engine/mass.py). */
+export const PART_MASS_UNCERTAINTY = 0.03;
+/** Phase 4: tilt hinge, bearing and linkage hardware per side when a catalogue tilt servo is selected. ESTIMATE (printed or aluminium hinge, two bearings, a ball link; 15-30 g). */
+export const TILT_HINGE_HARDWARE_G = 20;
+/** Phase 4: uncertainty of the tilt mechanism with a catalogue servo (servo known, hinge estimated). */
+export const TILT_MECH_PART_UNCERTAINTY = 0.15;
+/** Phase 4: uncertainty of the avionics mass from selected parts (parts known, mounts and cables not). */
+export const AVIONICS_PART_UNCERTAINTY = 0.1;
 /** Control servos (2 aileron + 2 tail): each 6 g + 0.0025 x take-off mass in g. ESTIMATE (9 g class at 2.5 kg, 60-70 g class at 24 kg), +/-40 %. */
 export const CONTROL_SERVO_COUNT = 4;
 export const CONTROL_SERVO_FIXED_G = 6;

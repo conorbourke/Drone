@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError, api, errorMessage, isAbortError, isAuthError } from '../api/client';
-import type { DesignVersion, Draft, Project, Settings, SettingsResponse, VersionSummary } from '../api/types';
+import type { DesignVersion, Draft, PartsSelection, Project, Settings, SettingsResponse, VersionSummary } from '../api/types';
 import { EmptyState } from '../components/EmptyState';
 import { Explain } from '../components/Explain';
 import { StatusPill } from '../components/StatusPill';
@@ -97,10 +97,28 @@ function ProjectWorkspace({ project }: { project: Project }) {
   const tab = parseTab(searchParams.get('tab'));
   const draft = useDraft(project.id, project.draft);
 
+  // Phase 4: the draft's stored parts selection; its masses replace the Tier 1 statistical ones.
+  const [partsSelection, setPartsSelection] = useState<PartsSelection | null>(project.draft.parts_selection ?? null);
+  const reloadPartsSelection = useCallback(
+    () =>
+      api<Draft>(`/api/projects/${project.id}/draft`)
+        .then((loaded) => setPartsSelection(loaded.parts_selection ?? null))
+        .catch(() => {
+          // Keep the masses already shown; the next tab switch tries again.
+        }),
+    [project.id],
+  );
+
   // A new tab starts at the top of the page.
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [tab]);
+
+  // The selection can change behind the Design tab (an analysis queued, a version restored or
+  // saved, the Parts tab): fetch it again whenever the Design tab opens.
+  useEffect(() => {
+    if (tab === 'design') void reloadPartsSelection();
+  }, [tab, reloadPartsSelection]);
 
   // Versions list.
   const [versions, setVersions] = useState<VersionSummary[] | null>(null);
@@ -209,8 +227,11 @@ function ProjectWorkspace({ project }: { project: Project }) {
         restored.based_on_version_id,
         restored.updated_at,
       );
+      // Restore copies the version's parts selection over the draft's.
+      if (restored.parts_selection !== undefined) setPartsSelection(restored.parts_selection ?? null);
+      else void reloadPartsSelection();
     },
-    [draft, project.id],
+    [draft, project.id, reloadPartsSelection],
   );
 
   const onVersionDeleted = useCallback(
@@ -268,8 +289,10 @@ function ProjectWorkspace({ project }: { project: Project }) {
       flushDraft,
       tryAsNewVersion,
       versionCreated,
+      partsSelection,
+      reloadPartsSelection,
     }),
-    [project.id, versions, basisNumber, draft.status, draft.savedAt, flushDraft, tryAsNewVersion, versionCreated],
+    [project.id, versions, basisNumber, draft.status, draft.savedAt, flushDraft, tryAsNewVersion, versionCreated, partsSelection, reloadPartsSelection],
   );
 
   // MTOW banner.
@@ -297,7 +320,14 @@ function ProjectWorkspace({ project }: { project: Project }) {
   switch (tab) {
     case 'design':
       content = (
-        <DesignTab doc={draft.doc} update={draft.update} fieldErrors={draft.fieldErrors} settings={settings} versions={versions} />
+        <DesignTab
+          doc={draft.doc}
+          update={draft.update}
+          fieldErrors={draft.fieldErrors}
+          settings={settings}
+          versions={versions}
+          partsMasses={partsSelection?.masses_g ?? null}
+        />
       );
       break;
     case 'parts':

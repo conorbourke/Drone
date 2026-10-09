@@ -5,9 +5,11 @@
  * Every number carries the engine's explanation and source through Explain.
  */
 import type { ReactNode } from 'react';
-import type { Settings } from '../api/types';
+import { Link, useSearchParams } from 'react-router';
+import type { PartsMasses, Settings } from '../api/types';
 import { Explain } from '../components/Explain';
 import type { Estimates, MassComponent, Quantity, Status, StatusLevel } from '../engine';
+import { partsMassNames } from '../lib/partsList';
 
 /** Plain A3 rules note shown next to range and endurance (docs/BRIEF.md). */
 export const A3_NOTE =
@@ -166,8 +168,15 @@ function MassBreakdown({ components, total }: { components: MassComponent[]; tot
             {[...components]
               .sort((a, b) => b.mass_g - a.mass_g)
               .map((c) => (
-                <tr key={c.key}>
-                  <td>{c.label}</td>
+                <tr key={c.key} data-from-parts={c.from_parts ? 'true' : undefined}>
+                  <td>
+                    {c.label}
+                    {c.from_parts ? (
+                      <span className="pill pill-info parts-mass-pill" title="Mass of the part chosen on the Parts tab">
+                        part
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="num">{Math.round(c.mass_g)} g</td>
                   <td className="num">{Math.round(c.x_mm)} mm</td>
                   <td>
@@ -242,7 +251,41 @@ function BalanceStrip({ e, settings }: { e: Estimates; settings: Settings }) {
   );
 }
 
-export function EstimatesPanel({ estimates, settings }: { estimates: Estimates; settings: Settings }) {
+/** Which masses come from the parts chosen on the Parts tab (or that none do yet). */
+function PartsMassesNote({ partsMasses }: { partsMasses: PartsMasses | null | undefined }) {
+  const [params] = useSearchParams();
+  const names = partsMassNames(partsMasses);
+  const partsLink = (() => {
+    const next = new URLSearchParams(params);
+    next.set('tab', 'parts');
+    return `?${next.toString()}`;
+  })();
+  if (names.length === 0) {
+    return (
+      <p className="small muted parts-masses-note" data-testid="estimates-parts-masses" data-count={0}>
+        Motor, propeller, ESC, battery, avionics and tube masses are statistical estimates until a parts list is stored (
+        <Link to={partsLink}>Parts tab</Link>).
+      </p>
+    );
+  }
+  return (
+    <p className="small parts-masses-note" data-testid="estimates-parts-masses" data-count={names.length}>
+      <span className="pill pill-info">From selected parts</span> {names.join(', ')} (
+      <Link to={partsLink}>Parts tab</Link>). The rest are statistical estimates.
+    </p>
+  );
+}
+
+export function EstimatesPanel({
+  estimates,
+  settings,
+  partsMasses,
+}: {
+  estimates: Estimates;
+  settings: Settings;
+  /** Phase 4: the draft's selected parts' masses, to say which masses come from real parts. */
+  partsMasses?: PartsMasses | null;
+}) {
   const e = estimates;
   if (!e.valid || !e.mass || !e.balance || !e.aero || !e.performance) {
     return (
@@ -274,6 +317,7 @@ export function EstimatesPanel({ estimates, settings }: { estimates: Estimates; 
         <Metric id="mass" q={mass.takeoff_max_payload} label="Take-off mass" level={worst(statuses, ['check.mtow'])} />
         <Metric id="mass_min" q={mass.takeoff_min_payload} label="With the lightest camera" />
       </div>
+      <PartsMassesNote partsMasses={partsMasses} />
       <MassBreakdown components={mass.components} total={mass.takeoff_max_payload.value} />
 
       <h3 className="metric-group-title">Balance</h3>

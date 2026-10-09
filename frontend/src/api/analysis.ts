@@ -85,9 +85,38 @@ export interface TransitionPoint {
   speed_mps: number;
   tilt_deg?: number;
   wing_lift_fraction: number;
-  thrust_margin: number;
+  /** Transition thrust margin of the busiest rotor group; null above the transition end speed. */
+  thrust_margin: number | null;
+  /** "transition" up to transition_end_speed_mps, "wing_borne" above it. */
+  phase?: 'transition' | 'wing_borne';
+  wing_borne?: boolean;
+  /** Full-throttle forward thrust of the cruise propellers / forward force needed; null until wing-borne. */
+  forward_thrust_margin?: number | null;
+  forward_thrust_available_n?: number | null;
+  /** Advance ratio J = V / (n D) of the cruise propellers at full throttle; null until wing-borne. */
+  forward_advance_ratio?: number | null;
   power_w: number;
   battery_current_a: number;
+}
+
+/** Top-speed (forward) thrust margin over the wing-borne part of the sweep. */
+export interface TopSpeedBlock {
+  /** Lowest forward thrust margin, and where. */
+  margin_min: number | null;
+  margin_min_speed_mps: number | null;
+  /** Margin at the sweep end (1.3 x cruise). */
+  margin_at_sweep_end: number | null;
+  sweep_end_speed_mps: number;
+  /** Warn below this (1.15). */
+  required_margin: number;
+  /** Speed where the margin reaches 1.0, or null when not found (searched to 2 x the sweep end). */
+  top_speed_mps: number | null;
+  top_speed_beyond_sweep?: boolean;
+  /** "tilted lift propellers" or "pusher". */
+  propeller?: string;
+  advance_ratio_at_sweep_end: number | null;
+  zero_thrust_advance_ratio: number | null;
+  level?: CheckLevel;
 }
 
 export interface Tier1Row {
@@ -183,6 +212,15 @@ export interface AnalysisResult {
     peak_power_w?: number;
     peak_current_a?: number;
     speed_wing_80pct_mps?: number | null;
+    speed_wing_100pct_mps?: number | null;
+    /** End of the transition range: 1.1 x the speed at which the wing carries the full weight. */
+    transition_end_speed_mps?: number;
+    transition_complete_within_sweep?: boolean;
+    tilt_complete_speed_mps?: number | null;
+    top_speed?: TopSpeedBlock;
+    top_speed_mps?: number | null;
+    min_margin?: ServerQuantity;
+    top_speed_margin?: ServerQuantity;
     level?: CheckLevel;
   };
   structure?: { wing_spar?: SparCheck; boom?: SparCheck };

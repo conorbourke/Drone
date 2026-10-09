@@ -45,6 +45,8 @@ test.describe('Phase 3 acceptance', () => {
       await expect(byId(page, 'analysis-a3-note')).toContainText('IAA authorisation');
       await expect(byId(page, 'chart-transition-margin')).toBeVisible();
       await expect(byId(page, 'chart-mission-power')).toBeVisible();
+      await expect(byId(page, 'chart-top-speed-margin')).toBeVisible();
+      await expect(byId(page, 'analysis-transition')).toContainText(/From hover to \d+(\.\d)? m\/s/);
       await expect(byId(page, 'analysis-tier-compare').locator('tr[data-row="cruise_power"]')).toBeVisible();
       await expect(byId(page, 'analysis-stale')).toHaveCount(0);
     });

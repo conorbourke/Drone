@@ -208,6 +208,48 @@ export interface Draft extends DraftDocument {
   based_on_version_id: number | null;
   /** ISO 8601 UTC timestamp of the last draft save. */
   updated_at: string;
+  /** Phase 4: the stored parts selection (masses the Tier 1 engine uses), or null/absent. */
+  parts_selection?: PartsSelection | null;
+}
+
+/** Phase 4: one stored role of a parts selection (docs/phases/PHASE4.md section 6). */
+export interface PartsSelectionRole {
+  part_id: number;
+  category: string;
+  manufacturer: string;
+  model: string;
+  name: string;
+  quantity: number;
+  locked: boolean;
+  unit_mass_g: number;
+  line_mass_g: number;
+  verified: boolean;
+  spec: Record<string, unknown>;
+}
+
+/**
+ * Phase 4: selected parts' masses by the Tier 1 mass-model component they replace. Keys are
+ * present only for the roles stored. `battery` is the pack mass (custom cell packs x 1.08);
+ * `avionics` is autopilot + GPS + receiver + telemetry + a 20 g power module.
+ */
+export interface PartsMasses {
+  lift_motor_each?: number;
+  lift_prop_each?: number;
+  esc_each?: number;
+  tilt_servo_each?: number;
+  cruise_motor?: number;
+  pusher_prop?: number;
+  battery?: number;
+  avionics?: number;
+  spar_tube_per_m?: number;
+  boom_tube_per_m?: number;
+}
+
+/** Phase 4: `parts_selection` on draft and version payloads. */
+export interface PartsSelection {
+  updated_at: string;
+  roles: Record<string, PartsSelectionRole>;
+  masses_g: PartsMasses;
 }
 
 // ---------- Airfoils (GET /api/airfoils, schema in docs/phases/PHASE2.md section 3) ----------
@@ -315,6 +357,8 @@ export interface DesignVersion extends VersionSummary {
   project_id: number;
   parameters: DesignParameters;
   mission: Mission;
+  /** Phase 4: the version's stored parts selection, or null/absent. */
+  parts_selection?: PartsSelection | null;
 }
 
 /** Body of POST /api/projects/{id}/versions. Omit parameters/mission to snapshot the draft. */
@@ -366,7 +410,16 @@ export interface PartListing {
   /** Stock state when last checked, or null when unknown. */
   in_stock: boolean | null;
   last_checked_at: string | null;
+  /** Phase 4: whether the link answered 200-399 when checked; null = never checked. */
+  url_ok?: boolean | null;
+  url_status?: number | null;
+  url_checked_at?: string | null;
+  /** Phase 4: not checked in 30 days. */
+  stale?: boolean;
 }
+
+/** Phase 4: state of the supplier lookup (refresh listings) of a part. */
+export type ListingsRefreshStatus = 'queued' | 'running' | 'done' | 'refused' | 'error';
 
 /** Row of GET /api/parts. */
 export interface Part {
@@ -386,6 +439,10 @@ export interface Part {
   verified: boolean;
   notes: string;
   listings: PartListing[];
+  /** Phase 4: when the supplier lookup last ran (or was queued). */
+  listings_refreshed_at?: string | null;
+  listings_refresh_status?: ListingsRefreshStatus | null;
+  listings_refresh_message?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -399,7 +456,7 @@ export interface Envelope {
   z: number;
 }
 
-/** Full settings document (schema_version 2). */
+/** Full settings document (schema_version 3). */
 export interface Settings {
   schema_version: number;
   printer: {
@@ -436,6 +493,11 @@ export interface Settings {
   };
   units: {
     system: 'metric';
+  };
+  /** Schema 3: money available for the prototype's bought parts. */
+  budget: {
+    /** In euro; default 5000, more than 0 and at most 1,000,000. */
+    prototype_eur: number;
   };
 }
 

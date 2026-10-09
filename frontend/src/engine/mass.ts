@@ -12,6 +12,7 @@ import {
   AREAL_DENSITY,
   AREAL_DENSITY_UNCERTAINTY,
   ALLOWANCE_UNCERTAINTY,
+  AVIONICS_PART_UNCERTAINTY,
   CARBON_TUBE_DENSITY,
   CARBON_TUBE_MIN_WALL_M,
   CARBON_TUBE_UNCERTAINTY,
@@ -39,6 +40,7 @@ import {
   MOTOR_MOUNT_FRACTION,
   PACK_SPECIFIC_ENERGY_UNCERTAINTY,
   PACK_SPECIFIC_ENERGY_WH_PER_KG,
+  PART_MASS_UNCERTAINTY,
   PROP_MASS_EXP,
   PROP_MASS_REF_DIAMETER_M,
   PROP_MASS_REF_G,
@@ -49,12 +51,14 @@ import {
   SPAR_EXTRA_FACTOR,
   SPAR_TUBE_THICKNESS_FRACTION,
   SPAR_ULTIMATE_LOAD_FACTOR,
+  TILT_HINGE_HARDWARE_G,
   TILT_MECH_FIXED_G,
   TILT_MECH_FRACTION,
+  TILT_MECH_PART_UNCERTAINTY,
 } from './constants';
 import type { ResolvedParameters } from './geometry';
 import { qRel, qRange } from './quantity';
-import type { Geometry, MassComponent, MassResult, Quantity } from './types';
+import type { Geometry, MassComponent, MassResult, PartsMasses, Quantity } from './types';
 import { clamp } from './units';
 
 // ---------- Statistical relations (each stated in constants.ts and docs/ENGINE.md) ----------
@@ -105,7 +109,31 @@ export interface MassContext {
   mission: Mission;
   settings: Settings;
   atm: Atmosphere;
+  /** Phase 4: selected parts' masses; each key present replaces the statistical mass. */
+  parts?: PartsMasses | null;
 }
+
+/** A usable selected-part mass (finite and positive), or null. */
+export function partMass(parts: PartsMasses | null | undefined, key: keyof PartsMasses): number | null {
+  const v = parts?.[key];
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/** Plain names of the Phase 4 parts-mass keys, for notes such as "from selected parts: ...". */
+export const PARTS_MASS_LABELS: Record<keyof PartsMasses, string> = {
+  lift_motor_each: 'lift motors',
+  lift_prop_each: 'lift propellers',
+  esc_each: 'ESCs',
+  tilt_servo_each: 'tilt servos',
+  cruise_motor: 'pusher motor',
+  pusher_prop: 'pusher propeller',
+  battery: 'battery',
+  avionics: 'avionics',
+  spar_tube_per_m: 'wing spar tube',
+  boom_tube_per_m: 'boom tubes',
+};
+
+const PART_SOURCE = 'Selected catalogue part (manufacturer figure, unverified; Parts tab)';
 
 export interface MassSolution {
   result: MassResult;
@@ -215,7 +243,20 @@ function buildComponents(ctx: MassContext, mtowKg: number, cgGuessX: number): Bu
   });
   const tRootMm = wing.thickness_ratio * wing.root_chord_mm;
   const sparX = wing.mac_x_le_mm + wing.x_max_thickness * wing.mac_mm;
-  if (scale === 'prototype') {
+  const sparPerM = partMass(ctx.parts, 'spar_tube_per_m');
+  if (scale === 'prototype' && sparPerM !== null) {
+    add({
+      key: 'wing_spar',
+      label: 'Wing spar (selected carbon tube, full span)',
+      group: 'structure',
+      mass_g: sparPerM * (wing.span_mm / 1000),
+      uncertainty: PART_MASS_UNCERTAINTY,
+      x_mm: sparX,
+      source: `${PART_SOURCE}: ${sparPerM} g/m x the span.`,
+      explain: 'The carbon tube running through the wing that carries the bending load, chosen on the Parts tab.',
+      from_parts: true,
+    });
+  } else if (scale === 'prototype') {
     const dSpar = clamp(Math.floor(SPAR_TUBE_THICKNESS_FRACTION * tRootMm), 8, 30);
     add({
       key: 'wing_spar',
@@ -264,17 +305,22 @@ function buildComponents(ctx: MassContext, mtowKg: number, cgGuessX: number): Bu
     source: `Areal density ${dens.tail} kg/m² of tail panel area for ${scaleWord} (estimate).`,
     explain: 'The tail panels that keep the aircraft pointing straight and level, estimated from their area.',
   });
-  const boomPerM = carbonTubeMassPerM(p.booms.diameter_mm);
+  const boomPart = partMass(ctx.parts, 'boom_tube_per_m');
+  const boomPerM = boomPart ?? carbonTubeMassPerM(p.booms.diameter_mm);
   const boomCount = Math.max(1, Math.round(p.booms.count));
   add({
     key: 'booms',
-    label: `Motor booms (${boomCount} carbon tubes, ${p.booms.diameter_mm} mm)`,
+    label: boomPart !== null ? `Motor booms (${boomCount} selected carbon tubes)` : `Motor booms (${boomCount} carbon tubes, ${p.booms.diameter_mm} mm)`,
     group: 'structure',
     mass_g: boomCount * boomPerM * (p.booms.length_mm / 1000),
-    uncertainty: CARBON_TUBE_UNCERTAINTY,
+    uncertainty: boomPart !== null ? PART_MASS_UNCERTAINTY : CARBON_TUBE_UNCERTAINTY,
     x_mm: g.booms[0].start[0] + p.booms.length_mm / 2,
-    source: 'Carbon tube mass per metre from diameter (tube geometry, 1550 kg/m³, wall max(1 mm, 5 % of D)).',
+    source:
+      boomPart !== null
+        ? `${PART_SOURCE}: ${boomPart} g/m x the boom length.`
+        : 'Carbon tube mass per metre from diameter (tube geometry, 1550 kg/m³, wall max(1 mm, 5 % of D)).',
     explain: 'The carbon tubes that hold the four lift motors.',
+    from_parts: boomPart !== null || undefined,
   });
   if (g.tail.support_length_mm > 0) {
     const n = g.tail.support_kind === 'booms' ? boomCount : 1;
@@ -286,7 +332,7 @@ function buildComponents(ctx: MassContext, mtowKg: number, cgGuessX: number): Bu
       mass_g: n * boomPerM * (g.tail.support_length_mm / 1000),
       uncertainty: CARBON_TUBE_UNCERTAINTY,
       x_mm: startX + g.tail.support_length_mm / 2,
-      source: 'Carbon tube of the boom diameter; mass per metre from tube geometry.',
+      source: boomPart !== null ? `${PART_SOURCE}: the boom tube, ${boomPart} g/m.` : 'Carbon tube of the boom diameter; mass per metre from tube geometry.',
       explain: 'Tube needed to carry the tail behind the fuselage or booms.',
     });
   }
@@ -304,40 +350,52 @@ function buildComponents(ctx: MassContext, mtowKg: number, cgGuessX: number): Bu
   const discArea = Math.PI * (D / 2000) ** 2;
   const motorMaxThrust = (tw * W * (1 + HOVER_DOWNLOAD_FRACTION) * worstShare) / 2;
   const motorMaxPower = idealHoverPower(motorMaxThrust, discArea, atm.rho) / FIGURE_OF_MERIT_MAX / ETA_MOTOR_MAX;
-  const motorG = motorMassG(motorMaxPower);
-  const escG = escMassG((motorMaxPower / pack.voltage) * ESC_CURRENT_MARGIN);
-  const propG = propMassG(D, p.propulsion.prop_blades);
+  const motorPart = partMass(ctx.parts, 'lift_motor_each');
+  const escPart = partMass(ctx.parts, 'esc_each');
+  const propPart = partMass(ctx.parts, 'lift_prop_each');
+  const motorG = motorPart ?? motorMassG(motorMaxPower);
+  const escG = escPart ?? escMassG((motorMaxPower / pack.voltage) * ESC_CURRENT_MARGIN);
+  const propG = propPart ?? propMassG(D, p.propulsion.prop_blades);
   const xf = g.front_rotor_x_mm;
   const xr = g.rear_rotor_x_mm;
   for (const [pos, x] of [['front', xf], ['rear', xr]] as const) {
     add({
       key: `motors_${pos}`,
-      label: `Lift motors, ${pos} pair`,
+      label: `Lift motors, ${pos} pair${motorPart !== null ? ' (selected part)' : ''}`,
       group: 'propulsion',
       mass_g: 2 * motorG,
-      uncertainty: MOTOR_MASS_UNCERTAINTY,
+      uncertainty: motorPart !== null ? PART_MASS_UNCERTAINTY : MOTOR_MASS_UNCERTAINTY,
       x_mm: x,
-      source: `Statistical motor mass 1.2 x P^0.73 g for ${Math.round(motorMaxPower)} W each, sized so the four motors give ${tw} x the weight (momentum theory, figure of merit 0.55 at full power).`,
+      source:
+        motorPart !== null
+          ? `${PART_SOURCE}: ${motorPart} g each.`
+          : `Statistical motor mass 1.2 x P^0.73 g for ${Math.round(motorMaxPower)} W each, sized so the four motors give ${tw} x the weight (momentum theory, figure of merit 0.55 at full power).`,
+      from_parts: motorPart !== null || undefined,
       explain: 'Two of the four lift motors. They are sized so that, together, they can lift the aircraft with the thrust-to-weight margin set in Settings.',
     });
     add({
       key: `escs_${pos}`,
-      label: `ESCs, ${pos} pair`,
+      label: `ESCs, ${pos} pair${escPart !== null ? ' (selected part)' : ''}`,
       group: 'propulsion',
       mass_g: 2 * escG,
-      uncertainty: ESC_MASS_UNCERTAINTY,
+      uncertainty: escPart !== null ? PART_MASS_UNCERTAINTY : ESC_MASS_UNCERTAINTY,
       x_mm: x,
-      source: 'Statistical ESC mass 1.0 g per amp of rating + 5 g; rating 1.2 x the full-power current.',
+      source:
+        escPart !== null
+          ? `${PART_SOURCE}: ${escPart} g each.`
+          : 'Statistical ESC mass 1.0 g per amp of rating + 5 g; rating 1.2 x the full-power current.',
+      from_parts: escPart !== null || undefined,
       explain: 'The speed controllers that drive the motors, sized for the full-power current.',
     });
     add({
       key: `props_${pos}`,
-      label: `Lift propellers, ${pos} pair`,
+      label: `Lift propellers, ${pos} pair${propPart !== null ? ' (selected part)' : ''}`,
       group: 'propulsion',
       mass_g: 2 * propG,
-      uncertainty: PROP_MASS_UNCERTAINTY,
+      uncertainty: propPart !== null ? PART_MASS_UNCERTAINTY : PROP_MASS_UNCERTAINTY,
       x_mm: x,
-      source: 'Statistical propeller mass 20 g x (D / 305 mm)^2.5 per two blades.',
+      source: propPart !== null ? `${PART_SOURCE}: ${propPart} g each.` : 'Statistical propeller mass 20 g x (D / 305 mm)^2.5 per two blades.',
+      from_parts: propPart !== null || undefined,
       explain: 'Two lift propellers, estimated from their diameter.',
     });
     add({
@@ -352,15 +410,20 @@ function buildComponents(ctx: MassContext, mtowKg: number, cgGuessX: number): Bu
     });
   }
   if (p.layout !== 'quad_pusher') {
-    const perSide = TILT_MECH_FIXED_G + TILT_MECH_FRACTION * (motorG + propG);
+    const servoPart = partMass(ctx.parts, 'tilt_servo_each');
+    const perSide = servoPart !== null ? servoPart + TILT_HINGE_HARDWARE_G : TILT_MECH_FIXED_G + TILT_MECH_FRACTION * (motorG + propG);
     add({
       key: 'tilt_mechanism',
-      label: 'Tilt mechanism (2 servos and hinges)',
+      label: `Tilt mechanism (2 servos and hinges)${servoPart !== null ? ' (selected servos)' : ''}`,
       group: 'systems',
       mass_g: 2 * perSide,
-      uncertainty: 0.5,
+      uncertainty: servoPart !== null ? TILT_MECH_PART_UNCERTAINTY : 0.5,
       x_mm: g.tilt_hinge_x_mm ?? (p.layout === 'front_tilt' ? xf : xr),
-      source: 'Per side 25 g + 25 % of the tilted motor and propeller mass (estimate).',
+      source:
+        servoPart !== null
+          ? `${PART_SOURCE}: ${servoPart} g per servo, plus ${TILT_HINGE_HARDWARE_G} g of hinge, bearing and linkage hardware per side (estimate).`
+          : 'Per side 25 g + 25 % of the tilted motor and propeller mass (estimate).',
+      from_parts: servoPart !== null || undefined,
       explain: 'The servos, hinges and bearings that tilt the motors forward for wing flight.',
     });
   }
@@ -370,36 +433,44 @@ function buildComponents(ctx: MassContext, mtowKg: number, cgGuessX: number): Bu
     const Dp = p.pusher.prop_diameter_mm;
     const area = Math.PI * (Dp / 2000) ** 2;
     pusherPower = idealHoverPower(PUSHER_THRUST_TO_WEIGHT * W, area, atm.rho) / FIGURE_OF_MERIT_PUSHER_STATIC / ETA_MOTOR_MAX;
-    pusherMotor = motorMassG(pusherPower);
+    const pusherPart = partMass(ctx.parts, 'cruise_motor');
+    const pusherPropPart = partMass(ctx.parts, 'pusher_prop');
+    pusherMotor = pusherPart ?? motorMassG(pusherPower);
     const px = p.pusher.x_mm;
     add({
       key: 'pusher_motor',
-      label: 'Pusher motor',
+      label: `Pusher motor${pusherPart !== null ? ' (selected part)' : ''}`,
       group: 'propulsion',
       mass_g: pusherMotor,
-      uncertainty: MOTOR_MASS_UNCERTAINTY,
+      uncertainty: pusherPart !== null ? PART_MASS_UNCERTAINTY : MOTOR_MASS_UNCERTAINTY,
       x_mm: px,
-      source: `Statistical motor mass for ${Math.round(pusherPower)} W, sized for a static thrust of ${PUSHER_THRUST_TO_WEIGHT} x the weight (momentum theory, figure of merit 0.6).`,
+      source:
+        pusherPart !== null
+          ? `${PART_SOURCE}: ${pusherPart} g.`
+          : `Statistical motor mass for ${Math.round(pusherPower)} W, sized for a static thrust of ${PUSHER_THRUST_TO_WEIGHT} x the weight (momentum theory, figure of merit 0.6).`,
+      from_parts: pusherPart !== null || undefined,
       explain: 'The separate motor that pushes the aircraft in wing flight. It needs enough thrust to accelerate through the transition.',
     });
     add({
       key: 'pusher_esc',
-      label: 'Pusher ESC',
+      label: `Pusher ESC${escPart !== null ? ' (selected part)' : ''}`,
       group: 'propulsion',
-      mass_g: escMassG((pusherPower / pack.voltage) * ESC_CURRENT_MARGIN),
-      uncertainty: ESC_MASS_UNCERTAINTY,
+      mass_g: escPart ?? escMassG((pusherPower / pack.voltage) * ESC_CURRENT_MARGIN),
+      uncertainty: escPart !== null ? PART_MASS_UNCERTAINTY : ESC_MASS_UNCERTAINTY,
       x_mm: px,
-      source: 'Statistical ESC mass 1.0 g per amp + 5 g.',
+      source: escPart !== null ? `${PART_SOURCE}: the lift ESC, ${escPart} g.` : 'Statistical ESC mass 1.0 g per amp + 5 g.',
+      from_parts: escPart !== null || undefined,
       explain: 'The speed controller for the pusher motor.',
     });
     add({
       key: 'pusher_prop',
-      label: 'Pusher propeller',
+      label: `Pusher propeller${pusherPropPart !== null ? ' (selected part)' : ''}`,
       group: 'propulsion',
-      mass_g: propMassG(Dp, 2),
-      uncertainty: PROP_MASS_UNCERTAINTY,
+      mass_g: pusherPropPart ?? propMassG(Dp, 2),
+      uncertainty: pusherPropPart !== null ? PART_MASS_UNCERTAINTY : PROP_MASS_UNCERTAINTY,
       x_mm: px,
-      source: 'Statistical propeller mass 20 g x (D / 305 mm)^2.5.',
+      source: pusherPropPart !== null ? `${PART_SOURCE}: ${pusherPropPart} g.` : 'Statistical propeller mass 20 g x (D / 305 mm)^2.5.',
+      from_parts: pusherPropPart !== null || undefined,
       explain: 'The pusher propeller.',
     });
     add({
@@ -436,15 +507,23 @@ function buildComponents(ctx: MassContext, mtowKg: number, cgGuessX: number): Bu
     source: 'Each 6 g + 0.25 % of take-off mass (estimate).',
     explain: 'Servos that move the tail control surfaces.',
   });
+  const avionicsPart = partMass(ctx.parts, 'avionics');
   add({
     key: 'avionics',
-    label: 'Avionics allowance',
+    label: avionicsPart !== null ? 'Avionics (selected parts)' : 'Avionics allowance',
     group: 'systems',
-    mass_g: p.allowances.avionics_g,
-    uncertainty: ALLOWANCE_UNCERTAINTY,
+    mass_g: avionicsPart ?? p.allowances.avionics_g,
+    uncertainty: avionicsPart !== null ? AVIONICS_PART_UNCERTAINTY : ALLOWANCE_UNCERTAINTY,
     x_mm: p.wing.x_le_mm,
-    source: 'Owner allowance (design parameter allowances.avionics_g), placed under the wing leading edge; replaced by real parts in Phase 4.',
-    explain: 'Autopilot, GPS, receiver, telemetry radio and power module, as an allowance until real parts are chosen.',
+    source:
+      avionicsPart !== null
+        ? `${PART_SOURCE}s: autopilot, GPS, receiver and telemetry radio plus a 20 g power module, ${avionicsPart} g, under the wing leading edge.`
+        : 'Owner allowance (design parameter allowances.avionics_g), placed under the wing leading edge; replaced by the selected parts once a parts list exists (Parts tab).',
+    explain:
+      avionicsPart !== null
+        ? 'Autopilot, GPS, receiver, telemetry radio and power module chosen on the Parts tab.'
+        : 'Autopilot, GPS, receiver, telemetry radio and power module, as an allowance until real parts are chosen.',
+    from_parts: avionicsPart !== null || undefined,
   });
   const gearType = p.landing_gear.type;
   add({
@@ -457,14 +536,19 @@ function buildComponents(ctx: MassContext, mtowKg: number, cgGuessX: number): Bu
     source: `${LANDING_GEAR_FRACTION[gearType] * 100} % of take-off mass for ${gearType} (estimate).`,
     explain: 'The skids or legs the aircraft stands and lands on.',
   });
+  const batteryPart = partMass(ctx.parts, 'battery');
   add({
     key: 'battery',
-    label: `Battery ${p.battery.cells_series}S${p.battery.cells_parallel}P ${p.battery.chemistry === 'lipo' ? 'LiPo' : 'Li-ion'}`,
+    label: `Battery ${p.battery.cells_series}S${p.battery.cells_parallel}P ${p.battery.chemistry === 'lipo' ? 'LiPo' : 'Li-ion'}${batteryPart !== null ? ' (selected part)' : ''}`,
     group: 'energy',
-    mass_g: pack.massG,
-    uncertainty: PACK_SPECIFIC_ENERGY_UNCERTAINTY,
+    mass_g: batteryPart ?? pack.massG,
+    uncertainty: batteryPart !== null ? PART_MASS_UNCERTAINTY : PACK_SPECIFIC_ENERGY_UNCERTAINTY,
     x_mm: p.battery.x_mm,
-    source: `Pack energy ${pack.energyWh.toFixed(0)} Wh at ${PACK_SPECIFIC_ENERGY_WH_PER_KG[p.battery.chemistry]} Wh/kg pack-level specific energy (typical datasheet value).`,
+    source:
+      batteryPart !== null
+        ? `${PART_SOURCE}: ${batteryPart} g (a custom cell pack counts the cells x 1.08 for nickel strip, wiring and wrap). The energy still comes from the design's battery inputs.`
+        : `Pack energy ${pack.energyWh.toFixed(0)} Wh at ${PACK_SPECIFIC_ENERGY_WH_PER_KG[p.battery.chemistry]} Wh/kg pack-level specific energy (typical datasheet value).`,
+    from_parts: batteryPart !== null || undefined,
     explain: 'The flight battery, estimated from its energy content and a typical energy per kilogram for this chemistry.',
   });
   // Wiring is a fraction f of the empty mass, which includes the wiring itself: f/(1-f) x the rest.
@@ -550,7 +634,7 @@ export function solveMass(ctx: MassContext): MassSolution {
       unit: 'kg',
       label: 'Empty mass',
       explain: 'Everything except the battery and the camera. Every gram here costs endurance, so this is the number to watch while building.',
-      source: 'Component build-up (structure from areal densities, motors/ESCs/propellers from statistical relations, owner allowances); range from per-component uncertainties.',
+      source: `Component build-up (structure from areal densities, ${comps.some((c) => c.from_parts) ? 'selected catalogue parts where the Parts tab has chosen them, statistical relations for the rest' : 'motors/ESCs/propellers from statistical relations'}, owner allowances); range from per-component uncertainties.`,
     }),
     battery: qRel(kg(battery), PACK_SPECIFIC_ENERGY_UNCERTAINTY, {
       unit: 'kg',
@@ -588,6 +672,7 @@ export function solveMass(ctx: MassContext): MassSolution {
     lift_motor_mass_g: build.liftMotorMassG,
     lift_motor_max_thrust_n: build.liftMotorMaxThrustN,
     pusher_motor_max_power_w: build.pusherMaxPowerW,
+    parts_used: comps.filter((c) => c.from_parts).map((c) => c.label),
   };
   return {
     result,

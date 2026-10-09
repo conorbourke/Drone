@@ -8,7 +8,7 @@ import { Component, lazy, Suspense, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useAirfoilCoordinates, useAirfoils } from '../api/airfoils';
 import { groupPaths, metaFor, useSchemas } from '../api/schema';
-import type { Settings, VersionSummary } from '../api/types';
+import type { PartsMasses, Settings, VersionSummary } from '../api/types';
 import { DesignDrawing } from '../components/DesignDrawing';
 import { buildGeometry, estimate, withDefaults } from '../engine';
 import { AnalysisPanel } from '../panels/AnalysisPanel';
@@ -60,9 +60,11 @@ export interface DesignTabProps extends TabProps {
   settings: Settings | null;
   /** Saved versions (for "Analyse" a version); null while loading. */
   versions: VersionSummary[] | null;
+  /** Phase 4: the draft's selected parts' masses (parts_selection.masses_g), or null for none. */
+  partsMasses?: PartsMasses | null;
 }
 
-export function DesignTab({ doc, update, fieldErrors, settings, versions }: DesignTabProps) {
+export function DesignTab({ doc, update, fieldErrors, settings, versions, partsMasses = null }: DesignTabProps) {
   const { status, schemas, error, retry } = useSchemas();
   const airfoils = useAirfoils();
   const params = doc.parameters;
@@ -71,8 +73,8 @@ export function DesignTab({ doc, update, fieldErrors, settings, versions }: Desi
 
   const geometry = useMemo(() => buildGeometry(params, { airfoils, coordinates }), [params, airfoils, coordinates]);
   const estimates = useMemo(
-    () => (settings ? estimate({ parameters: params, mission: doc.mission, settings, airfoils }) : null),
-    [params, doc.mission, settings, airfoils],
+    () => (settings ? estimate({ parameters: params, mission: doc.mission, settings, airfoils, partsMasses }) : null),
+    [params, doc.mission, settings, airfoils, partsMasses],
   );
 
   const onEdit = useCallback(
@@ -150,7 +152,7 @@ export function DesignTab({ doc, update, fieldErrors, settings, versions }: Desi
         </div>
         <div className="design-estimates">
           {estimates && settings ? (
-            <EstimatesPanel estimates={estimates} settings={settings} />
+            <EstimatesPanel estimates={estimates} settings={settings} partsMasses={partsMasses} />
           ) : (
             <div className="skeleton" aria-busy="true" aria-label="Loading estimates" data-testid="estimates-panel" />
           )}

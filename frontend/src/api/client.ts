@@ -25,14 +25,17 @@ export class ApiError extends Error {
   readonly fields: FieldError[];
   /** True when `detail` came from the server rather than a client-side fallback. */
   readonly hasDetail: boolean;
+  /** The parsed JSON error body (for extra fields such as `retry_after_s`), or null. */
+  readonly body: unknown;
 
-  constructor(status: number, detail: string, fields: FieldError[] = [], hasDetail = true) {
+  constructor(status: number, detail: string, fields: FieldError[] = [], hasDetail = true, body: unknown = null) {
     super(detail);
     this.name = 'ApiError';
     this.status = status;
     this.detail = detail;
     this.fields = fields;
     this.hasDetail = hasDetail;
+    this.body = body;
   }
 }
 
@@ -73,7 +76,7 @@ function parseErrorBody(status: number, body: unknown, statusText: string): ApiE
   if (body && typeof body === 'object' && 'detail' in body) {
     const detail = (body as { detail: unknown }).detail;
     if (typeof detail === 'string') {
-      return new ApiError(status, detail);
+      return new ApiError(status, detail, [], true, body);
     }
     if (Array.isArray(detail)) {
       const fields: FieldError[] = detail
@@ -85,7 +88,7 @@ function parseErrorBody(status: number, body: unknown, statusText: string): ApiE
           return path ? `${path}: ${f.msg}` : f.msg;
         })
         .join('; ');
-      return new ApiError(status, summary || 'Validation failed', fields);
+      return new ApiError(status, summary || 'Validation failed', fields, true, body);
     }
   }
   return new ApiError(status, defaultMessage(status, statusText), [], false);

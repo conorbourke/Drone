@@ -90,7 +90,7 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
   const M = mach(atm, V);
 
   // ----- Mass and balance (iterated) -----
-  const ms = solveMass({ p, g, mission, settings, atm });
+  const ms = solveMass({ p, g, mission, settings, atm, parts: input.partsMasses ?? null });
   const mass = ms.result;
   const massKg = ms.totalMaxG / 1000;
   const massMinKg = ms.totalMinG / 1000;
@@ -236,7 +236,9 @@ function run(input: EngineInput, inputStatuses: Status[], t0: number): Estimates
   const assumptions = [
     'Sea-level standard air (1.225 kg/m³, 15 °C), still air.',
     `Structure weights use ${scale === 'final' ? 'carbon-composite' : '3D-printed'} densities that are first estimates; Phase 6 built weights will calibrate them.`,
-    `Motors are sized so the four lift motors give ${settings.checks.hover_thrust_to_weight_min} x the weight; motor, ESC and propeller weights come from statistical relations until real parts are chosen in Phase 4.`,
+    mass.parts_used.length > 0
+      ? `Masses of the parts chosen on the Parts tab replace the statistical ones for: ${mass.parts_used.join('; ')}. Motor and propeller performance still uses the generic Tier 1 models; the full analysis uses the parts' own data.`
+      : `Motors are sized so the four lift motors give ${settings.checks.hover_thrust_to_weight_min} x the weight; motor, ESC and propeller weights come from statistical relations until parts are chosen on the Parts tab.`,
     `Hover figure of merit ${FIGURE_OF_MERIT_HOVER}, motor efficiency 0.85, ESC 0.95. Cruise on ${cruisePropName}: propeller efficiency ${etaPropText} from the generic CT(J), CP(J) model (the same curves as the server analysis).`,
     `Mission: ${mp.takeoff_hover_s} s take-off hover, ${mp.transition_s} s transitions at ${TRANSITION_POWER_FACTOR} x hover power, ${mp.landing_hover_s} s landing hover, ${settings.checks.battery_reserve_fraction * 100} % reserve, ${mp.usable_energy_factor * 100} % of nominal pack energy usable.`,
     'Airfoil data from the XFOIL tables at the cruise and stall Reynolds numbers; Phase 3 replaces the whole-aircraft numbers with AVL and XFOIL runs.',

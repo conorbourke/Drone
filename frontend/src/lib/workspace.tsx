@@ -4,7 +4,7 @@
  * Versions panel and shows a toast with a link to compare it.
  */
 import { createContext, useContext } from 'react';
-import type { DesignVersion, VersionSummary } from '../api/types';
+import type { DesignVersion, PartsSelection, VersionSummary } from '../api/types';
 import type { PatchBase } from '../api/versions';
 
 export interface TryVersionRequest {
@@ -30,6 +30,10 @@ export interface WorkspaceApi {
   tryAsNewVersion: (request: TryVersionRequest) => Promise<DesignVersion | null>;
   /** Tell the workspace about a version created elsewhere (scale dialog). */
   versionCreated: (version: DesignVersion, compareWith: number | null) => Promise<void>;
+  /** Phase 4: the draft's stored parts selection (its masses feed the Tier 1 estimate), or null. */
+  partsSelection: PartsSelection | null;
+  /** Phase 4: fetch the draft's parts selection again (after the Parts tab changed it). */
+  reloadPartsSelection: () => Promise<void>;
 }
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);
