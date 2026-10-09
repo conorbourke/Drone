@@ -2,7 +2,7 @@
 
 The brief lists five decisions for Claude Code to confirm with the owner before building. Phase 1 could not wait on all of them, so each one below records the default that was taken, the reasoning, and what the owner can change. Items marked **needs owner confirmation** are not final.
 
-## 1. Hosting provider — Fly.io (taken for Phase 1)
+## 1. Hosting provider — Fly.io (confirmed by the owner, 9 Oct 2026)
 
 **Decision:** Fly.io, one machine in `lhr` (London, the nearest region to Ireland), a 3 GB persistent volume at `/data` for the SQLite database, uploaded files and backups, automatic HTTPS.
 
@@ -23,7 +23,7 @@ The brief lists five decisions for Claude Code to confirm with the owner before 
 
 Roughly $7–8 (≈ €7) a month always on. Phase 3 (AVL/XFOIL) and Phase 5 (CadQuery) will likely need 2 GB of RAM, taking it to about $14 (≈ €13) a month. Both are inside the €10–30 budget. Fly's daily volume snapshots (14 kept) add well under a euro. Pay-as-you-go Claude API usage is separate.
 
-**Alternatives considered:** Railway (similar, slightly less control over volumes), Render (persistent disk only on paid plans, no suspend), Hetzner VPS (cheapest, but needs server administration that would fall on Claude Code every time). The Dockerfile is provider-neutral, so switching later is a matter of a new deploy workflow.
+**Alternatives considered:** Railway (similar, slightly less control over volumes), Render (persistent disk only on paid plans), Hetzner VPS (about €4 a month, but a self-managed server), Oracle Cloud's Always Free ARM VM (genuinely free, but a self-managed server with a halved allowance since August 2026 and frequent capacity shortages), and Cloudflare (its free plan cannot run the compiled aerodynamics and CAD tools; Cloudflare Containers need the $5 a month paid plan and have no persistent disk). The owner chose Fly.io. The Dockerfile is provider-neutral, so switching later is a matter of a new deploy workflow.
 
 **Owner can change:** region, machine size and the app name are repository variables and `fly.toml` values; see `docs/DEPLOYMENT.md`.
 

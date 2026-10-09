@@ -4,7 +4,7 @@ Build one phase at a time. A phase is done when its acceptance criteria pass in 
 
 | # | Phase | Status | Done when |
 |---|---|---|---|
-| 1 | Foundations: hosting, login, project and version storage, parts database structure, deployment pipeline | **Built, awaiting the owner's first deploy** | The owner opens a URL, logs in, creates a project and saves two versions. |
+| 1 | Foundations: hosting, login, project and version storage, parts database structure, deployment pipeline | **Built; hosting confirmed as Fly.io; awaiting the owner's first deploy** | The owner opens a URL, logs in, creates a project and saves two versions. |
 | 2 | Inputs and design: image upload, mission form, Claude image reading, parametric model for all three layouts, 3D view and 2D drawings with handles, Tier 1 instant estimates, version comparison | Not started | Uploaded images produce a sensible starting model, edits update the model and estimates instantly, two versions compare side by side. |
 | 3 | Full analysis and assistant: AVL, XFOIL, drag, propulsion, battery and transition models, checks, ranked recommendations, scale-to-weight, validation suite, Claude assistant | Not started | Validation suite passes with a report in the app; Analyse returns results, checks and ranked recommendations; the assistant explains them correctly. |
 | 4 | Parts and suppliers: real components, engine-driven recommendations, Irish/UK supplier lookup, cost and weight totals | Not started | A complete prototype parts list with working supplier links and a total against the €5,000 budget. |
