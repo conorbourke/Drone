@@ -824,9 +824,9 @@ textarea.input {
   border-top: 0;
 }
 
-/* Envelope rows hold three per-axis inputs, so their control column is wider. */
+/* Envelope rows hold three per-axis inputs with their Explain buttons, so their control column is wider. */
 .setting-row-envelope {
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 390px;
 }
 
 .setting-label {
@@ -857,7 +857,8 @@ textarea.input {
 
 .envelope-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Three axes in a row where there is room; on a phone the third wraps rather than clips. */
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: var(--space-2);
 }
 
@@ -877,6 +878,15 @@ textarea.input {
 .envelope-axis .input {
   min-width: calc(5ch + 40px);
   font-variant-numeric: tabular-nums;
+}
+
+.envelope-axis .explain {
+  flex: none;
+}
+
+/* One spec value of a part with its Explain button; kept on one line. */
+.spec-item {
+  white-space: nowrap;
 }
 
 .kv {

@@ -16,11 +16,14 @@ import { formatBytes, formatDateTime, humanizeKey, unitForKey } from '../lib/for
 
 type Meta = Record<string, SettingsMetaEntry>;
 
-/** Metadata for a path, falling back to its parent (e.g. the envelope object for an axis). */
-function metaFor(meta: Meta, path: string): SettingsMetaEntry | undefined {
-  if (meta[path]) return meta[path];
-  const parent = path.split('.').slice(0, -1).join('.');
-  return parent ? meta[parent] : undefined;
+/** Display name for a path: the API's label, else the caller's fallback, else the key itself. */
+function labelFor(meta: Meta, path: string, fallback?: string): string {
+  return meta[path]?.label || fallback || humanizeKey(path);
+}
+
+/** Explain text for an entry: its description, then the source as a second paragraph. */
+function explainText(entry: SettingsMetaEntry): string {
+  return [entry.description, entry.source ? `Source: ${entry.source}` : ''].filter(Boolean).join('\n\n');
 }
 
 function SettingRow({
@@ -31,19 +34,24 @@ function SettingRow({
   children,
   error,
   className,
+  isDefault,
 }: {
   path: string;
   meta: Meta;
+  /** Fallback title when the API has no label for the path. */
   label?: string;
   unit?: string | null;
   children: ReactNode;
   error?: string | null;
   /** Extra class for layout variants. */
   className?: string;
+  /** Overrides the Default/Changed pill for rows that aggregate several paths; null hides it. */
+  isDefault?: boolean | null;
 }) {
-  const entry = metaFor(meta, path);
-  const title = label ?? humanizeKey(path);
+  const entry = meta[path];
+  const title = labelFor(meta, path, label);
   const unitText = unit === undefined ? unitForKey(path) : unit;
+  const defaultState = isDefault === undefined ? (entry ? entry.is_default : null) : isDefault;
   return (
     <div className={`setting-row${className ? ` ${className}` : ''}`} data-testid={`setting-row-${path}`}>
       <div>
@@ -52,17 +60,15 @@ function SettingRow({
             {title}
             {unitText ? <span className="muted"> ({unitText})</span> : null}
           </span>
-          {entry ? (
-            entry.is_default ? (
-              <StatusPill tone="neutral" title="Using the shipped default">
-                Default
-              </StatusPill>
-            ) : (
-              <StatusPill tone="info" title="Changed from the shipped default">
-                Changed
-              </StatusPill>
-            )
-          ) : null}
+          {defaultState === null ? null : defaultState ? (
+            <StatusPill tone="neutral" title="Using the shipped default">
+              Default
+            </StatusPill>
+          ) : (
+            <StatusPill tone="info" title="Changed from the shipped default">
+              Changed
+            </StatusPill>
+          )}
           {entry?.description ? <Explain text={entry.description} label={title} /> : null}
         </div>
         {entry?.description ? <p className="setting-description">{entry.description}</p> : null}
@@ -182,6 +188,8 @@ export function SettingsPage() {
   /** Inputs flagged by a group-level server error (the message is in the banner). */
   const [highlighted, setHighlighted] = useState<Record<string, true>>({});
   const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+  /** Server notes about the stored settings, e.g. values reset to defaults. */
+  const [warnings, setWarnings] = useState<string[]>([]);
   /** Number inputs whose text is currently empty or not a number; saving is blocked meanwhile. */
   const [invalidNumbers, setInvalidNumbers] = useState<Record<string, true>>({});
 
@@ -220,6 +228,7 @@ export function SettingsPage() {
       .then((response) => {
         setSettings(response.settings);
         setMeta(response.meta ?? {});
+        setWarnings(response.warnings ?? []);
         setLoadError(null);
       })
       .catch((caught: unknown) => {
@@ -262,6 +271,7 @@ export function SettingsPage() {
       const response = await api<SettingsResponse>('/api/settings', { method: 'PUT', body: settings });
       setSettings(response.settings);
       setMeta(response.meta ?? {});
+      setWarnings(response.warnings ?? []);
       setDirty(false);
       toast.success('Settings saved');
     } catch (caught) {
@@ -316,6 +326,10 @@ export function SettingsPage() {
   const envelopeRow = (path: 'printer.build_volume_mm' | 'printer.usable_envelope_mm', label: string) => {
     if (!settings) return null;
     const value = getAtPath(settings, path) as Settings['printer']['build_volume_mm'];
+    const axes = ['x', 'y', 'z'] as const;
+    // The API describes each axis separately; the row's pill summarises all three.
+    const known = axes.map((axis) => meta[`${path}.${axis}`]).filter((entry) => entry !== undefined);
+    const isDefault = known.length > 0 ? known.every((entry) => entry.is_default) : null;
     return (
       <SettingRow
         path={path}
@@ -324,10 +338,13 @@ export function SettingsPage() {
         unit="mm"
         error={fieldErrors[path] ?? null}
         className="setting-row-envelope"
+        isDefault={isDefault}
       >
         <div className="envelope-grid">
-          {(['x', 'y', 'z'] as const).map((axis) => {
+          {axes.map((axis) => {
             const axisPath = `${path}.${axis}`;
+            const entry = meta[axisPath];
+            const axisLabel = labelFor(meta, axisPath, `${label} ${axis.toUpperCase()}`);
             const axisError = rowError(axisPath);
             return (
               <div key={axis}>
@@ -336,13 +353,14 @@ export function SettingsPage() {
                     {axis.toUpperCase()}
                   </span>
                   <NumberInput
-                    label={`${label} ${axis.toUpperCase()} (mm)`}
+                    label={`${axisLabel} (mm)`}
                     value={value[axis]}
                     onChange={(next) => update(axisPath, next)}
                     onInvalid={(invalid) => setNumberInvalid(axisPath, invalid)}
                     invalid={!!axisError || !!highlighted[axisPath]}
                     testId={`setting-${axisPath}`}
                   />
+                  {entry?.description ? <Explain text={explainText(entry)} label={axisLabel} /> : null}
                 </div>
                 {axisError ? (
                   <p className="field-error" role="alert">
@@ -369,6 +387,19 @@ export function SettingsPage() {
         <div className="skeleton" aria-busy="true" aria-label="Loading settings" />
       ) : (
         <form className="stack" onSubmit={(event) => void save(event)} data-testid="settings-form">
+          {warnings.length > 0 ? (
+            <div className="banner banner-warn" role="status" data-testid="settings-warnings">
+              <div>
+                <div className="banner-title">Some settings need attention</div>
+                <ul className="small">
+                  {warnings.map((message, index) => (
+                    <li key={index}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+
           <section className="card" aria-labelledby="printer-heading">
             <div className="card-header">
               <h2 id="printer-heading">3D printer</h2>
@@ -379,7 +410,7 @@ export function SettingsPage() {
             <SettingRow path="printer.name" meta={meta} label="Printer" unit={null}>
               <input
                 className="input"
-                aria-label="Printer name"
+                aria-label={labelFor(meta, 'printer.name', 'Printer name')}
                 data-testid="setting-printer.name"
                 value={settings.printer.name}
                 onChange={(event) => update('printer.name', event.target.value)}
@@ -402,7 +433,7 @@ export function SettingsPage() {
               return (
                 <SettingRow key={key} path={path} meta={meta} error={rowError(path)}>
                   <NumberInput
-                    label={`${humanizeKey(key)} (kg)`}
+                    label={`${labelFor(meta, path)} (kg)`}
                     value={settings.limits[key]}
                     onChange={(next) => update(path, next)}
                     onInvalid={(invalid) => setNumberInvalid(path, invalid)}
@@ -428,7 +459,7 @@ export function SettingsPage() {
               return (
                 <SettingRow key={key} path={path} meta={meta} unit={null} error={rowError(path)}>
                   <NumberInput
-                    label={humanizeKey(key)}
+                    label={labelFor(meta, path)}
                     value={settings.checks[key]}
                     onChange={(next) => update(path, next)}
                     onInvalid={(invalid) => setNumberInvalid(path, invalid)}
@@ -446,7 +477,12 @@ export function SettingsPage() {
               <h2 id="units-heading">Units</h2>
             </div>
             <SettingRow path="units.system" meta={meta} label="Unit system" unit={null}>
-              <input className="input" aria-label="Unit system" value="Metric (mm, g, kg, m/s, W, Wh, €)" readOnly />
+              <input
+                className="input"
+                aria-label={labelFor(meta, 'units.system', 'Unit system')}
+                value="Metric (mm, g, kg, m/s, W, Wh, €)"
+                readOnly
+              />
             </SettingRow>
           </section>
 

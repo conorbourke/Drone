@@ -2,7 +2,7 @@
  * Parts tab: categories and parts from the API. Phase 1 shows the database structure;
  * engine-driven recommendations and supplier lookup arrive in Phase 4.
  */
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { api, errorMessage, isAbortError, isAuthError } from '../api/client';
 import type { Part, PartCategory } from '../api/types';
 import { EmptyState } from '../components/EmptyState';
@@ -12,16 +12,24 @@ import { formatEur, formatMassG, formatWithUnit, humanizeKey, unitForKey } from 
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-function specSummary(part: Part, category: PartCategory | undefined): string {
+interface SpecItem {
+  key: string;
+  label: string;
+  text: string;
+  /** Explanation from the category metadata; empty when the server has none. */
+  description: string;
+}
+
+/** Up to four spec values of a part, each with its label and explanation from the category. */
+function specSummary(part: Part, category: PartCategory | undefined): SpecItem[] {
   const entries = Object.entries(part.spec).filter(([, value]) => typeof value === 'number' || typeof value === 'string');
-  const items = entries.slice(0, 4).map(([key, value]) => {
+  return entries.slice(0, 4).map(([key, value]) => {
     const field = category?.fields.find((f) => f.name === key);
     const label = field?.label ?? humanizeKey(key);
     const unit = field?.unit ?? unitForKey(key);
     const text = typeof value === 'number' ? formatWithUnit(value, unit) : String(value);
-    return `${label} ${text}`;
+    return { key, label, text, description: field?.description ?? '' };
   });
-  return items.join(' · ');
 }
 
 export function PartsTab() {
@@ -220,7 +228,17 @@ export function PartsTab() {
                       <td>{partCategory?.label ?? humanizeKey(part.category)}</td>
                       <td className="num">{formatMassG(part.mass_g)}</td>
                       <td className="num">{formatEur(part.price_eur_estimate)}</td>
-                      <td className="small">{specSummary(part, partCategory)}</td>
+                      <td className="small">
+                        {specSummary(part, partCategory).map((item, index) => (
+                          <Fragment key={item.key}>
+                            {index > 0 ? ' · ' : null}
+                            <span className="spec-item" title={item.description || undefined}>
+                              {item.label} {item.text}
+                              <Explain text={item.description} label={item.label} />
+                            </span>
+                          </Fragment>
+                        ))}
+                      </td>
                       <td>
                         {part.verified ? (
                           <StatusPill tone="ok" title={part.source}>

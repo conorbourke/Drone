@@ -115,6 +115,11 @@ export function InputsTab({ doc, update, fieldErrors }: TabProps) {
           What the aircraft must do. These targets drive every later estimate; the engine arrives in Phases 2
           and 3. Hover or tap the <strong>?</strong> beside a value for an explanation.
         </p>
+        {schemas.notes.defaults ? (
+          <p className="card-note" data-testid="defaults-note">
+            {schemas.notes.defaults}
+          </p>
+        ) : null}
         <div className="field-grid">
           {missionKeys.map((key) => (
             <SchemaField

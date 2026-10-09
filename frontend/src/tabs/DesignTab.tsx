@@ -47,6 +47,11 @@ export function DesignTab({ doc, update, fieldErrors }: TabProps) {
         Layout: <strong>{layoutLabel}</strong> (change it on the Inputs tab). All lengths are in millimetres, angles
         in degrees.
       </p>
+      {schemas.notes.defaults ? (
+        <p className="small muted" data-testid="defaults-note">
+          {schemas.notes.defaults}
+        </p>
+      ) : null}
 
       {visibleGroups.map((group) => {
         const paths = groupPaths(schemas.design, group.key);

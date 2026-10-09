@@ -1,15 +1,18 @@
 /**
- * Loads the field metadata for mission and design documents once and shares it through a
- * React context. Labels, units and explanations come from here and nowhere else.
+ * Loads the field metadata for mission and design documents (and the plain-language notes
+ * shown beside them) once and shares it through a React context. Labels, units and
+ * explanations come from here and nowhere else.
  */
 import { createContext, createElement, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { api, errorMessage, isAbortError } from './client';
-import type { FieldMeta, SchemaMap } from './types';
+import type { FieldMeta, SchemaMap, SchemaNotes } from './types';
 
 export interface Schemas {
   mission: SchemaMap;
   design: SchemaMap;
+  /** Notes such as "starting values, not an analysed design"; blank when the server has none. */
+  notes: SchemaNotes;
 }
 
 type SchemaStatus = 'loading' | 'ready' | 'error';
@@ -38,9 +41,14 @@ export function loadSchemas(signal?: AbortSignal): Promise<Schemas> {
     inflight = Promise.all([
       api<SchemaMap>('/api/schema/mission', { signal }),
       api<SchemaMap>('/api/schema/design', { signal }),
+      // The notes are informational: a server without them must not block editing.
+      api<SchemaNotes>('/api/schema/notes', { signal }).catch((error: unknown): SchemaNotes => {
+        if (isAbortError(error)) throw error;
+        return { defaults: '' };
+      }),
     ])
-      .then(([mission, design]) => {
-        cached = { mission, design };
+      .then(([mission, design, notes]) => {
+        cached = { mission, design, notes };
         return cached;
       })
       .finally(() => {

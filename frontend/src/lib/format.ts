@@ -134,7 +134,11 @@ export function formatDate(iso: string | null | undefined, options: DateFormatOp
   }).format(date);
 }
 
-/** Unit suffixes recognised at the end of a field name, mapped to display symbols. */
+/**
+ * Unit suffixes recognised at the end of a field name, mapped to display symbols. A trailing
+ * "min" is deliberately absent: in this app it means "minimum" (static_margin_min); minutes are
+ * declared explicitly through the schema endpoint.
+ */
 const UNIT_SUFFIXES: Record<string, string> = {
   mm: 'mm',
   m: 'm',
@@ -143,7 +147,6 @@ const UNIT_SUFFIXES: Record<string, string> = {
   deg: '°',
   mps: 'm/s',
   kmh: 'km/h',
-  min: 'min',
   s: 's',
   w: 'W',
   wh: 'Wh',

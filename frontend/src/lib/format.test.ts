@@ -113,12 +113,15 @@ describe('field-name helpers', () => {
     expect(splitUnitSuffix('cruise_speed_mps')).toEqual({ base: 'cruise_speed', unit: 'm/s' });
     expect(splitUnitSuffix('sweep_deg')).toEqual({ base: 'sweep', unit: '°' });
     expect(splitUnitSuffix('name')).toEqual({ base: 'name', unit: null });
+    // A trailing "min" means minimum, never minutes.
+    expect(splitUnitSuffix('static_margin_min')).toEqual({ base: 'static_margin_min', unit: null });
   });
 
   it('humanizes keys and keeps acronyms', () => {
     expect(humanizeKey('design_mtow_kg')).toBe('Design MTOW');
     expect(humanizeKey('printer.usable_envelope_mm')).toBe('Usable envelope');
-    expect(humanizeKey('hover_thrust_to_weight_min')).toBe('Hover thrust to weight');
+    expect(humanizeKey('hover_thrust_to_weight_min')).toBe('Hover thrust to weight min');
+    expect(humanizeKey('static_margin_min')).toBe('Static margin min');
     expect(humanizeKey('static_margin_max')).toBe('Static margin max');
     expect(humanizeKey('battery_reserve_fraction')).toBe('Battery reserve fraction');
   });
@@ -126,6 +129,8 @@ describe('field-name helpers', () => {
   it('extracts units from dotted keys', () => {
     expect(unitForKey('limits.warn_mtow_kg')).toBe('kg');
     expect(unitForKey('printer.name')).toBeNull();
+    expect(unitForKey('checks.static_margin_min')).toBeNull();
+    expect(unitForKey('mission.target_endurance_min')).toBeNull();
   });
 });
 

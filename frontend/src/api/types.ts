@@ -333,6 +333,8 @@ export interface Settings {
 
 /** Per-dotted-path metadata returned with the settings document. */
 export interface SettingsMetaEntry {
+  /** Display name for the row title and the input's accessible label. */
+  label: string;
   description: string;
   source: string;
   /** True when the stored value equals the shipped default. */
@@ -343,6 +345,8 @@ export interface SettingsMetaEntry {
 export interface SettingsResponse {
   settings: Settings;
   meta: Record<string, SettingsMetaEntry>;
+  /** Plain-language notes, e.g. stored values that no longer fit this version and were reset. */
+  warnings: string[];
 }
 
 // ---------- Schema (labels and explanations) ----------
@@ -370,6 +374,12 @@ export interface FieldMeta {
 
 /** Response of GET /api/schema/design and GET /api/schema/mission. */
 export type SchemaMap = Record<string, FieldMeta>;
+
+/** Response of GET /api/schema/notes. */
+export interface SchemaNotes {
+  /** That a new project's numbers are starting values, not an analysed design. */
+  defaults: string;
+}
 
 // ---------- System ----------
 
