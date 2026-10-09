@@ -30,6 +30,7 @@ function SettingRow({
   unit,
   children,
   error,
+  className,
 }: {
   path: string;
   meta: Meta;
@@ -37,12 +38,14 @@ function SettingRow({
   unit?: string | null;
   children: ReactNode;
   error?: string | null;
+  /** Extra class for layout variants. */
+  className?: string;
 }) {
   const entry = metaFor(meta, path);
   const title = label ?? humanizeKey(path);
   const unitText = unit === undefined ? unitForKey(path) : unit;
   return (
-    <div className="setting-row" data-testid={`setting-row-${path}`}>
+    <div className={`setting-row${className ? ` ${className}` : ''}`} data-testid={`setting-row-${path}`}>
       <div>
         <div className="setting-label">
           <span>
@@ -75,9 +78,15 @@ function SettingRow({
   );
 }
 
+/**
+ * Number input that keeps partial text locally and propagates only finite numbers. While the
+ * text is empty or not a number it reports that through onInvalid so the page can block saving;
+ * on blur such text is normalised back to the stored value.
+ */
 function NumberInput({
   value,
   onChange,
+  onInvalid,
   label,
   step = 'any',
   invalid,
@@ -85,6 +94,8 @@ function NumberInput({
 }: {
   value: number;
   onChange: (value: number) => void;
+  /** Called when the text starts or stops being empty / not a number. */
+  onInvalid: (invalid: boolean) => void;
   label: string;
   step?: number | 'any';
   invalid?: boolean;
@@ -113,10 +124,15 @@ function NumberInput({
         const next = event.target.value;
         setText(next);
         const parsed = Number(next);
-        if (next.trim() !== '' && Number.isFinite(parsed)) onChange(parsed);
+        const nextBad = next.trim() === '' || !Number.isFinite(parsed);
+        if (nextBad !== bad) onInvalid(nextBad);
+        if (!nextBad) onChange(parsed);
       }}
       onBlur={() => {
-        if (bad) setText(String(value));
+        if (bad) {
+          setText(String(value));
+          onInvalid(false);
+        }
       }}
     />
   );
@@ -133,6 +149,28 @@ const CHECK_KEYS: Array<keyof Settings['checks']> = [
 
 const LIMIT_KEYS: Array<keyof Settings['limits']> = ['warn_mtow_kg', 'design_mtow_kg', 'legal_mtow_kg'];
 
+/** Section names for group-level 422 locations such as ["body", "limits"]. */
+const GROUP_LABELS: Record<string, string> = {
+  printer: '3D printer',
+  'printer.build_volume_mm': 'Build volume',
+  'printer.usable_envelope_mm': 'Usable envelope',
+  limits: 'Mass limits',
+  checks: 'Check thresholds',
+  units: 'Units',
+};
+
+function groupLabel(path: string): string {
+  return GROUP_LABELS[path] ?? humanizeKey(path);
+}
+
+/** Dotted paths of every scalar below a value: "limits" → ["limits.design_mtow_kg", ...]. */
+function leafPaths(value: unknown, prefix: string): string[] {
+  if (typeof value !== 'object' || value === null) return [prefix];
+  return Object.entries(value).flatMap(([key, child]) => leafPaths(child, prefix ? `${prefix}.${key}` : key));
+}
+
+const INVALID_NUMBER = 'Enter a number';
+
 export function SettingsPage() {
   const toast = useToast();
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -141,7 +179,11 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  /** Inputs flagged by a group-level server error (the message is in the banner). */
+  const [highlighted, setHighlighted] = useState<Record<string, true>>({});
   const [generalErrors, setGeneralErrors] = useState<string[]>([]);
+  /** Number inputs whose text is currently empty or not a number; saving is blocked meanwhile. */
+  const [invalidNumbers, setInvalidNumbers] = useState<Record<string, true>>({});
 
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const [backups, setBackups] = useState<BackupEntry[] | null>(null);
@@ -194,11 +236,27 @@ export function SettingsPage() {
     setDirty(true);
   };
 
+  const setNumberInvalid = (path: string, invalid: boolean) => {
+    setInvalidNumbers((current) => {
+      if (!!current[path] === invalid) return current;
+      const next = { ...current };
+      if (invalid) next[path] = true;
+      else delete next[path];
+      return next;
+    });
+  };
+
+  /** Inline message for a row: the server's, or the local one while its text is not a number. */
+  const rowError = (path: string): string | null => fieldErrors[path] ?? (invalidNumbers[path] ? INVALID_NUMBER : null);
+
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (!settings) return;
+    // Empty or non-numeric text never reaches the settings object; do not save the stale value.
+    if (Object.keys(invalidNumbers).length > 0) return;
     setSaving(true);
     setFieldErrors({});
+    setHighlighted({});
     setGeneralErrors([]);
     try {
       const response = await api<SettingsResponse>('/api/settings', { method: 'PUT', body: settings });
@@ -210,19 +268,29 @@ export function SettingsPage() {
       if (isAuthError(caught)) return;
       if (caught instanceof ApiError && caught.status === 422) {
         const perField: Record<string, string> = {};
+        const flagged: Record<string, true> = {};
         const general: string[] = [];
         for (const field of caught.fields) {
           const path = fieldErrorPath(field);
-          if (path && getAtPath(settings, path) !== undefined && typeof getAtPath(settings, path) !== 'object') {
+          const target = path ? getAtPath(settings, path) : undefined;
+          if (target !== undefined && typeof target !== 'object') {
             perField[path] = field.msg;
           } else {
-            general.push(path ? `${path}: ${field.msg}` : field.msg);
+            // A group-level error (e.g. loc ["body", "limits"]): highlight every input in the
+            // group and explain it once in the banner under a readable section name.
+            if (target !== undefined) for (const leaf of leafPaths(target, path)) flagged[leaf] = true;
+            general.push(path ? `${groupLabel(path)}: ${field.msg}` : field.msg);
           }
         }
         if (caught.fields.length === 0) general.push(caught.detail);
         setFieldErrors(perField);
+        setHighlighted(flagged);
         setGeneralErrors(general);
-        toast.error('Settings were not saved. Check the highlighted values.');
+        toast.error(
+          general.length > 0
+            ? 'Settings were not saved. See the message below.'
+            : 'Settings were not saved. Check the highlighted values.',
+        );
       } else {
         toast.error(`Could not save settings: ${errorMessage(caught)}`);
       }
@@ -249,20 +317,41 @@ export function SettingsPage() {
     if (!settings) return null;
     const value = getAtPath(settings, path) as Settings['printer']['build_volume_mm'];
     return (
-      <SettingRow path={path} meta={meta} label={label} unit="mm" error={fieldErrors[path] ?? null}>
+      <SettingRow
+        path={path}
+        meta={meta}
+        label={label}
+        unit="mm"
+        error={fieldErrors[path] ?? null}
+        className="setting-row-envelope"
+      >
         <div className="envelope-grid">
-          {(['x', 'y', 'z'] as const).map((axis) => (
-            <div key={axis}>
-              <NumberInput
-                label={`${label} ${axis.toUpperCase()} (mm)`}
-                value={value[axis]}
-                onChange={(next) => update(`${path}.${axis}`, next)}
-                invalid={!!fieldErrors[`${path}.${axis}`]}
-                testId={`setting-${path}.${axis}`}
-              />
-              {fieldErrors[`${path}.${axis}`] ? <p className="field-error">{fieldErrors[`${path}.${axis}`]}</p> : null}
-            </div>
-          ))}
+          {(['x', 'y', 'z'] as const).map((axis) => {
+            const axisPath = `${path}.${axis}`;
+            const axisError = rowError(axisPath);
+            return (
+              <div key={axis}>
+                <div className="envelope-axis">
+                  <span className="envelope-axis-label" aria-hidden="true">
+                    {axis.toUpperCase()}
+                  </span>
+                  <NumberInput
+                    label={`${label} ${axis.toUpperCase()} (mm)`}
+                    value={value[axis]}
+                    onChange={(next) => update(axisPath, next)}
+                    onInvalid={(invalid) => setNumberInvalid(axisPath, invalid)}
+                    invalid={!!axisError || !!highlighted[axisPath]}
+                    testId={`setting-${axisPath}`}
+                  />
+                </div>
+                {axisError ? (
+                  <p className="field-error" role="alert">
+                    {axisError}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </SettingRow>
     );
@@ -311,23 +400,19 @@ export function SettingsPage() {
             {LIMIT_KEYS.map((key) => {
               const path = `limits.${key}`;
               return (
-                <SettingRow key={key} path={path} meta={meta} error={fieldErrors[path] ?? null}>
+                <SettingRow key={key} path={path} meta={meta} error={rowError(path)}>
                   <NumberInput
                     label={`${humanizeKey(key)} (kg)`}
                     value={settings.limits[key]}
                     onChange={(next) => update(path, next)}
+                    onInvalid={(invalid) => setNumberInvalid(path, invalid)}
                     step={0.1}
-                    invalid={!!fieldErrors[path]}
+                    invalid={!!rowError(path) || !!highlighted[path]}
                     testId={`setting-${path}`}
                   />
                 </SettingRow>
               );
             })}
-            {fieldErrors['limits'] ? (
-              <p className="form-error" role="alert">
-                {fieldErrors['limits']}
-              </p>
-            ) : null}
           </section>
 
           <section className="card" aria-labelledby="checks-heading">
@@ -341,13 +426,14 @@ export function SettingsPage() {
             {CHECK_KEYS.map((key) => {
               const path = `checks.${key}`;
               return (
-                <SettingRow key={key} path={path} meta={meta} unit={null} error={fieldErrors[path] ?? null}>
+                <SettingRow key={key} path={path} meta={meta} unit={null} error={rowError(path)}>
                   <NumberInput
                     label={humanizeKey(key)}
                     value={settings.checks[key]}
                     onChange={(next) => update(path, next)}
+                    onInvalid={(invalid) => setNumberInvalid(path, invalid)}
                     step={0.01}
-                    invalid={!!fieldErrors[path]}
+                    invalid={!!rowError(path) || !!highlighted[path]}
                     testId={`setting-${path}`}
                   />
                 </SettingRow>

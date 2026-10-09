@@ -824,6 +824,11 @@ textarea.input {
   border-top: 0;
 }
 
+/* Envelope rows hold three per-axis inputs, so their control column is wider. */
+.setting-row-envelope {
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
 .setting-label {
   font-weight: 600;
   display: flex;
@@ -854,6 +859,24 @@ textarea.input {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
+}
+
+.envelope-axis {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.envelope-axis-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+/* Room for five digits plus the padding and the spin button. */
+.envelope-axis .input {
+  min-width: calc(5ch + 40px);
+  font-variant-numeric: tabular-nums;
 }
 
 .kv {

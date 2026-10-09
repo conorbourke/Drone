@@ -2,7 +2,7 @@
  * Accessible dialog on top of the native <dialog> element: focus is trapped, Escape closes,
  * the page behind is inert, and clicking the backdrop closes.
  */
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useReducer, useRef } from 'react';
 import type { ReactNode } from 'react';
 
 interface ModalProps {
@@ -21,7 +21,12 @@ interface ModalProps {
 export function Modal({ open, title, onClose, children, footer, className, testId }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  // Forces a render when the browser closed the element by itself, so the sync below runs again.
+  const [, rerender] = useReducer((count: number) => count + 1, 0);
 
+  // Keep the element in step with the prop on every render: the browser can close a native
+  // dialog on its own (Chromium does on a second Escape while the owner keeps it open), and
+  // showModal() must then run again or the dialog could never be reopened.
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
@@ -30,7 +35,7 @@ export function Modal({ open, title, onClose, children, footer, className, testI
     } else if (!open && dialog.open) {
       dialog.close();
     }
-  }, [open]);
+  });
 
   useEffect(() => {
     const dialog = ref.current;
@@ -39,9 +44,20 @@ export function Modal({ open, title, onClose, children, footer, className, testI
       event.preventDefault();
       onClose();
     };
+    // Fires whenever the element closes, including the close() requested above (open is false
+    // then). Any other close is the browser's doing: tell the owner, then re-sync the element.
+    const onNativeClose = () => {
+      if (!open || dialog.open) return;
+      onClose();
+      rerender();
+    };
     dialog.addEventListener('cancel', onCancel);
-    return () => dialog.removeEventListener('cancel', onCancel);
-  }, [onClose]);
+    dialog.addEventListener('close', onNativeClose);
+    return () => {
+      dialog.removeEventListener('cancel', onCancel);
+      dialog.removeEventListener('close', onNativeClose);
+    };
+  }, [open, onClose]);
 
   return (
     <dialog

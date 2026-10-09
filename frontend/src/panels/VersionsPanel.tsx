@@ -27,6 +27,10 @@ interface VersionsPanelProps {
   basisLabel: string;
   /** True when restoring would discard edits that no version holds. */
   dirty: boolean;
+  /** Number the server will give the next saved version; null when unknown. */
+  nextVersionNumber: number | null;
+  /** Called with every version this panel creates (save or duplicate). */
+  onVersionCreated: (version: DesignVersion) => void;
   onVersionSaved: (version: DesignVersion) => void;
   onRestored: (draft: Draft, version: VersionSummary) => void;
   onVersionDeleted: (versionId: number) => void;
@@ -47,6 +51,8 @@ export function VersionsPanel({
   draft,
   basisLabel,
   dirty,
+  nextVersionNumber,
+  onVersionCreated,
   onVersionSaved,
   onRestored,
   onVersionDeleted,
@@ -65,8 +71,8 @@ export function VersionsPanel({
   };
 
   const openSave = () => {
-    const nextNumber = versions && versions.length ? Math.max(...versions.map((v) => v.number)) + 1 : 1;
-    setName(`v${nextNumber}`);
+    // Numbers are assigned by the server and never reused, so only its counter is a safe default.
+    setName(nextVersionNumber === null ? '' : `v${nextVersionNumber}`);
     setNotes('');
     setFormError(null);
     setDialog({ kind: 'save' });
@@ -107,6 +113,7 @@ export function VersionsPanel({
         method: 'POST',
         body: { name: trimmed, notes: notes.trim() },
       });
+      onVersionCreated(version);
       onVersionSaved(version);
       await onReload();
       toast.success(`Saved v${version.number} “${version.name}”`);
@@ -179,6 +186,7 @@ export function VersionsPanel({
     setBusy(true);
     try {
       const copy = await api<DesignVersion>(`/api/versions/${version.id}/duplicate`, { method: 'POST', body: {} });
+      onVersionCreated(copy);
       await onReload();
       toast.success(`Duplicated v${version.number} as v${copy.number} “${copy.name}”`);
     } catch (error) {
@@ -312,6 +320,7 @@ export function VersionsPanel({
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={120}
+              placeholder="Version name"
               autoFocus
               required
             />

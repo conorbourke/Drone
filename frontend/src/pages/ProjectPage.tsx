@@ -116,6 +116,12 @@ function ProjectWorkspace({ project }: { project: Project }) {
     void reloadVersions();
   }, [reloadVersions]);
 
+  // Number the server will give the next saved version (monotonic, so a delete never lowers it).
+  const [nextVersionNumber, setNextVersionNumber] = useState<number | null>(project.next_version_number ?? null);
+  const onVersionCreated = useCallback((version: DesignVersion) => {
+    setNextVersionNumber((current) => Math.max(current ?? 0, version.number + 1));
+  }, []);
+
   // Limits for the MTOW banner.
   const [limits, setLimits] = useState<Settings['limits'] | null>(null);
   useEffect(() => {
@@ -131,8 +137,11 @@ function ProjectWorkspace({ project }: { project: Project }) {
 
   // Full documents of versions, used to tell whether the draft differs from its basis.
   const [versionDocs, setVersionDocs] = useState<Record<number, DesignVersion>>({});
+  // Id of a basis whose document could not be fetched (deleted elsewhere, or a network error).
+  const [basisUnavailable, setBasisUnavailable] = useState<number | null>(null);
   const basedOn = draft.basedOnVersionId;
   const basisDoc = basedOn !== null ? (versionDocs[basedOn] ?? null) : null;
+  const basisLoading = basedOn !== null && !basisDoc && basisUnavailable !== basedOn;
 
   useEffect(() => {
     if (basedOn === null || basisDoc) return;
@@ -142,15 +151,27 @@ function ProjectWorkspace({ project }: { project: Project }) {
       .catch((caught: unknown) => {
         if (isAbortError(caught) || isAuthError(caught)) return;
         // A 404 means the basis was deleted elsewhere; the label simply shows no basis.
+        setBasisUnavailable(basedOn);
       });
     return () => controller.abort();
   }, [basedOn, basisDoc]);
 
-  const dirty = useMemo(() => isDraftDirty(draft.doc, basisDoc), [draft.doc, basisDoc]);
+  // null while the basis document is still on its way: no verdict can be given yet.
+  const dirty = useMemo(
+    () => (basisLoading ? null : isDraftDirty(draft.doc, basisDoc)),
+    [basisLoading, draft.doc, basisDoc],
+  );
   const basisNumber = basedOn === null ? null : (versions?.find((v) => v.id === basedOn)?.number ?? basisDoc?.number ?? null);
   const basisLabel = draftBasisLabel(basisNumber, dirty);
-  // Restoring discards edits when the draft differs from its basis, or when no version holds it at all.
-  const restoreNeedsConfirm = dirty || (basedOn === null && (versions?.length ?? 0) > 0);
+  // Anything changed locally since the document was loaded: the only evidence available while
+  // the basis document is unknown.
+  const edited = draft.edited || draft.status !== 'saved';
+  // Restoring discards edits when the draft differs from its basis, when that cannot be told yet
+  // (basis still loading, or unavailable after an edit), or when no version holds the draft at all.
+  const restoreNeedsConfirm =
+    basedOn !== null && !basisDoc
+      ? basisLoading || edited
+      : dirty === true || (basedOn === null && (versions?.length ?? 0) > 0);
 
   const onVersionSaved = useCallback(
     (version: DesignVersion) => {
@@ -250,6 +271,8 @@ function ProjectWorkspace({ project }: { project: Project }) {
             draft={draft}
             basisLabel={basisLabel}
             dirty={restoreNeedsConfirm}
+            nextVersionNumber={nextVersionNumber}
+            onVersionCreated={onVersionCreated}
             onVersionSaved={onVersionSaved}
             onRestored={onRestored}
             onVersionDeleted={onVersionDeleted}

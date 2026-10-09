@@ -118,9 +118,14 @@ describe('draftBasisLabel', () => {
     expect(draftBasisLabel(3, true)).toBe('Draft based on v3 (modified)');
   });
 
+  it('gives no verdict while the basis is still loading', () => {
+    expect(draftBasisLabel(2, null)).toBe('Draft based on v2 (checking…)');
+  });
+
   it('explains when there is no basis', () => {
     expect(draftBasisLabel(null, false)).toBe('Draft not based on a saved version');
     expect(draftBasisLabel(undefined, true)).toBe('Draft not based on a saved version');
+    expect(draftBasisLabel(null, null)).toBe('Draft not based on a saved version');
   });
 });
 

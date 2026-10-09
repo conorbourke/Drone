@@ -33,6 +33,8 @@ export interface DraftController {
   basedOnVersionId: number | null;
   /** ISO timestamp of the last successful save. */
   savedAt: string | null;
+  /** True once anything was edited locally since the document was loaded or replaced. */
+  edited: boolean;
   /** Update one dotted path (e.g. "parameters.wing.span_mm"); schedules an autosave. */
   update: (path: string, value: unknown) => void;
   /** Replace the whole document with server state (after a restore); marks it saved. */
@@ -53,6 +55,7 @@ export function useDraft(projectId: number, initial: Draft): DraftController {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>(NO_FIELD_ERRORS);
   const [basedOnVersionId, setBasedOnVersionId] = useState<number | null>(initial.based_on_version_id);
   const [savedAt, setSavedAt] = useState<string | null>(initial.updated_at);
+  const [edited, setEdited] = useState(false);
 
   // Mutable bookkeeping that must not trigger renders.
   const latestDoc = useRef<DraftDocument>(doc);
@@ -70,9 +73,13 @@ export function useDraft(projectId: number, initial: Draft): DraftController {
   }, []);
 
   const performSave = useCallback(
-    async (keepalive = false): Promise<boolean> => {
+    async (unloading = false): Promise<boolean> => {
       clearTimer();
-      if (inflight.current) {
+      // Normally wait for the request in flight so saves reach the server in order. While the
+      // page is unloading that await would never resume (the document is torn down first), so
+      // the latest snapshot goes out at once with keepalive instead; the server keeps the last
+      // write it receives.
+      if (inflight.current && !unloading) {
         await inflight.current;
       }
       if (savedSeq.current === editSeq.current) return true;
@@ -86,7 +93,7 @@ export function useDraft(projectId: number, initial: Draft): DraftController {
           const saved = await api<Draft>(`/api/projects/${projectId}/draft`, {
             method: 'PUT',
             body: { parameters: snapshot.parameters, mission: snapshot.mission },
-            keepalive,
+            keepalive: unloading,
           });
           if (gen !== generation.current) return true; // document was replaced meanwhile
           savedSeq.current = Math.max(savedSeq.current, seq);
@@ -106,11 +113,13 @@ export function useDraft(projectId: number, initial: Draft): DraftController {
             setFieldErrors(fieldErrorsOf(e));
           }
           return false;
-        } finally {
-          inflight.current = null;
         }
       })();
       inflight.current = run;
+      // Forget the request once it settles, unless a later one has taken its place meanwhile.
+      void run.then(() => {
+        if (inflight.current === run) inflight.current = null;
+      });
       return run;
     },
     [projectId, clearTimer],
@@ -132,6 +141,7 @@ export function useDraft(projectId: number, initial: Draft): DraftController {
       setDoc(next);
       setStatus('unsaved');
       setError(null);
+      setEdited(true);
       schedule();
     },
     [schedule],
@@ -147,6 +157,7 @@ export function useDraft(projectId: number, initial: Draft): DraftController {
       setStatus('saved');
       setError(null);
       setFieldErrors(NO_FIELD_ERRORS);
+      setEdited(false);
       setBasedOnVersionId(nextBasedOn);
       if (nextSavedAt) setSavedAt(nextSavedAt);
     },
@@ -160,7 +171,8 @@ export function useDraft(projectId: number, initial: Draft): DraftController {
   const flush = useCallback(() => performSave(), [performSave]);
 
   // Save pending edits when the page is hidden or the workspace unmounts, using keepalive so
-  // the request survives navigation. No beforeunload prompt: the autosave is the safety net.
+  // the request survives navigation, and without waiting for an in-flight save (see
+  // performSave). No beforeunload prompt: the autosave is the safety net.
   useEffect(() => {
     const onPageHide = () => {
       if (savedSeq.current !== editSeq.current) void performSave(true);
@@ -181,11 +193,12 @@ export function useDraft(projectId: number, initial: Draft): DraftController {
       fieldErrors,
       basedOnVersionId,
       savedAt,
+      edited,
       update,
       replace,
       setBasedOn,
       flush,
     }),
-    [doc, status, error, fieldErrors, basedOnVersionId, savedAt, update, replace, setBasedOn, flush],
+    [doc, status, error, fieldErrors, basedOnVersionId, savedAt, edited, update, replace, setBasedOn, flush],
   );
 }

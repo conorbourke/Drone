@@ -170,6 +170,8 @@ export interface ProjectSummary {
   version_count: number;
   /** Most recently created version, or null when none has been saved. */
   latest_version: { id: number; number: number; name: string } | null;
+  /** Number the next saved version will get (monotonic, never reused). Absent from older servers. */
+  next_version_number?: number;
 }
 
 /** GET /api/projects/{id}. */
@@ -181,6 +183,8 @@ export interface Project {
   updated_at: string;
   draft: Draft;
   version_count: number;
+  /** Number the next saved version will get (monotonic, never reused). Absent from older servers. */
+  next_version_number?: number;
 }
 
 /** Body of POST /api/projects. */

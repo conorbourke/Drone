@@ -75,9 +75,13 @@ export function isDraftDirty(draft: DraftDocument, basis: DraftDocument | null |
   return !deepEqual(draftDocument(draft), draftDocument(basis));
 }
 
-/** Text for the draft-basis indicator: "Draft based on v3 (modified)". */
-export function draftBasisLabel(basisNumber: number | null | undefined, dirty: boolean): string {
+/**
+ * Text for the draft-basis indicator: "Draft based on v3 (modified)". Pass `dirty` as null while
+ * the basis document is still loading: the label then names the version without a verdict.
+ */
+export function draftBasisLabel(basisNumber: number | null | undefined, dirty: boolean | null): string {
   if (basisNumber === null || basisNumber === undefined) return 'Draft not based on a saved version';
+  if (dirty === null) return `Draft based on v${basisNumber} (checking…)`;
   return dirty ? `Draft based on v${basisNumber} (modified)` : `Draft based on v${basisNumber}`;
 }
 
