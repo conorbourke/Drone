@@ -475,9 +475,14 @@ def _requeue(prog: _Progress) -> None:
         log.exception("Could not re-queue flight log %s", prog.analysis_id)
 
 
-def recover_flight_logs(session_factory: sessionmaker[Session]) -> tuple[int, list[int]]:
+def recover_flight_logs(
+    session_factory: sessionmaker[Session], settings: Settings | None = None
+) -> tuple[int, list[int]]:
     """At startup: logs left ``running`` become ``error`` (the owner can run them again);
-    ``queued`` ones are returned, oldest first, to be queued again."""
+    ``queued`` ones are returned, oldest first, to be queued again. With ``settings``, files
+    in the logs directory without a row are removed (see :func:`sweep_orphan_logs`)."""
+    if settings is not None:
+        sweep_orphan_logs(session_factory, settings)
     with session_factory() as db:
         result = db.execute(
             update(FlightLog)
@@ -491,6 +496,29 @@ def recover_flight_logs(session_factory: sessionmaker[Session]) -> tuple[int, li
         )
         db.commit()
     return int(getattr(result, "rowcount", 0) or 0), queued
+
+
+def sweep_orphan_logs(session_factory: sessionmaker[Session], settings: Settings) -> int:
+    """Remove log files that have no row: an upload cut off by a crash or restart (the file
+    is written before its row is committed), or a delete interrupted between the commit and
+    the file removal. Only safe at startup, before any upload can be in flight."""
+    root = settings.flight_logs_dir
+    if not root.is_dir():
+        return 0
+    with session_factory() as db:
+        names = set(db.scalars(select(FlightLog.storage_name)).all())
+    removed = 0
+    for entry in root.iterdir():
+        if entry.name in names or (entry.is_dir() and not entry.is_symlink()):
+            continue
+        try:
+            entry.unlink()
+        except OSError:
+            continue
+        removed += 1
+    if removed:
+        log.warning("Removed %d flight log file(s) without a row", removed)
+    return removed
 
 
 def delete_project_flight_data(db: Session, project_id: int) -> list[str]:

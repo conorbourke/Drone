@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app import exports as ex
 from app.db import utcnow
 from app.deps import AppSettings, CurrentUser, DbSession, current_user
+from app.disk_space import JOB_OUTPUT_BYTES, ensure_free_space
 from app.engine.analysis import ENGINE_VERSION
 from app.jobs import AnalysisWorker
 from app.models import Export, User
@@ -177,6 +178,7 @@ def create_moulds(
         db.refresh(row)
         return _accepted(db, row, worker)
 
+    ensure_free_space(settings.exports_dir, JOB_OUTPUT_BYTES, "make the moulds")
     row = Export(
         owner_id=user.id,
         project_id=project.id,

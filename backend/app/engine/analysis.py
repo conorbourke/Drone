@@ -473,7 +473,11 @@ def _factor_sets(
     }
     if "cruise_drag" in unc:
         u = min(unc["cruise_drag"], 0.5)
-        sets["profile"] = ({"profile": 1 - u}, {"profile": 1 + u})
+        # The whole drag coefficient moves with the measured factor: perturbing the profile
+        # term alone would apply the flights' uncertainty to only part of the drag.
+        lo_f = {"profile": 1 - u, "parasite": 1 - u, "induced": 1 - u}
+        hi_f = {"profile": 1 + u, "parasite": 1 + u, "induced": 1 + u}
+        sets["profile"] = (lo_f, hi_f)
         sets.pop("parasite", None)
         sets.pop("induced", None)
     if "battery_usable_energy" in unc:

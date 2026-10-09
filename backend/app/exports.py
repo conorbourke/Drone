@@ -723,6 +723,10 @@ def delete_exports(
 
 _mesh_cache: OrderedDict[tuple[str, int, int], dict[str, Any]] = OrderedDict()
 _mesh_lock = threading.Lock()
+#: One preview mesh is built at a time: a large STL takes hundreds of MB and many seconds to
+#: index and decimate, and requests run on a thread pool (the browser aborting a preview does
+#: not stop its build), so concurrent builds next to a CAD child could exhaust the 2 GB.
+_mesh_build_lock = threading.Lock()
 
 
 def find_piece(manifest: dict[str, Any], piece_id: str) -> tuple[dict, dict] | None:
@@ -770,10 +774,25 @@ def piece_mesh(path: Path, max_triangles: int = PREVIEW_MAX_TRIANGLES) -> dict[s
     as base64 little-endian float32 positions and uint32 indices. Cached per file."""
     st = path.stat()
     key = (str(path), st.st_mtime_ns, max_triangles)
+    cached = _cached_mesh(key)
+    if cached is not None:
+        return cached
+    with _mesh_build_lock:
+        cached = _cached_mesh(key)  # built meanwhile by a request that held the lock
+        if cached is not None:
+            return cached
+        return _build_piece_mesh(path, key, max_triangles)
+
+
+def _cached_mesh(key: tuple[str, int, int]) -> dict[str, Any] | None:
     with _mesh_lock:
         if key in _mesh_cache:
             _mesh_cache.move_to_end(key)
             return _mesh_cache[key]
+    return None
+
+
+def _build_piece_mesh(path: Path, key: tuple[str, int, int], max_triangles: int) -> dict[str, Any]:
     tris = _read_stl(path)
     original = len(tris)
     extent = float(np.ptp(tris.reshape(-1, 3), axis=0).max()) if original else 1.0

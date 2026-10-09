@@ -278,7 +278,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     for export_id in queued_exports:
         worker.submit_export(export_id)
     # Phase 6 flight logs: read and compared on the same worker (app.flight_data).
-    failed_logs, queued_logs = recover_flight_logs(app.state.session_factory)
+    failed_logs, queued_logs = recover_flight_logs(app.state.session_factory, settings)
     if failed_logs:
         log.warning("Marked %d interrupted flight log(s) as failed", failed_logs)
     for log_id in queued_logs:

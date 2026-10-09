@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app import flight_data as fd
 from app.db import utcnow
 from app.deps import AppSettings, CurrentUser, DbSession, current_user
+from app.disk_space import ensure_free_space
 from app.flightlog.logging_guide import logging_guide
 from app.imaging import sanitise_filename
 from app.jobs import AnalysisWorker
@@ -162,6 +163,11 @@ async def upload_flight_log(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Upload an ArduPilot DataFlash log: a .bin file (or a .log text log).",
         )
+    try:
+        declared = int(request.headers.get("content-length") or fd.MAX_LOG_BYTES)
+    except ValueError:
+        declared = fd.MAX_LOG_BYTES
+    ensure_free_space(settings.flight_logs_dir, declared, "store this log")
     settings.flight_logs_dir.mkdir(parents=True, exist_ok=True)
     storage_name = fd.new_storage_name(ext)
     path = fd.log_file(settings, storage_name)
@@ -232,6 +238,9 @@ def load_sample_flight(
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, detail="The sample log is not part of this installation."
         )
+    ensure_free_space(
+        settings.flight_logs_dir, fd.SAMPLE_LOG_PATH.stat().st_size, "add the sample flight"
+    )
     storage_name, size = fd.copy_sample(settings)
     row = FlightLog(
         owner_id=user.id,

@@ -20,6 +20,7 @@ from app import parts_service
 from app.cad import MANIFEST_SCHEMA
 from app.db import utcnow
 from app.deps import AppSettings, CurrentUser, DbSession, current_user
+from app.disk_space import JOB_OUTPUT_BYTES, ensure_free_space
 from app.engine.analysis import ENGINE_VERSION
 from app.jobs import AnalysisWorker
 from app.models import DesignVersion, Export, Part, Project, User
@@ -222,6 +223,7 @@ def create_export(
         db.refresh(row)
         return _accepted(db, row, worker)
 
+    ensure_free_space(settings.exports_dir, JOB_OUTPUT_BYTES, "make the files")
     row = Export(
         owner_id=user.id,
         project_id=project.id,
