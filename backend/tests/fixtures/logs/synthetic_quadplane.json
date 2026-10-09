@@ -1,0 +1,58 @@
+{
+ "hover_power_w": 397.4929669707615,
+ "cruise_power_w": 228.67572704073362,
+ "mass_kg": 3.35,
+ "cruise_airspeed_mps": 16.0,
+ "phases": {
+  "takeoff_hover": [
+   6.0,
+   51.0
+  ],
+  "transition": [
+   51.0,
+   63.67
+  ],
+  "cruise": [
+   63.67,
+   183.67
+  ],
+  "back_transition": [
+   183.67,
+   197.0
+  ],
+  "landing_hover": [
+   197.0,
+   247.0
+  ]
+ },
+ "counts": {
+  "UNIT": 23,
+  "MULT": 7,
+  "FMTU": 18,
+  "MSG": 4,
+  "VER": 1,
+  "PARM": 26,
+  "MODE": 3,
+  "ATT": 6300,
+  "BAT": 2520,
+  "CTUN": 2520,
+  "ARSP": 2520,
+  "VIBE": 2520,
+  "RCOU": 2520,
+  "GPS": 1260,
+  "BARO": 2520,
+  "POS": 2520,
+  "ESC": 12600,
+  "EV": 2,
+  "ARM": 2,
+  "QTUN": 2921
+ },
+ "energy_wh": 21.331108581447484,
+ "charge_mah": 876.2103978853919,
+ "hover_factor": 0.95,
+ "cruise_factor": 1.12,
+ "predicted_hover_w": 418.41364944290683,
+ "predicted_cruise_w": 204.17475628636927,
+ "energy_factor": 1.0,
+ "design": "default design (app/defaults.py), run_analysis(mode='fast')"
+}

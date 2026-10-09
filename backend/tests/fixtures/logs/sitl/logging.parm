@@ -1,0 +1,7 @@
+# Flight-data logging for the Phase 6 sample (see backend/tests/fixtures/logs/README.md)
+BATT_MONITOR     4
+BATT_CAPACITY    5000
+LOG_BITMASK      11199
+LOG_FILE_RATEMAX 10
+LOG_DISARMED     0
+SIM_BATT_CAP_AH  5
