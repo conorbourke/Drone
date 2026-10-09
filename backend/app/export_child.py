@@ -11,6 +11,9 @@ goes to stderr (the server log).
 
 The exit code is 0 after ``done`` and 1 after ``error``. ``manifest.json`` in ``out_dir`` holds
 the manifest (written by the generator, or here when a generator did not write it).
+
+A job with ``"task": "moulds"`` (Phase 7) runs :func:`app.cad.moulds.generate_moulds` instead
+(or the ``MOULD_FAKE_GENERATOR`` test seam) and its manifest is ``moulds_manifest.json``.
 """
 
 from __future__ import annotations
@@ -26,11 +29,12 @@ from pathlib import Path
 from typing import Any, TextIO
 
 DEFAULT_GENERATOR = "app.cad:generate_files"
+DEFAULT_MOULD_GENERATOR = "app.cad.moulds:generate_moulds"
 
 
-def _generator(spec: str | None) -> Callable[..., dict[str, Any]]:
-    module, _, name = (spec or DEFAULT_GENERATOR).partition(":")
-    return getattr(importlib.import_module(module), name or "generate_files")
+def _generator(spec: str | None, default: str = DEFAULT_GENERATOR) -> Callable[..., dict[str, Any]]:
+    module, _, name = (spec or default).partition(":")
+    return getattr(importlib.import_module(module), name or default.partition(":")[2])
 
 
 def _peak_rss_mb() -> float:
@@ -49,19 +53,33 @@ def run(job: dict[str, Any], proto: TextIO) -> int:
 
     out = Path(job["out_dir"])
     try:
-        generate = _generator(job.get("generator"))
-        manifest = generate(
-            job["parameters"],
-            job["mission"],
-            job.get("settings"),
-            analysis=job.get("analysis"),
-            parts_selection=job.get("parts_selection"),
-            out_dir=out,
-            progress=progress,
-            project=job.get("project"),
-            mesh_tolerance_mm=float(job.get("mesh_tolerance_mm") or 0.05),
-        )
-        path = out / "manifest.json"
+        if job.get("task") == "moulds":
+            generate = _generator(job.get("generator"), DEFAULT_MOULD_GENERATOR)
+            manifest = generate(
+                job["parameters"],
+                job["mission"],
+                job.get("settings"),
+                parts=tuple(job.get("parts") or ()),
+                out_dir=out,
+                progress=progress,
+                options=job.get("options"),
+                project=job.get("project"),
+            )
+            path = out / "moulds_manifest.json"
+        else:
+            generate = _generator(job.get("generator"))
+            manifest = generate(
+                job["parameters"],
+                job["mission"],
+                job.get("settings"),
+                analysis=job.get("analysis"),
+                parts_selection=job.get("parts_selection"),
+                out_dir=out,
+                progress=progress,
+                project=job.get("project"),
+                mesh_tolerance_mm=float(job.get("mesh_tolerance_mm") or 0.05),
+            )
+            path = out / "manifest.json"
         if not path.is_file():
             path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     except EnvelopeError as exc:

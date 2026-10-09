@@ -24,6 +24,11 @@ Design (docs/phases/PHASE5.md section 3; the job and API choices are recorded he
 * **Files** live in ``{APP_DATA_DIR}/files/exports/{id}/`` (the CAD library's layout plus
   ``manifest.json``) and are removed with the row, its version or its project. Downloads are
   looked up in the stored manifest's ``files`` list; no path is ever taken from the URL.
+* **Mould sets (Phase 7)** are rows of the same table with ``kind = "moulds"`` (migration
+  0007): the same job, child process, guards, reuse and storage, but the child runs
+  :func:`app.cad.moulds.generate_moulds` (``moulds_manifest.json``, schema ``vtol-moulds/1``)
+  with its own time limit (:attr:`Settings.mould_timeout_s`); the memory guard is shared
+  (a mould set peaks at about 900 MB, under the 1500 MB limit of the 2 GB machine).
 """
 
 from __future__ import annotations
@@ -58,6 +63,11 @@ log = logging.getLogger("app.exports")
 #: Bumped when the export job or the CAD library output changes, so ``inputs_hash`` reuse never
 #: hands back files made by older code.
 EXPORT_JOB_VERSION = "exports-1"
+MOULD_JOB_VERSION = "moulds-1"
+MOULD_SCHEMA = "vtol-moulds/1"
+MANIFEST_NAME = "manifest.json"
+MOULD_MANIFEST_NAME = "moulds_manifest.json"
+MOULD_PART_KEYS = ("nose", "fuselage", "wing_root_fairing")
 MESH_TOLERANCE_MM = 0.05
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 CHILD_MODULE = "app.export_child"
@@ -126,12 +136,19 @@ def sweep_orphan_dirs(session_factory: sessionmaker[Session], settings: Settings
     return removed
 
 
+def manifest_name(manifest: dict[str, Any] | None) -> str:
+    """The manifest's own file name: ``moulds_manifest.json`` for a mould set."""
+    if manifest and manifest.get("schema") == MOULD_SCHEMA:
+        return MOULD_MANIFEST_NAME
+    return MANIFEST_NAME
+
+
 def manifest_file_paths(manifest: dict[str, Any] | None) -> list[str]:
     """The relative paths an export may serve: the manifest's ``files`` plus the manifest."""
     if not manifest:
         return []
     paths = [str(f["path"]) for f in manifest.get("files") or [] if isinstance(f, dict)]
-    return [*paths, "manifest.json"]
+    return [*paths, manifest_name(manifest)]
 
 
 def resolve_export_file(settings: Settings, row: Export, rel: str) -> Path | None:
@@ -161,7 +178,7 @@ def files_complete(settings: Settings, row: Export) -> bool:
                 return False
         except OSError:
             return False
-    return (base / "manifest.json").is_file()
+    return (base / manifest_name(row.manifest)).is_file()
 
 
 def link_files(src: Path, dst: Path, rel_paths: list[str]) -> None:
@@ -292,6 +309,10 @@ def inputs_hash(inputs: dict[str, Any]) -> str:
         "job_version": inputs.get("job_version"),
         "cad_schema": inputs.get("cad_schema"),
     }
+    if inputs.get("kind") == "moulds":  # absent for file exports: their hashes stay valid
+        hashed["kind"] = "moulds"
+        hashed["mould_parts"] = inputs.get("mould_parts")
+        hashed["mould_options"] = inputs.get("mould_options")
     return hashlib.sha256(_canonical(hashed).encode("ascii")).hexdigest()
 
 
@@ -325,7 +346,7 @@ def summary(manifest: dict[str, Any] | None) -> dict[str, Any] | None:
 
 def list_item(row: Export, version_number: int | None, queue_position: int | None) -> dict:
     inputs = row.inputs or {}
-    done = row.status == "done"
+    done = row.status == "done" and row.kind != "moulds"  # mould_list_item fills its own
     return {
         "id": row.id,
         "project_id": row.project_id,
@@ -429,6 +450,7 @@ def run_export_job(
         if row is None or row.status != "queued":
             return
         inputs = dict(row.inputs)
+        kind = row.kind or "files"
         row.status = "running"
         row.started_at = utcnow()
         row.progress = 0.01
@@ -441,17 +463,34 @@ def run_export_job(
     prog = _Progress(session_factory, export_id, stop, model=Export)
     report = prog.window(0.02, 0.97)
     t0 = time.monotonic()
-    job = {
-        "parameters": inputs["parameters"],
-        "mission": inputs["mission"],
-        "settings": inputs["settings"],
-        "analysis": inputs.get("analysis"),
-        "parts_selection": inputs.get("parts_selection"),
-        "project": inputs.get("project"),
-        "mesh_tolerance_mm": inputs.get("mesh_tolerance_mm", MESH_TOLERANCE_MM),
-        "out_dir": str(out),
-        "generator": settings.fake_export_generator,
-    }
+    moulds = kind == "moulds"
+    what = "the moulds" if moulds else "the files"
+    timeout_s = settings.mould_timeout_s if moulds else settings.export_timeout_s
+    job: dict[str, Any]
+    if moulds:
+        job = {
+            "task": "moulds",
+            "parameters": inputs["parameters"],
+            "mission": inputs["mission"],
+            "settings": inputs["settings"],
+            "parts": inputs.get("mould_parts") or list(MOULD_PART_KEYS),
+            "options": inputs.get("mould_options"),
+            "project": inputs.get("project"),
+            "out_dir": str(out),
+            "generator": settings.fake_mould_generator,
+        }
+    else:
+        job = {
+            "parameters": inputs["parameters"],
+            "mission": inputs["mission"],
+            "settings": inputs["settings"],
+            "analysis": inputs.get("analysis"),
+            "parts_selection": inputs.get("parts_selection"),
+            "project": inputs.get("project"),
+            "mesh_tolerance_mm": inputs.get("mesh_tolerance_mm", MESH_TOLERANCE_MM),
+            "out_dir": str(out),
+            "generator": settings.fake_export_generator,
+        }
     peak = 0.0
     outcome: dict[str, Any] | None = None
     failure: str | None = None
@@ -499,14 +538,20 @@ def run_export_job(
                 raise JobCancelled()
             if rss is not None and rss > settings.export_memory_limit_mb:
                 failure = (
-                    f"Making the files needed more than {settings.export_memory_limit_mb:.0f} MB "
-                    "of memory and was stopped. Try a smaller design or split it into versions."
+                    f"Making {what} needed more than {settings.export_memory_limit_mb:.0f} MB "
+                    "of memory and was stopped. "
+                    + (
+                        "Make the moulds one part at a time."
+                        if moulds
+                        else "Try a smaller design or split it into versions."
+                    )
                 )
                 break
-            if time.monotonic() - t0 > settings.export_timeout_s:
+            if time.monotonic() - t0 > timeout_s:
                 failure = (
-                    f"Making the files took longer than {_duration(settings.export_timeout_s)} "
-                    "and was stopped. Try again; if it keeps happening, simplify the design."
+                    f"Making {what} took longer than {_duration(timeout_s)} "
+                    "and was stopped. Try again; if it keeps happening, "
+                    + ("make the moulds one part at a time." if moulds else "simplify the design.")
                 )
                 break
         if failure is not None:
@@ -526,7 +571,7 @@ def run_export_job(
         _safe_write(
             prog,
             status="error",
-            error="Making the files was stopped. Generate them again.",
+            error=f"Making {what} was stopped. Generate them again.",
             stage="Stopped",
             finished_at=utcnow(),
         )
@@ -568,10 +613,13 @@ def run_export_job(
                 failure = UNEXPECTED_MESSAGE
     if failure is None:
         try:
-            manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+            name = MOULD_MANIFEST_NAME if moulds else MANIFEST_NAME
+            manifest = json.loads((out / name).read_text(encoding="utf-8"))
+            if moulds and manifest.get("schema") != MOULD_SCHEMA:
+                raise ValueError(f"unexpected mould manifest schema {manifest.get('schema')!r}")
             total = (
                 sum((out / str(f["path"])).stat().st_size for f in manifest.get("files") or [])
-                + (out / "manifest.json").stat().st_size
+                + (out / name).stat().st_size
             )
         except (OSError, ValueError, KeyError, TypeError):
             log.exception("Export %s: the manifest or a listed file is missing", export_id)
@@ -753,3 +801,64 @@ def piece_mesh(path: Path, max_triangles: int = PREVIEW_MAX_TRIANGLES) -> dict[s
         while len(_mesh_cache) > 32:
             _mesh_cache.popitem(last=False)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Mould sets (Phase 7)
+# ---------------------------------------------------------------------------
+
+
+def mould_summary(manifest: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The list view of a finished mould set: per part halves, tiles, fit, demoulding and
+    flagged faces, plus the totals."""
+    if not manifest:
+        return None
+    parts = manifest.get("summary") or []
+    kinds: dict[str, int] = {}
+    for f in manifest.get("files") or []:
+        kinds[str(f.get("kind", "other"))] = kinds.get(str(f.get("kind", "other")), 0) + 1
+    tiles = [
+        t
+        for p in manifest.get("parts") or []
+        for h in p.get("halves") or []
+        for t in h.get("tiles") or []
+    ]
+    return {
+        "parts": parts,
+        "tiles": len(tiles),
+        "all_tiles_fit": all(bool(t.get("fits")) for t in tiles) if tiles else None,
+        "demouldable": all(bool(p.get("demouldable")) for p in parts) if parts else None,
+        "flagged_faces": sum(int(p.get("flagged_faces") or 0) for p in parts),
+        "estimated_mass_g": round(sum(float(t.get("estimated_mass_g") or 0.0) for t in tiles), 1),
+        "files": len(manifest.get("files") or []),
+        "kinds": kinds,
+        "envelope_mm": manifest.get("envelope_mm"),
+        "printer": manifest.get("printer"),
+    }
+
+
+def mould_list_item(row: Export, version_number: int | None, queue_position: int | None) -> dict:
+    out = list_item(row, version_number, queue_position)
+    done = row.status == "done"
+    if done:
+        out["file_count"] = len((row.manifest or {}).get("files") or [])
+    inputs = row.inputs or {}
+    options = inputs.get("mould_options") or {}
+    out.update(
+        summary=mould_summary(row.manifest) if done else None,
+        zip_url=f"/api/moulds/{row.id}/zip" if done else None,
+        mould_parts=list(inputs.get("mould_parts") or []),
+        options={k: options[k] for k in ("min_draft_deg", "vent_channels") if k in options},
+    )
+    return out
+
+
+def find_tile(manifest: dict[str, Any], tile_id: str) -> tuple[dict, dict, dict] | None:
+    """(part, half, tile) whose STL file stem is ``tile_id``."""
+    for part in manifest.get("parts") or []:
+        for half in part.get("halves") or []:
+            for tile in half.get("tiles") or []:
+                stl = str((tile.get("files") or {}).get("stl", ""))
+                if stl and Path(stl).stem == tile_id:
+                    return part, half, tile
+    return None

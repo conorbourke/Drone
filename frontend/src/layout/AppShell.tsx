@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 
-export type TabKey = 'inputs' | 'design' | 'parts' | 'files' | 'flight';
+export type TabKey = 'inputs' | 'design' | 'parts' | 'files' | 'flight' | 'fullscale';
 
 /** Workspace tabs, left to right, in the order the owner works through them. */
 export const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
@@ -16,6 +16,7 @@ export const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: 'parts', label: 'Parts' },
   { key: 'files', label: 'Files' },
   { key: 'flight', label: 'Flight data' },
+  { key: 'fullscale', label: 'Full scale' },
 ];
 
 export function parseTab(value: string | null): TabKey {

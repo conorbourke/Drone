@@ -61,6 +61,7 @@ describe('formatting', () => {
     expect(thresholdText([5, 20], '% MAC')).toBe('5–20 % MAC');
     expect(thresholdText({ static_margin: [5, 20], max_pair_share: 0.65 })).toBe('static margin 5–20 %; max pair share 0.65');
     expect(thresholdText(null)).toBe('');
+    expect(thresholdText([23, 24, 25], 'kg')).toBe('23 / 24 / 25 kg');
   });
   it('formats a quantity with its range', () => {
     expect(quantityShort({ value: 20.77, low: 16.1, high: 25.6, unit: 'min', label: '', explain: '', source: '' })).toBe(

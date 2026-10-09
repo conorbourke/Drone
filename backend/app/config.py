@@ -121,6 +121,20 @@ class Settings(BaseSettings):
         "(same signature as app.cad.generate_files) in the child process instead of the CAD "
         "kernel. Ignored when APP_ENV=production.",
     )
+    mould_timeout_s: float = Field(
+        default=1800.0,
+        gt=0,
+        description="Phase 7: hard time limit of one mould set (the CAD child process is killed "
+        "after it). A 24 kg design's nose, fuselage and fairing moulds take about 3 minutes on a "
+        "fast desktop and several times that on the shared server CPU. Default 30 minutes. The "
+        "memory limit is export_memory_limit_mb (a mould set peaks at about 900 MB).",
+    )
+    mould_fake_generator: str | None = Field(
+        default=None,
+        description="Test seam: outside production, mould sets call this 'module:function' "
+        "(same signature as app.cad.moulds.generate_moulds) in the child process instead of the "
+        "CAD kernel. Ignored when APP_ENV=production.",
+    )
     validation_on_startup: bool = Field(
         default=True,
         description="Run the validation suite once in the background at startup when no "
@@ -220,6 +234,13 @@ class Settings(BaseSettings):
         if self.is_production:
             return None
         return self.export_fake_generator
+
+    @property
+    def fake_mould_generator(self) -> str | None:
+        """The mould generator test seam, only outside production."""
+        if self.is_production:
+            return None
+        return self.mould_fake_generator
 
     @property
     def fake_claude_response_file(self) -> Path | None:

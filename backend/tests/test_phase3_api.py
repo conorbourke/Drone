@@ -212,8 +212,8 @@ def test_from_patch_name_conflict_and_foreign_base(auth_client: TestClient, proj
 
 def test_system_info_current_phase(auth_client: TestClient) -> None:
     body = auth_client.get("/api/system/info").json()
-    assert body["phase"] == 6
-    assert body["version"] == "0.6.0"
+    assert body["phase"] == 7
+    assert body["version"] == "0.7.0"
 
 
 def _fake_report(passed: int = 3) -> dict[str, Any]:

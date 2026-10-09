@@ -146,6 +146,10 @@ export function thresholdText(threshold: unknown, unit = ''): string {
   if (Array.isArray(threshold) && threshold.length === 2 && threshold.every((t) => typeof t === 'number')) {
     return `${fmt(threshold[0] as number)}–${fmt(threshold[1] as number)}${u}`;
   }
+  // Several thresholds in rising order (for example the 23 / 24 / 25 kg mass limits).
+  if (Array.isArray(threshold) && threshold.length > 2 && threshold.every((t) => typeof t === 'number')) {
+    return `${threshold.map((t) => fmt(t as number)).join(' / ')}${u}`;
+  }
   if (isObject(threshold)) {
     return Object.entries(threshold)
       .map(([key, value]) => `${key.replace(/_/g, ' ')} ${thresholdText(value, key.includes('margin') ? '%' : '')}`)

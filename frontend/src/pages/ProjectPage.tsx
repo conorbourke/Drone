@@ -3,7 +3,7 @@
  * basis version for dirty tracking and the MTOW banner, and renders the active tab with the
  * Versions and Assistant panels in the right rail.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ApiError, api, errorMessage, isAbortError, isAuthError } from '../api/client';
 import type { DesignVersion, Draft, PartsSelection, Project, Settings, SettingsResponse, VersionSummary } from '../api/types';
@@ -24,6 +24,9 @@ import { FilesTab } from '../tabs/FilesTab';
 import { FlightDataTab } from '../tabs/FlightDataTab';
 import { InputsTab } from '../tabs/InputsTab';
 import { PartsTab } from '../tabs/PartsTab';
+
+// Phase 7: loaded on first use (the moulds and full-scale views are large and used rarely).
+const FullScaleTab = lazy(() => import('../tabs/FullScaleTab').then((m) => ({ default: m.FullScaleTab })));
 
 export function ProjectPage() {
   const params = useParams<{ id: string }>();
@@ -335,6 +338,13 @@ function ProjectWorkspace({ project }: { project: Project }) {
       break;
     case 'files':
       content = <FilesTab />;
+      break;
+    case 'fullscale':
+      content = (
+        <Suspense fallback={<div className="skeleton" aria-busy="true" aria-label="Loading the full-scale view" />}>
+          <FullScaleTab />
+        </Suspense>
+      );
       break;
     case 'flight':
       content = <FlightDataTab />;

@@ -51,7 +51,8 @@ def _item(db: Session, row: Export, worker: AnalysisWorker | None) -> dict[str, 
 
 def _owned_export(db: Session, user: User, export_id: int) -> Export:
     row = db.get(Export, export_id)
-    if row is None or row.owner_id != user.id:
+    # Mould sets (Phase 7) share the table but have their own routes (app.routers.moulds).
+    if row is None or row.owner_id != user.id or row.kind != "files":
         raise not_found("Export")
     return row
 
@@ -157,6 +158,7 @@ def create_export(
         .where(
             Export.owner_id == user.id,
             Export.project_id == project.id,
+            Export.kind == "files",
             Export.inputs_hash == digest,
             Export.status.in_(("queued", "running")),
             same_source,
@@ -171,6 +173,7 @@ def create_export(
         select(Export)
         .where(
             Export.owner_id == user.id,
+            Export.kind == "files",
             Export.inputs_hash == digest,
             Export.status == "done",
         )
@@ -245,7 +248,7 @@ def list_exports(
     project = owned_project(db, user, project_id)
     rows = db.scalars(
         select(Export)
-        .where(Export.project_id == project.id)
+        .where(Export.project_id == project.id, Export.kind == "files")
         .order_by(Export.id.desc())
         .limit(max(1, min(limit, 200)))
     ).all()

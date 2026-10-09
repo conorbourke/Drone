@@ -42,7 +42,9 @@ from app.routers import (
     auth,
     exports,
     flight_data,
+    fullscale,
     images,
+    moulds,
     parts,
     parts_list,
     projects,
@@ -385,6 +387,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(assistant.router)
     app.include_router(exports.router)
     app.include_router(flight_data.router)
+    app.include_router(moulds.router)
+    app.include_router(fullscale.router)
 
     @app.api_route(
         "/api/{path:path}",

@@ -27,6 +27,8 @@
  * Validation page then shows the committed snapshot (docs/validation/latest.json).
  * EXPORT_FAKE_GENERATOR=tests.export_fakes:generate_files makes "Generate files" on the Files tab
  * write a small, complete fake file set at once instead of running the CAD kernel (never in production).
+ * MOULD_FAKE_GENERATOR=tests.export_fakes:generate_moulds does the same for "Generate moulds" on the
+ * Full scale tab (Phase 7): a small fake mould set instead of minutes of mould CAD.
  */
 import { defineConfig, devices } from '@playwright/test';
 import fs from 'node:fs';
@@ -135,6 +137,8 @@ export default defineConfig({
       // Phase 5: file exports use the fast fake generator (backend/tests/export_fakes.py) instead of
       // the CAD kernel, so "Generate files" finishes in about a second.
       EXPORT_FAKE_GENERATOR: 'tests.export_fakes:generate_files',
+      // Phase 7: mould sets use the fast fake mould generator from the same module.
+      MOULD_FAKE_GENERATOR: 'tests.export_fakes:generate_moulds',
     },
   },
 });

@@ -314,7 +314,8 @@ class PartSelection(TimestampMixin, Base):
 
 
 class Export(TimestampMixin, Base):
-    """One "Generate files" job of a project's draft or version and its manifest (Phase 5).
+    """One "Generate files" job of a project's draft or version and its manifest (Phase 5), or
+    one "Generate moulds" job (Phase 7, ``kind = "moulds"``, manifest ``vtol-moulds/1``).
 
     The files live under ``{APP_DATA_DIR}/files/{files_dir}`` (``exports/{id}``); deleting the
     row through the API, its version or its project removes that directory. ``version_id`` is
@@ -333,6 +334,10 @@ class Export(TimestampMixin, Base):
     )
     version_id: Mapped[int | None] = mapped_column(
         ForeignKey("design_versions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    #: "files" (Phase 5 print/CAD/drawing files) or "moulds" (Phase 7 mould set; migration 0007).
+    kind: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="files", server_default="files", index=True
     )
     source: Mapped[str] = mapped_column(String(20), nullable=False)  # draft | version
     inputs: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)

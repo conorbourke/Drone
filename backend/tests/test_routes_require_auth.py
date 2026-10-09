@@ -110,6 +110,15 @@ def test_every_api_route_requires_session(app: FastAPI) -> None:
         ("DELETE", "/api/projects/{project_id}/calibration"),
         ("GET", "/api/projects/{project_id}/built-weights"),
         ("PUT", "/api/projects/{project_id}/built-weights"),
+        # Phase 7: mould sets and full-scale checks.
+        ("POST", "/api/projects/{project_id}/moulds"),
+        ("GET", "/api/projects/{project_id}/moulds"),
+        ("GET", "/api/moulds/{mould_id}"),
+        ("DELETE", "/api/moulds/{mould_id}"),
+        ("GET", "/api/moulds/{mould_id}/files/{path:path}"),
+        ("GET", "/api/moulds/{mould_id}/zip"),
+        ("GET", "/api/moulds/{mould_id}/tiles/{tile_id}/mesh"),
+        ("POST", "/api/projects/{project_id}/fullscale"),
     }
     assert expected <= checked, expected - checked
     assert len(checked) > 45

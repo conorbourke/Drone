@@ -1,0 +1,87 @@
+{
+ "parameters": {
+  "schema_version": 2,
+  "layout": "front_tilt",
+  "wing": {
+   "span_mm": 4760,
+   "root_chord_mm": 690,
+   "tip_chord_mm": 475,
+   "sweep_deg": 0.0,
+   "dihedral_deg": 3.0,
+   "incidence_deg": 2.0,
+   "twist_deg": 0.0,
+   "airfoil": "sd7037",
+   "x_le_mm": 625,
+   "z_mm": 0.0
+  },
+  "fuselage": {
+   "length_mm": 1870,
+   "width_mm": 115,
+   "height_mm": 125,
+   "cross_section": "rounded_rect"
+  },
+  "booms": {
+   "count": 2,
+   "lateral_offset_mm": 795,
+   "length_mm": 1415,
+   "x_offset_mm": -400,
+   "diameter_mm": 25.0
+  },
+  "motors": {
+   "front_x_mm": 51,
+   "rear_x_mm": 1366,
+   "height_mm": 48
+  },
+  "tilt": {
+   "axis_x_mm": 51,
+   "max_angle_deg": 90.0
+  },
+  "pusher": {
+   "prop_diameter_mm": 254.0,
+   "x_mm": 880.0
+  },
+  "tail": {
+   "type": "inverted_v",
+   "span_mm": 1490,
+   "chord_mm": 420,
+   "arm_mm": 1290,
+   "height_mm": 190,
+   "v_angle_deg": 40.0,
+   "airfoil": "naca0009"
+  },
+  "nose_bay": {
+   "length_mm": 180.0,
+   "width_mm": 100.0,
+   "height_mm": 100.0
+  },
+  "landing_gear": {
+   "type": "skids",
+   "height_mm": 125
+  },
+  "propulsion": {
+   "prop_diameter_mm": 635.0,
+   "prop_pitch_mm": 269.4,
+   "prop_blades": 2
+  },
+  "battery": {
+   "chemistry": "lipo",
+   "cells_series": 12,
+   "cells_parallel": 2,
+   "capacity_mah": 20700,
+   "x_mm": 671
+  },
+  "allowances": {
+   "avionics_g": 220.0,
+   "wiring_fraction": 0.06
+  }
+ },
+ "mission": {
+  "schema_version": 1,
+  "scale": "final",
+  "target_takeoff_mass_kg": 24.0,
+  "target_endurance_min": 45.0,
+  "cruise_speed_mps": 16.0,
+  "payload_min_g": 150.0,
+  "payload_max_g": 400.0
+ }
+}
