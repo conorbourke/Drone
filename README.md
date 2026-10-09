@@ -4,7 +4,7 @@ A browser-based design tool for a carbon-fibre VTOL camera drone: describe the m
 
 The full product brief is in [`docs/BRIEF.md`](docs/BRIEF.md). The build is in seven phases; progress and acceptance criteria are in [`docs/PHASES.md`](docs/PHASES.md).
 
-**Status: Phase 1 (Foundations) is built.** Login, projects, design versions, the parts database structure, settings, backups and a no-terminal deployment pipeline are in place. The design tools arrive in Phase 2 and the engineering engine in Phase 3.
+**Status: Phase 1 (Foundations) is done and live at https://conor-vtol-designer.fly.dev.** Login, projects, design versions, the parts database structure, settings, backups and a no-terminal deployment pipeline are in place. The design tools arrive in Phase 2 and the engineering engine in Phase 3.
 
 ## Getting it running (owner)
 
