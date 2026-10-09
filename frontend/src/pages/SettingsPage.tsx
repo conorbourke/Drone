@@ -3,6 +3,7 @@
  * and source from the API), backups with "Back up now" and downloads, and system info.
  */
 import { useCallback, useEffect, useId, useState } from 'react';
+import { Link } from 'react-router';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiError, api, errorMessage, fieldErrorPath, isAbortError, isAuthError } from '../api/client';
 import type { BackupEntry, Settings, SettingsMetaEntry, SettingsResponse, SystemInfo } from '../api/types';
@@ -151,7 +152,12 @@ const CHECK_KEYS: Array<keyof Settings['checks']> = [
   'cruise_to_stall_speed_ratio_min',
   'battery_reserve_fraction',
   'battery_current_max_fraction_of_rating',
+  'manoeuvre_load_factor',
+  'structural_safety_factor',
+  'transition_thrust_margin_min',
 ];
+
+const ANALYSIS_KEYS: Array<keyof Settings['analysis']> = ['ncrit'];
 
 const LIMIT_KEYS: Array<keyof Settings['limits']> = ['warn_mtow_kg', 'design_mtow_kg', 'legal_mtow_kg'];
 
@@ -162,6 +168,7 @@ const GROUP_LABELS: Record<string, string> = {
   'printer.usable_envelope_mm': 'Usable envelope',
   limits: 'Mass limits',
   checks: 'Check thresholds',
+  analysis: 'Analysis',
   units: 'Units',
 };
 
@@ -449,10 +456,10 @@ export function SettingsPage() {
           <section className="card" aria-labelledby="checks-heading">
             <div className="card-header">
               <h2 id="checks-heading">Check thresholds</h2>
-              <StatusPill tone="info">Proposed; confirm in Phase 3</StatusPill>
             </div>
             <p className="card-note">
-              Pass/warn/fail limits the Phase 3 analysis will apply. Each one lists where the default comes from.
+              Pass/warn/fail limits the full analysis applies. Each one lists where the default comes from; every check in
+              an analysis names the threshold it used.
             </p>
             {CHECK_KEYS.map((key) => {
               const path = `checks.${key}`;
@@ -464,6 +471,35 @@ export function SettingsPage() {
                     onChange={(next) => update(path, next)}
                     onInvalid={(invalid) => setNumberInvalid(path, invalid)}
                     step={0.01}
+                    invalid={!!rowError(path) || !!highlighted[path]}
+                    testId={`setting-${path}`}
+                  />
+                </SettingRow>
+              );
+            })}
+          </section>
+
+          <section className="card" aria-labelledby="analysis-settings-heading">
+            <div className="card-header">
+              <h2 id="analysis-settings-heading">Analysis</h2>
+              <Link to="/validation" className="button button-ghost button-sm" data-testid="settings-validation-link">
+                Validation report
+              </Link>
+            </div>
+            <p className="card-note">
+              Options for the full server analysis. The validation report shows how the engine compares with textbook
+              results, wind-tunnel data and published aircraft.
+            </p>
+            {ANALYSIS_KEYS.map((key) => {
+              const path = `analysis.${key}`;
+              return (
+                <SettingRow key={key} path={path} meta={meta} unit={null} error={rowError(path)}>
+                  <NumberInput
+                    label={labelFor(meta, path)}
+                    value={settings.analysis?.[key] ?? 9}
+                    onChange={(next) => update(path, next)}
+                    onInvalid={(invalid) => setNumberInvalid(path, invalid)}
+                    step={0.5}
                     invalid={!!rowError(path) || !!highlighted[path]}
                     testId={`setting-${path}`}
                   />

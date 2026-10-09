@@ -60,7 +60,7 @@ export function defaultMission(): Mission {
 
 export function defaultSettings(): Settings {
   return {
-    schema_version: 1,
+    schema_version: 2,
     printer: { name: 'Bambu Lab P2S', build_volume_mm: { x: 256, y: 256, z: 256 }, usable_envelope_mm: { x: 240, y: 240, z: 240 } },
     limits: { design_mtow_kg: 24, legal_mtow_kg: 25, warn_mtow_kg: 23 },
     checks: {
@@ -70,7 +70,11 @@ export function defaultSettings(): Settings {
       cruise_to_stall_speed_ratio_min: 1.3,
       battery_reserve_fraction: 0.2,
       battery_current_max_fraction_of_rating: 0.8,
+      manoeuvre_load_factor: 3,
+      structural_safety_factor: 1.5,
+      transition_thrust_margin_min: 1.3,
     },
+    analysis: { ncrit: 9 },
     units: { system: 'metric' },
   };
 }

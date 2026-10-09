@@ -4,19 +4,27 @@
  */
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 
 type Tone = 'success' | 'error' | 'info';
+
+/** Optional link shown after the message, e.g. "Compare with v3". */
+export interface ToastAction {
+  label: string;
+  to: string;
+}
 
 interface ToastItem {
   id: number;
   tone: Tone;
   message: string;
+  action?: ToastAction;
 }
 
 export interface ToastApi {
-  success: (message: string) => void;
-  error: (message: string) => void;
-  info: (message: string) => void;
+  success: (message: string, action?: ToastAction) => void;
+  error: (message: string, action?: ToastAction) => void;
+  info: (message: string, action?: ToastAction) => void;
 }
 
 const ToastContext = createContext<ToastApi>({
@@ -36,20 +44,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const push = useCallback(
-    (tone: Tone, message: string) => {
+    (tone: Tone, message: string, action?: ToastAction) => {
       const id = nextId.current;
       nextId.current += 1;
-      setItems((current) => [...current.slice(-3), { id, tone, message }]);
-      setTimeout(() => dismiss(id), DURATION_MS[tone]);
+      setItems((current) => [...current.slice(-3), { id, tone, message, action }]);
+      // A toast with a link stays long enough to reach it.
+      setTimeout(() => dismiss(id), DURATION_MS[tone] + (action ? 6000 : 0));
     },
     [dismiss],
   );
 
   const api = useMemo<ToastApi>(
     () => ({
-      success: (message) => push('success', message),
-      error: (message) => push('error', message),
-      info: (message) => push('info', message),
+      success: (message, action) => push('success', message, action),
+      error: (message, action) => push('error', message, action),
+      info: (message, action) => push('info', message, action),
     }),
     [push],
   );
@@ -60,7 +69,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="toast-region" aria-live="polite" aria-relevant="additions">
         {items.map((item) => (
           <div key={item.id} className={`toast toast-${item.tone}`} role={item.tone === 'error' ? 'alert' : 'status'}>
-            <span className="toast-message">{item.message}</span>
+            <span className="toast-message">
+              {item.message}
+              {item.action ? (
+                <>
+                  {' '}
+                  <Link to={item.action.to} className="toast-action" data-testid="toast-action" onClick={() => dismiss(item.id)}>
+                    {item.action.label}
+                  </Link>
+                </>
+              ) : null}
+            </span>
             <button type="button" className="toast-close" aria-label="Dismiss notification" onClick={() => dismiss(item.id)}>
               {'×'}
             </button>

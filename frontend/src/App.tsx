@@ -9,6 +9,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { ProjectPage } from './pages/ProjectPage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ValidationPage } from './pages/ValidationPage';
 
 /** Renders child routes only when signed in; otherwise sends the owner to /login and remembers where they were. */
 function RequireAuth() {
@@ -46,6 +47,7 @@ export function App() {
               <Route path="/projects/:id" element={<ProjectPage />} />
               <Route path="/projects/:id/compare" element={<ComparePage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/validation" element={<ValidationPage />} />
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

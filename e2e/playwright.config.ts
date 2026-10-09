@@ -17,7 +17,11 @@
  *
  * The backend gets CLAUDE_FAKE_RESPONSE_FILE (absolute path of
  * backend/tests/fixtures/vision_fake_response.json), so "Read images with Claude" answers with
- * that canned reading and never calls the API.
+ * that canned reading and never calls the API, and CLAUDE_FAKE_CHAT_FILE (absolute path of
+ * backend/tests/fixtures/chat_fake_script.json), so the assistant replays a scripted
+ * conversation (one run_quick_analysis tool call, an answer quoting it, a proposal).
+ * VALIDATION_ON_STARTUP=false keeps the validation suite from running at startup; the
+ * Validation page then shows the committed snapshot (docs/validation/latest.json).
  */
 import { defineConfig, devices } from '@playwright/test';
 import fs from 'node:fs';
@@ -34,6 +38,8 @@ const DATA_DIR = process.env.E2E_DATA_DIR ?? path.join(os.tmpdir(), 'vtol-e2e-da
 const STATIC_DIR = path.join(repoRoot, 'frontend', 'dist');
 /** Canned Claude answer: the backend returns it instead of calling the API (never in production). */
 const CLAUDE_FAKE_RESPONSE_FILE = path.join(repoRoot, 'backend', 'tests', 'fixtures', 'vision_fake_response.json');
+/** Scripted assistant conversation (never in production). */
+const CLAUDE_FAKE_CHAT_FILE = path.join(repoRoot, 'backend', 'tests', 'fixtures', 'chat_fake_script.json');
 
 /** Owner password the backend is started with; the specs sign in with it. */
 export const TEST_PASSWORD = 'test-password';
@@ -116,6 +122,8 @@ export default defineConfig({
       BACKUP_ENABLED: 'false',
       PORT: String(PORT),
       CLAUDE_FAKE_RESPONSE_FILE,
+      CLAUDE_FAKE_CHAT_FILE,
+      VALIDATION_ON_STARTUP: 'false',
     },
   },
 });

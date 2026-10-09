@@ -44,7 +44,9 @@ type Dialog =
   | { kind: 'save' }
   | { kind: 'rename'; version: VersionSummary }
   | { kind: 'restore'; version: VersionSummary }
-  | { kind: 'delete'; version: VersionSummary };
+  | { kind: 'delete'; version: VersionSummary }
+  /** The server refused (409): the version has analyses; offer to delete them too. */
+  | { kind: 'delete-analyses'; version: VersionSummary; message: string };
 
 export function VersionsPanel({
   projectId,
@@ -209,16 +211,24 @@ export function VersionsPanel({
     }
   };
 
-  const remove = async (version: VersionSummary) => {
+  const remove = async (version: VersionSummary, withAnalyses = false) => {
     setBusy(true);
     try {
-      await api<void>(`/api/versions/${version.id}`, { method: 'DELETE' });
+      await api<void>(`/api/versions/${version.id}${withAnalyses ? '?with_analyses=true' : ''}`, { method: 'DELETE' });
       onVersionDeleted(version.id);
       await onReload();
-      toast.success(`Deleted v${version.number}`);
+      toast.success(withAnalyses ? `Deleted v${version.number} and its analyses` : `Deleted v${version.number}`);
       setDialog({ kind: 'none' });
     } catch (error) {
-      fail(error, 'Could not delete the version');
+      if (error instanceof ApiError && error.status === 409 && !withAnalyses) {
+        setDialog({
+          kind: 'delete-analyses',
+          version,
+          message: error.hasDetail ? error.detail : `v${version.number} has analyses, so it cannot be deleted on its own.`,
+        });
+      } else {
+        fail(error, 'Could not delete the version');
+      }
     } finally {
       setBusy(false);
     }
@@ -410,6 +420,23 @@ export function VersionsPanel({
         busy={busy}
         onConfirm={() => {
           if (dialog.kind === 'delete') void remove(dialog.version);
+        }}
+        onCancel={closeDialog}
+      />
+
+      <ConfirmDialog
+        open={dialog.kind === 'delete-analyses'}
+        title={dialog.kind === 'delete-analyses' ? `v${dialog.version.number} has analyses` : 'Delete'}
+        message={
+          dialog.kind === 'delete-analyses'
+            ? `${dialog.message} Deleting it also deletes those analyses permanently; the draft and other versions are not affected.`
+            : ''
+        }
+        confirmLabel="Delete it and its analyses"
+        danger
+        busy={busy}
+        onConfirm={() => {
+          if (dialog.kind === 'delete-analyses') void remove(dialog.version, true);
         }}
         onCancel={closeDialog}
       />

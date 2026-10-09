@@ -8,9 +8,10 @@ import { Component, lazy, Suspense, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useAirfoilCoordinates, useAirfoils } from '../api/airfoils';
 import { groupPaths, metaFor, useSchemas } from '../api/schema';
-import type { Settings } from '../api/types';
+import type { Settings, VersionSummary } from '../api/types';
 import { DesignDrawing } from '../components/DesignDrawing';
 import { buildGeometry, estimate, withDefaults } from '../engine';
+import { AnalysisPanel } from '../panels/AnalysisPanel';
 import { EstimatesPanel } from '../panels/EstimatesPanel';
 import { SchemaField, SchemaLoading, type TabProps } from './InputsTab';
 
@@ -57,9 +58,11 @@ class ViewBoundary extends Component<{ children: ReactNode }, { error: boolean }
 export interface DesignTabProps extends TabProps {
   /** Phase 1 settings document (limits and check thresholds); null while loading. */
   settings: Settings | null;
+  /** Saved versions (for "Analyse" a version); null while loading. */
+  versions: VersionSummary[] | null;
 }
 
-export function DesignTab({ doc, update, fieldErrors, settings }: DesignTabProps) {
+export function DesignTab({ doc, update, fieldErrors, settings, versions }: DesignTabProps) {
   const { status, schemas, error, retry } = useSchemas();
   const airfoils = useAirfoils();
   const params = doc.parameters;
@@ -153,6 +156,8 @@ export function DesignTab({ doc, update, fieldErrors, settings }: DesignTabProps
           )}
         </div>
       </div>
+
+      <AnalysisPanel doc={doc} versions={versions} settings={settings} />
 
       {schemas.notes.defaults ? (
         <p className="small muted" data-testid="defaults-note">

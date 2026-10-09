@@ -15,6 +15,8 @@ import { AppShell, WorkspaceTabs, parseTab } from '../layout/AppShell';
 import { draftBasisLabel, isDraftDirty, saveStatusLabel } from '../lib/draft';
 import { formatMassKg } from '../lib/format';
 import { useDraft } from '../lib/useDraft';
+import { WorkspaceContext, type TryVersionRequest, type WorkspaceApi } from '../lib/workspace';
+import { createVersionFromPatch } from '../api/versions';
 import { AssistantPanel } from '../panels/AssistantPanel';
 import { VersionsPanel } from '../panels/VersionsPanel';
 import { DesignTab } from '../tabs/DesignTab';
@@ -224,6 +226,52 @@ function ProjectWorkspace({ project }: { project: Project }) {
     [draft],
   );
 
+  // Shared with the analysis, scale and assistant panels.
+  const versionCreated = useCallback(
+    async (version: DesignVersion, compareWith: number | null) => {
+      onVersionCreated(version);
+      await reloadVersions();
+      const link =
+        compareWith !== null && compareWith !== version.number
+          ? { label: `Compare with v${compareWith}`, to: `/projects/${project.id}/compare?versions=${Math.min(compareWith, version.number)},${Math.max(compareWith, version.number)}` }
+          : undefined;
+      toast.success(`Saved as v${version.number} “${version.name}”.`, link);
+    },
+    [onVersionCreated, reloadVersions, project.id, toast],
+  );
+  const flushDraft = draft.flush;
+  const tryAsNewVersion = useCallback(
+    async (request: TryVersionRequest) => {
+      try {
+        if (request.base === 'draft') await flushDraft();
+        const version = await createVersionFromPatch(
+          project.id,
+          { name: request.name, notes: request.notes, base: request.base, patch: request.patch },
+          (versions ?? []).map((v) => v.name),
+        );
+        await versionCreated(version, request.compareWith);
+        return version;
+      } catch (caught) {
+        if (!isAuthError(caught)) toast.error(`Could not save the new version: ${errorMessage(caught)}`);
+        return null;
+      }
+    },
+    [flushDraft, project.id, versions, versionCreated, toast],
+  );
+  const workspace = useMemo<WorkspaceApi>(
+    () => ({
+      projectId: project.id,
+      versions,
+      basisNumber,
+      draftStatus: draft.status,
+      draftSavedAt: draft.savedAt,
+      flushDraft,
+      tryAsNewVersion,
+      versionCreated,
+    }),
+    [project.id, versions, basisNumber, draft.status, draft.savedAt, flushDraft, tryAsNewVersion, versionCreated],
+  );
+
   // MTOW banner.
   const mass = draft.doc.mission.target_takeoff_mass_kg;
   let banner: { level: 'warn' | 'error'; title: string; text: string } | null = null;
@@ -248,7 +296,9 @@ function ProjectWorkspace({ project }: { project: Project }) {
   let content;
   switch (tab) {
     case 'design':
-      content = <DesignTab doc={draft.doc} update={draft.update} fieldErrors={draft.fieldErrors} settings={settings} />;
+      content = (
+        <DesignTab doc={draft.doc} update={draft.update} fieldErrors={draft.fieldErrors} settings={settings} versions={versions} />
+      );
       break;
     case 'parts':
       content = <PartsTab />;
@@ -272,6 +322,7 @@ function ProjectWorkspace({ project }: { project: Project }) {
   }
 
   return (
+    <WorkspaceContext.Provider value={workspace}>
     <AppShell
       title={project.name}
       tabs={<WorkspaceTabs active={tab} />}
@@ -291,7 +342,7 @@ function ProjectWorkspace({ project }: { project: Project }) {
             onRestored={onRestored}
             onVersionDeleted={onVersionDeleted}
           />
-          <AssistantPanel />
+          <AssistantPanel projectId={project.id} doc={draft.doc} />
         </>
       }
     >
@@ -324,5 +375,6 @@ function ProjectWorkspace({ project }: { project: Project }) {
 
       {content}
     </AppShell>
+    </WorkspaceContext.Provider>
   );
 }

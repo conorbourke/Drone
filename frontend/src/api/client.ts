@@ -224,3 +224,43 @@ export async function apiUpload<T>(path: string, form: FormData, signal?: AbortS
   }
   return parsed as T;
 }
+
+/**
+ * POST a JSON body and return the raw streaming response (Server-Sent Events). Same headers,
+ * credentials, error parsing and 401 handling as `api`; a non-2xx answer rejects with ApiError
+ * before any of the stream is read.
+ */
+export async function apiStream(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method: 'POST',
+      headers: {
+        Accept: 'text/event-stream',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'fetch',
+      },
+      body: JSON.stringify(body),
+      credentials: 'include',
+      signal,
+      cache: 'no-store',
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new ApiError(0, 'Could not reach the server. Check your connection and try again.', [], false);
+  }
+  if (!response.ok) {
+    let parsed: unknown = null;
+    if ((response.headers.get('content-type') ?? '').includes('application/json')) {
+      try {
+        parsed = await response.json();
+      } catch {
+        parsed = null;
+      }
+    }
+    const error = parseErrorBody(response.status, parsed, response.statusText);
+    if (response.status === 401) unauthorizedHandler?.();
+    throw error;
+  }
+  return response;
+}

@@ -399,7 +399,7 @@ export interface Envelope {
   z: number;
 }
 
-/** Full settings document (schema_version 1). */
+/** Full settings document (schema_version 2). */
 export interface Settings {
   schema_version: number;
   printer: {
@@ -422,6 +422,17 @@ export interface Settings {
     cruise_to_stall_speed_ratio_min: number;
     battery_reserve_fraction: number;
     battery_current_max_fraction_of_rating: number;
+    /** Schema 2: wing spar and boom design load, in g. */
+    manoeuvre_load_factor: number;
+    /** Schema 2: ultimate / limit load. */
+    structural_safety_factor: number;
+    /** Schema 2: available / required thrust through the transition. */
+    transition_thrust_margin_min: number;
+  };
+  /** Schema 2: server analysis options. */
+  analysis: {
+    /** XFOIL transition parameter. */
+    ncrit: number;
   };
   units: {
     system: 'metric';
