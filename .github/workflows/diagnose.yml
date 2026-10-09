@@ -55,3 +55,11 @@ jobs:
           cat /tmp/me.out; echo
           curl -sS -b /tmp/jar -o /tmp/p.out -w 'projects: %{http_code}\n' --max-time 20 "$base/api/projects" || true
           head -c 300 /tmp/p.out; echo
+          for path in /api/system/info /api/validation /api/assistant/status /api/image-readings/status; do
+            printf '%-28s ' "$path"
+            curl -sS -b /tmp/jar -o /tmp/x.out -w '%{http_code}\n' --max-time 20 "$base$path" || true
+            jq -c 'if has("report") then {source, job, summary: (.report.summary // .report.counts // null)} else . end' /tmp/x.out 2>/dev/null | head -c 600 || head -c 300 /tmp/x.out
+            echo
+          done
+          printf '%-28s ' "parts in catalogue"
+          curl -sS -b /tmp/jar --max-time 20 "$base/api/parts" | jq 'length' || true
