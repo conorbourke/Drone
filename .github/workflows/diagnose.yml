@@ -1,0 +1,57 @@
+name: Diagnose the live app
+
+# Read-only health report for the deployed app: machine status, recent logs and live HTTP
+# checks. Changes nothing on the server. Run it from the Actions tab when something looks wrong.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Status, logs and live checks
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP_NAME: ${{ vars.FLY_APP_NAME || 'vtol-drone-designer' }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@1.5
+
+      - name: App and machine status
+        run: |
+          flyctl status --app "$FLY_APP_NAME" || true
+          echo
+          flyctl machines list --app "$FLY_APP_NAME" || true
+          echo
+          flyctl volumes list --app "$FLY_APP_NAME" || true
+          echo
+          flyctl secrets list --app "$FLY_APP_NAME" || true
+
+      - name: Recent app logs
+        run: flyctl logs --app "$FLY_APP_NAME" --no-tail 2>&1 | tail -n 200 || true
+
+      - name: Live HTTP checks
+        env:
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: |
+          base="https://$FLY_APP_NAME.fly.dev"
+          for path in /api/health / /login /assets/; do
+            printf '%-14s ' "$path"
+            curl -sS -o /tmp/body -w '%{http_code} %{content_type}\n' --max-time 20 "$base$path" || echo "request failed"
+            head -c 200 /tmp/body 2>/dev/null; echo
+          done
+          printf '%-14s ' "http redirect"
+          curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}\n' --max-time 20 "http://$FLY_APP_NAME.fly.dev/" || true
+          echo "--- login with the APP_PASSWORD secret ---"
+          jq -n --arg p "$APP_PASSWORD" '{password: $p}' > /tmp/login.json
+          curl -sS -c /tmp/jar -o /tmp/login.out -w 'login: %{http_code}\n' --max-time 20 \
+            -H 'Content-Type: application/json' -H 'X-Requested-With: fetch' \
+            --data @/tmp/login.json "$base/api/auth/login" || true
+          cat /tmp/login.out; echo
+          grep -o 'vtol_session.*' /tmp/jar | cut -c1-20 || echo "no session cookie set"
+          curl -sS -b /tmp/jar -o /tmp/me.out -w 'me: %{http_code}\n' --max-time 20 "$base/api/auth/me" || true
+          cat /tmp/me.out; echo
+          curl -sS -b /tmp/jar -o /tmp/p.out -w 'projects: %{http_code}\n' --max-time 20 "$base/api/projects" || true
+          head -c 300 /tmp/p.out; echo
