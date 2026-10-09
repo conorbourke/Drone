@@ -63,6 +63,11 @@ export interface WingParameters {
   x_le_mm: number;
   /** Vertical offset from the fuselage centreline, in mm (0 = mid-wing, positive = up). */
   z_mm: number;
+  /**
+   * Schema v2: tip incidence relative to the root, in degrees (negative = washout).
+   * Optional in this type so schema v1 documents still type-check; default 0.
+   */
+  twist_deg?: number;
 }
 
 /** Fuselage outer dimensions, in mm. */
@@ -81,6 +86,8 @@ export interface BoomParameters {
   length_mm: number;
   /** Boom front relative to the wing leading edge, in mm (negative = ahead). */
   x_offset_mm: number;
+  /** Schema v2: outer diameter of the carbon boom tube, in mm (default 20). */
+  diameter_mm?: number;
 }
 
 /** Motor positions along each boom, in mm. */
@@ -112,6 +119,10 @@ export interface TailParameters {
   /** Wing quarter chord to tail quarter chord, in mm. */
   arm_mm: number;
   height_mm: number;
+  /** Schema v2: for v_tail / inverted_v, angle of each panel above (or below) horizontal, degrees (default 40). */
+  v_angle_deg?: number;
+  /** Schema v2: tail airfoil identifier (default "naca0009"). */
+  airfoil?: string;
 }
 
 /** Swappable nose bay envelope, in mm (geometry only; payload mass lives in Mission). */
@@ -127,7 +138,43 @@ export interface LandingGearParameters {
   height_mm: number;
 }
 
-/** Design parameters document (schema_version 1): the editable geometry of the aircraft. */
+/** Schema v2: the four lift (and, for tilt layouts, cruise) propellers. */
+export interface PropulsionParameters {
+  prop_diameter_mm: number;
+  prop_pitch_mm: number;
+  prop_blades: number;
+}
+
+/** Schema v2: battery chemistry. */
+export type BatteryChemistry = 'lipo' | 'li-ion';
+
+/** Schema v2: flight battery pack. */
+export interface BatteryParameters {
+  chemistry: BatteryChemistry;
+  /** Cells in series (1-14). */
+  cells_series: number;
+  /** Cells in parallel (1-10). */
+  cells_parallel: number;
+  /** Capacity per parallel group member (one cell or string), in mAh; pack capacity = this x cells_parallel. */
+  capacity_mah: number;
+  /** Pack centre measured from the nose, in mm. */
+  x_mm: number;
+}
+
+/** Schema v2: mass allowances for items not modelled individually until Phase 4. */
+export interface AllowanceParameters {
+  /** Autopilot, GPS, receiver, telemetry radio, power module, in grams. */
+  avionics_g: number;
+  /** Wiring, connectors and fasteners as a fraction of the empty mass. */
+  wiring_fraction: number;
+}
+
+/**
+ * Design parameters document (schema_version 1 or 2): the editable geometry of the aircraft.
+ * The schema v2 blocks and fields (docs/phases/PHASE2.md section 2) are optional in this type
+ * so schema v1 documents still type-check; the server always sends them for v2 and the
+ * engine fills the contract defaults when they are missing.
+ */
 export interface DesignParameters {
   /** Version of this document's shape; the server upgrades older documents on read. */
   schema_version: number;
@@ -141,6 +188,12 @@ export interface DesignParameters {
   tail: TailParameters;
   nose_bay: NoseBayParameters;
   landing_gear: LandingGearParameters;
+  /** Schema v2. */
+  propulsion?: PropulsionParameters;
+  /** Schema v2. */
+  battery?: BatteryParameters;
+  /** Schema v2. */
+  allowances?: AllowanceParameters;
 }
 
 /** The editable working copy of a project: parameters plus mission. */
@@ -155,6 +208,45 @@ export interface Draft extends DraftDocument {
   based_on_version_id: number | null;
   /** ISO 8601 UTC timestamp of the last draft save. */
   updated_at: string;
+}
+
+// ---------- Airfoils (GET /api/airfoils, schema in docs/phases/PHASE2.md section 3) ----------
+
+/** XFOIL polar summary of one airfoil at one Reynolds number. */
+export interface AirfoilPolarSummary {
+  re: number;
+  cl_max: number;
+  alpha_cl_max_deg: number;
+  alpha_zero_lift_deg: number;
+  /** Section lift-curve slope fitted between -2 and 6 degrees, per radian. */
+  cl_alpha_per_rad: number;
+  cd_min: number;
+  cl_at_cd_min: number;
+  cm0: number;
+}
+
+/** Row of GET /api/airfoils (what the Tier 1 engine needs). */
+export interface AirfoilSummary {
+  id: string;
+  name: string;
+  description: string;
+  use: 'wing' | 'tail';
+  /** Maximum thickness, % of chord. */
+  thickness_pct: number;
+  /** Chordwise position of maximum thickness, % of chord. */
+  x_thickness_pct: number;
+  /** Maximum camber, % of chord. */
+  camber_pct: number;
+  /** Chordwise position of maximum camber, % of chord. */
+  x_camber_pct: number;
+  source: string;
+  /** One entry per Reynolds number, ascending. */
+  polar_summary: AirfoilPolarSummary[];
+}
+
+/** GET /api/airfoils/{id}: the summary plus unit-chord coordinates in Selig order. */
+export interface AirfoilDetail extends AirfoilSummary {
+  coordinates: [number, number][];
 }
 
 // ---------- Projects ----------
