@@ -97,7 +97,14 @@ def test_progress_reports(tmp_path: Path) -> None:
 
 
 def test_bounded_memory_on_a_large_log(tmp_path: Path) -> None:
-    """A ~40 MB log (IMU at 400 Hz) parses with a peak RSS far below the 300 MB target."""
+    """A ~40 MB log (IMU at 400 Hz) parses with a peak RSS far below the 300 MB target.
+
+    The peak is the child's own ``VmHWM`` (/proc/self/status), not ``ru_maxrss``: Linux keeps
+    the pre-exec high-water mark in ``signal->maxrss`` across ``execve``, and Python starts
+    the child with vfork, so ``ru_maxrss`` reports the *parent* pytest process (about 850 MB
+    late in a full CI run) rather than the parser. ``VmHWM`` counts resident file-backed pages
+    of the mapped log too (the parser hands them back with ``MADV_DONTNEED``, which works
+    without memory pressure), and the anonymous part is checked on its own."""
     path = tmp_path / "large.bin"
     synthesize_quadplane_log(
         str(path),
@@ -106,11 +113,13 @@ def test_bounded_memory_on_a_large_log(tmp_path: Path) -> None:
     size_mb = path.stat().st_size / 1e6
     assert size_mb > 30
     code = (
-        "import resource, sys, json\n"
+        "import sys, json\n"
         "from app.flightlog import process_log\n"
         "r = process_log(sys.argv[1])\n"
-        "print(json.dumps({'rss_mb': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,"
-        " 'phases': len(r['phases'])}))\n"
+        "st = dict(l.split(':', 1) for l in open('/proc/self/status') if ':' in l)\n"
+        "kb = lambda k: int(st[k].split()[0]) / 1024\n"
+        "print(json.dumps({'rss_mb': kb('VmHWM'), 'anon_mb': kb('RssAnon'),"
+        " 'file_mb': kb('RssFile'), 'phases': len(r['phases'])}))\n"
     )
     out = subprocess.run(
         [sys.executable, "-c", code, str(path)],
@@ -123,6 +132,9 @@ def test_bounded_memory_on_a_large_log(tmp_path: Path) -> None:
     res = json.loads(out.stdout.strip().splitlines()[-1])
     assert res["phases"] == 5
     assert res["rss_mb"] < 300, res
+    assert res["anon_mb"] < 200, res
+    # the mapped log does not stay resident: at most part of it after the parse
+    assert res["file_mb"] < 40 + size_mb * 0.75, res
 
 
 def test_parsed_log_keeps_only_decimated_arrays(synthetic_logs: list[dict[str, Any]]) -> None:

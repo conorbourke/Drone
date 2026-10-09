@@ -95,6 +95,21 @@ def test_every_api_route_requires_session(app: FastAPI) -> None:
         ("GET", "/api/exports/{export_id}/files/{path:path}"),
         ("GET", "/api/exports/{export_id}/zip"),
         ("GET", "/api/exports/{export_id}/pieces/{piece_id}/mesh"),
+        ("GET", "/api/flight-data/guide"),
+        ("POST", "/api/projects/{project_id}/flight-logs"),
+        ("POST", "/api/projects/{project_id}/flight-logs/sample"),
+        ("GET", "/api/projects/{project_id}/flight-logs"),
+        ("GET", "/api/flight-logs/{log_id}"),
+        ("GET", "/api/flight-logs/{log_id}/series"),
+        ("PATCH", "/api/flight-logs/{log_id}"),
+        ("POST", "/api/flight-logs/{log_id}/reprocess"),
+        ("DELETE", "/api/flight-logs/{log_id}"),
+        ("GET", "/api/projects/{project_id}/calibration"),
+        ("GET", "/api/projects/{project_id}/calibration/preview"),
+        ("POST", "/api/projects/{project_id}/calibration"),
+        ("DELETE", "/api/projects/{project_id}/calibration"),
+        ("GET", "/api/projects/{project_id}/built-weights"),
+        ("PUT", "/api/projects/{project_id}/built-weights"),
     }
     assert expected <= checked, expected - checked
     assert len(checked) > 45

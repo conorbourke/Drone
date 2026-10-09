@@ -25,10 +25,12 @@ def test_migration_created_every_table_with_fk_actions(app: FastAPI) -> None:
         "analyses",
         "assistant_threads",
         "assistant_messages",
+        "flight_logs",
+        "calibrations",
+        "built_weights",
         "alembic_version",
     } <= tables
-    for reserved in ("flight_logs", "calibrations", "export_files"):
-        assert reserved not in tables
+    assert "export_files" not in tables  # Phase 5 named it "exports"
 
     def fk_actions(table: str) -> dict[str, str | None]:
         return {
@@ -49,6 +51,12 @@ def test_migration_created_every_table_with_fk_actions(app: FastAPI) -> None:
     assert fk_actions("analyses")["reused_from_id"] == "SET NULL"
     assert fk_actions("assistant_threads")["project_id"] == "CASCADE"
     assert fk_actions("assistant_messages")["thread_id"] == "CASCADE"
+    # Phase 6: measurements never disappear with a version (Phase 1 RESTRICT policy).
+    assert fk_actions("flight_logs")["project_id"] == "CASCADE"
+    assert fk_actions("flight_logs")["version_id"] == "RESTRICT"
+    assert fk_actions("flight_logs")["analysis_id"] == "SET NULL"
+    assert fk_actions("calibrations")["version_id"] == "RESTRICT"
+    assert fk_actions("built_weights")["project_id"] == "CASCADE"
     for table in ("projects", "design_versions", "parts"):
         assert {"id", "created_at", "updated_at"} <= {
             c["name"] for c in inspector.get_columns(table)

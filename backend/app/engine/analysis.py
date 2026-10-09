@@ -292,6 +292,9 @@ def performance_core(
 ) -> dict[str, Any]:
     """Propulsion, battery, transition and mission energy for one set of factors."""
     f = {**NOMINAL, **(f or {})}
+    cal = calibration_values(st.get("calibration"))
+    k_hover = cal.get("hover_power", 1.0)
+    k_drag = cal.get("cruise_drag", 1.0)
     p = st["p"]
     mission = st["mission"]
     v = mission["cruise_speed_mps"]
@@ -299,7 +302,10 @@ def performance_core(
     q = 0.5 * RHO_SL * v * v
     out: dict[str, Any] = {}
     pack = bat.pack_model(p["battery"], f["pack_r"])
-    pack = {**pack, "energy_wh": pack["energy_wh"] * f["energy"]}
+    pack = {
+        **pack,
+        "energy_wh": pack["energy_wh"] * f["energy"] * cal.get("battery_usable_energy", 1.0),
+    }
     lift_prop, lift_motor = prp.with_factors(
         st["lift_prop"], st["lift_motor"], f["ct"], f["cp"], f["motor_loss"]
     )
@@ -316,7 +322,7 @@ def performance_core(
         w = mass * G0
         cdi = st[f"cdi_{case}"] * f["induced"] * f["mass"] ** 2
         cd = st["cd_profile_" + case] * f["profile"] + st["cd_parasite"] * f["parasite"] + cdi
-        drag = q * s_ref * cd
+        drag = q * s_ref * cd * k_drag
         cl = w / (q * s_ref)
         # Hover
         share = clamp(st[f"front_share_{case}"], 0.0, 1.0)
@@ -329,6 +335,8 @@ def performance_core(
                 op = prp.operating_point(lift_prop, lift_motor, thrust_total * sh / 2, 0.0, vbus)
                 hover_ops[name] = op
                 total += 2 * op["battery_power_w"]
+            # Phase 6 calibration: measured / predicted hover power from flight logs.
+            total = avionics + (total - avionics) * k_hover
             lv = bat.loaded_voltage(pack, total)
             vbus = lv["voltage_v"]
         hover_power = total
@@ -368,9 +376,10 @@ def performance_core(
                 pusher_motor,
                 avionics,
             )
-            tr_energy = tr["energy_wh"]
+            # The transition runs mostly on the lift motors: the hover calibration scales it.
+            tr_energy = tr["energy_wh"] * k_hover
             tr_time = tr["duration_s"]
-            tr_power = tr["mean_power_w"]
+            tr_power = tr["mean_power_w"] * k_hover
         else:
             tr_time = v / trn.ACCELERATION
             tr_power = 1.25 * hover_power
@@ -422,11 +431,60 @@ def performance_core(
     return out
 
 
+def calibration_values(calibration: dict[str, Any] | None) -> dict[str, float]:
+    """``{name: value}`` of an applied Phase 6 calibration (``{factors: {name: {value,
+    uncertainty}}, n_logs}``); empty when none is applied. Unknown or non-finite values are
+    ignored."""
+    out: dict[str, float] = {}
+    for name, fac in ((calibration or {}).get("factors") or {}).items():
+        v = fac.get("value") if isinstance(fac, dict) else None
+        if (
+            name in CALIBRATION_FACTORS
+            and isinstance(v, int | float)
+            and math.isfinite(v)
+            and v > 0
+        ):
+            out[name] = float(v)
+    return out
+
+
+#: Calibration factors the analysis applies (Phase 6, ``app.flightlog.calibrate``).
+CALIBRATION_FACTORS = ("hover_power", "cruise_drag", "battery_usable_energy", "structural_mass")
+
+
 def _factor_sets(
-    scale: str, mass_rel: float
+    scale: str, mass_rel: float, calibration: dict[str, Any] | None = None
 ) -> dict[str, tuple[dict[str, float], dict[str, float]]]:
     lo, hi = drg.PROFILE_UNCERTAINTY[scale]
     mr = mass_rel if math.isfinite(mass_rel) else 0.1
+    sets = _base_factor_sets(lo, hi, mr)
+    # Measured factors replace the model's own guesses where they apply: a calibrated cruise
+    # drag carries the flights' uncertainty on the whole drag (profile, parasite and induced
+    # together), a calibrated battery the flights' uncertainty on the usable energy.
+    factors = (calibration or {}).get("factors") or {}
+    unc = {
+        k: float(v["uncertainty"]) / float(v["value"])
+        for k, v in factors.items()
+        if isinstance(v, dict)
+        and isinstance(v.get("uncertainty"), int | float)
+        and isinstance(v.get("value"), int | float)
+        and v["value"] > 0
+        and math.isfinite(v["uncertainty"])
+    }
+    if "cruise_drag" in unc:
+        u = min(unc["cruise_drag"], 0.5)
+        sets["profile"] = ({"profile": 1 - u}, {"profile": 1 + u})
+        sets.pop("parasite", None)
+        sets.pop("induced", None)
+    if "battery_usable_energy" in unc:
+        u = min(unc["battery_usable_energy"], 0.5)
+        sets["energy"] = ({"energy": 1 - u}, {"energy": 1 + u})
+    return sets
+
+
+def _base_factor_sets(
+    lo: float, hi: float, mr: float
+) -> dict[str, tuple[dict[str, float], dict[str, float]]]:
     return {
         "profile": ({"profile": 1 - lo}, {"profile": 1 + hi}),
         "parasite": (
@@ -446,6 +504,46 @@ def _factor_sets(
 # ---------------------------------------------------------------------------
 # The analysis
 # ---------------------------------------------------------------------------
+
+
+CALIBRATION_LABELS = {
+    "hover_power": "hover power",
+    "cruise_drag": "cruise drag",
+    "battery_usable_energy": "battery usable energy",
+    "structural_mass": "structure mass",
+}
+
+
+def calibration_summary(calibration: dict[str, Any]) -> dict[str, Any]:
+    """The ``result["calibration"]`` block: the applied factors and how many flights."""
+    values = calibration_values(calibration)
+    factors = calibration.get("factors") or {}
+    n = int(calibration.get("n_logs") or 0)
+    return {
+        "n_logs": n,
+        "label": f"Calibrated with {n} flight{'s' if n != 1 else ''}"
+        if n
+        else "Calibrated with built weights",
+        "factors": {
+            k: {
+                "value": v,
+                "uncertainty": (factors.get(k) or {}).get("uncertainty"),
+                "label": CALIBRATION_LABELS[k],
+            }
+            for k, v in values.items()
+        },
+    }
+
+
+def calibration_note(summary: dict[str, Any]) -> dict[str, Any]:
+    parts = ", ".join(f"{f['label']} x {f['value']:.3f}" for f in summary["factors"].values())
+    return status(
+        "analysis.calibrated",
+        summary["label"],
+        "info",
+        f"{summary['label']}: the model's predictions are multiplied by the measured factors "
+        f"({parts}). Their uncertainty replaces the model's own where it applies.",
+    )
 
 
 def _invalid(problems: list[dict[str, Any]], mode: str, t0: float) -> dict[str, Any]:
@@ -473,8 +571,15 @@ def run_analysis(
     parts: dict[str, Any] | None = None,
     polar_store: PolarStore | None = None,
     uncertainty: bool = True,
+    calibration: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Analyse one design. Never raises for bad input: returns ``valid: False`` with fail checks.
+
+    ``calibration`` (optional, Phase 6): the factors applied from flight logs and built weights,
+    ``{factors: {name: {value, uncertainty}}, n_logs}`` with names from
+    :data:`CALIBRATION_FACTORS`. Hover (and transition) power, cruise drag, the pack's usable
+    energy and the structure masses are multiplied by them, the matching uncertainty bands are
+    replaced by the measured ones, and the result says "Calibrated with N flights".
 
     ``parts`` (optional, Phase 4): the selected catalogue parts, each a spec dict plus
     ``label`` and ``mass_g`` (see :func:`apply_parts` for every key). A lift motor with
@@ -500,7 +605,16 @@ def run_analysis(
     settings_doc = resolve_settings(settings)
     try:
         st = _prepare(
-            p, mission_doc, settings_doc, mode, cache_dir, polar_store, report, timings, parts
+            p,
+            mission_doc,
+            settings_doc,
+            mode,
+            cache_dir,
+            polar_store,
+            report,
+            timings,
+            parts,
+            calibration_values(calibration).get("structural_mass", 1.0),
         )
     except SolverError as exc:
         return _invalid(
@@ -516,7 +630,11 @@ def run_analysis(
             mode,
             t0,
         )
+    st["calibration"] = calibration if calibration_values(calibration) else None
     result = _assemble(st, settings_meta, uncertainty, report, timings)
+    if st["calibration"]:
+        result["calibration"] = calibration_summary(st["calibration"])
+        result["notes"] = sort_statuses([*result["notes"], calibration_note(result["calibration"])])
     timings["total_s"] = round(time.time() - t0, 3)
     result["timings"] = timings
     report(1.0, "Done")
@@ -533,6 +651,7 @@ def _prepare(
     report: ProgressFn,
     timings: dict[str, float],
     parts: dict[str, Any] | None,
+    structure_factor: float = 1.0,
 ) -> dict[str, Any]:
     t = time.time()
     scale = "final" if mission.get("scale") == "final" else "prototype"
@@ -544,7 +663,7 @@ def _prepare(
     s_ref = w["area_m2"]
     mac_m = w["mac_mm"] / 1000
     report(0.06, "Weights and balance")
-    ms = solve_mass(p, g, mission, settings, parts=mass_parts)
+    ms = solve_mass(p, g, mission, settings, parts=mass_parts, structure_factor=structure_factor)
     t = _tick(timings, "mass_s", t)
 
     # ----- Polars at the operating Reynolds numbers -----
@@ -596,7 +715,15 @@ def _prepare(
         # pass is needed; the strength check below then uses AVL's own span loading.
         spar_sizing = stc.size_spar_tube(g, stc.schrenk_strips(g), weight_max, 1.0, n_man, sf)
         tube = {"outer_mm": spar_sizing["outer_mm"], "wall_mm": spar_sizing["wall_mm"]}
-        ms = solve_mass(p, g, mission, settings, spar_tube=tube, parts=mass_parts)
+        ms = solve_mass(
+            p,
+            g,
+            mission,
+            settings,
+            spar_tube=tube,
+            parts=mass_parts,
+            structure_factor=structure_factor,
+        )
     avl = _avl_cases(g, ms, mission, s_ref, claf_w, claf_t)
     t = _tick(timings, "avl_s", t)
     cr_max, cr_min, hi = avl["cases"]
@@ -973,7 +1100,7 @@ def _assemble(
     report(0.80, "Performance and mission")
     nominal = performance_core(st)
     t = _tick(timings, "performance_s", t)
-    sets = _factor_sets(scale, ms["mass_rel"]) if uncertainty else {}
+    sets = _factor_sets(scale, ms["mass_rel"], st.get("calibration")) if uncertainty else {}
     perturbed: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
     for i, (name, (flo, fhi)) in enumerate(sets.items()):
         report(0.82 + 0.08 * i / max(1, len(sets)), "Uncertainty ranges")

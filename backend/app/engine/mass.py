@@ -198,6 +198,7 @@ def _build(
     cg_guess: float,
     spar_tube: dict[str, float] | None,
     parts: dict[str, Any] | None = None,
+    structure_factor: float = 1.0,
 ) -> dict[str, Any]:
     scale = "final" if mission.get("scale") == "final" else "prototype"
     dens = AREAL_DENSITY[scale]
@@ -216,6 +217,12 @@ def _build(
         return f"Selected catalogue part {entry['label']}: {what} (manufacturer figure)."
 
     def add(**c: Any) -> None:
+        if c["group"] == "structure" and structure_factor != 1.0:
+            # Phase 6: the owner's built weights calibrate the structure densities.
+            c["mass_g"] *= structure_factor
+            c["source"] = (
+                f"{c.get('source', '')} Calibrated with built weights (x {structure_factor:.3f})."
+            ).strip()
         if math.isfinite(c["mass_g"]) and c["mass_g"] > 0:
             comps.append(c)
 
@@ -649,6 +656,7 @@ def solve_mass(
     spar_tube: dict[str, float] | None = None,
     start_kg: float | None = None,
     parts: dict[str, Any] | None = None,
+    structure_factor: float = 1.0,
 ) -> dict[str, Any]:
     """Iterate the build-up to a fixed point at the maximum payload (as Tier 1).
 
@@ -656,11 +664,14 @@ def solve_mass(
     ``lift_motor``, ``lift_prop``, ``esc`` (each), ``cruise_motor``, ``pusher_prop``,
     ``tilt_servo`` (each), ``avionics`` (total, plus ``detail``), ``battery`` (pack), and the
     tubes ``spar_tube`` / ``boom_tube`` with ``outer_mm``, ``wall_mm`` and ``mass_per_m_g``.
+
+    ``structure_factor`` (Phase 6): the applied structural-mass calibration from built weights;
+    every structure component is multiplied by it.
     """
     target = mission.get("target_takeoff_mass_kg") or 2.5
     m = start_kg if start_kg and start_kg > 0 else (target if target > 0 else 2.5)
     cg = (g["front_rotor_x_mm"] + g["rear_rotor_x_mm"]) / 2
-    build = _build(p, g, mission, settings, m, cg, spar_tube, parts)
+    build = _build(p, g, mission, settings, m, cg, spar_tube, parts, structure_factor)
     converged = False
     iterations = 0
     for i in range(MASS_MAX_ITERATIONS):
@@ -672,7 +683,7 @@ def solve_mass(
         m, cg = m_new, c["x"]
         if not math.isfinite(m) or m > 1e4:
             break
-        build = _build(p, g, mission, settings, m, cg, spar_tube, parts)
+        build = _build(p, g, mission, settings, m, cg, spar_tube, parts, structure_factor)
         if d_g < MASS_TOLERANCE_G and d_cg < 0.05:
             converged = True
             break

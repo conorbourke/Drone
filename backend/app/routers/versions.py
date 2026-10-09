@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.db import utcnow
 from app.deps import AppSettings, CurrentUser, DbSession, current_user
 from app.exports import delete_exports, remove_export_files
-from app.models import Analysis, DesignVersion, Project
+from app.models import Analysis, Calibration, DesignVersion, FlightLog, Project
 from app.parts_service import copy_selection
 from app.patching import PatchError, apply_patch
 from app.routers.common import (
@@ -310,6 +310,28 @@ def delete_version(
     ``with_analyses=true`` a version that has analyses answers 409 with a plain message and
     ``analyses`` (the count); with it, the analyses are deleted first, then the version."""
     version = owned_version(db, user, version_id)
+    # Phase 6: measurements are never deleted with a version (ON DELETE RESTRICT).
+    flight_logs = db.scalar(
+        select(func.count()).select_from(FlightLog).where(FlightLog.version_id == version.id)
+    )
+    calibrated = db.scalar(
+        select(func.count()).select_from(Calibration).where(Calibration.version_id == version.id)
+    )
+    if flight_logs or calibrated:
+        what = (
+            f"{flight_logs} flight log{'s' if flight_logs != 1 else ''}"
+            if flight_logs
+            else "an applied calibration"
+        )
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "detail": f"Version {version.number} has {what} recorded against it, so it "
+                "cannot be deleted. Delete the flight logs (or undo the calibration) on the "
+                "Flight data tab first, or keep the version.",
+                "flight_logs": flight_logs,
+            },
+        )
     count = db.scalar(
         select(func.count()).select_from(Analysis).where(Analysis.version_id == version.id)
     )

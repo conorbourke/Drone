@@ -23,6 +23,7 @@ from app import parts_service
 from app.db import utcnow
 from app.deps import CurrentUser, DbSession, current_user
 from app.engine.analysis import ENGINE_VERSION
+from app.flight_data import analysis_calibration
 from app.jobs import JOB_VERSION, AnalysisWorker, canonical_json
 from app.models import Analysis, DesignVersion, Project, User
 from app.routers.common import current_mission, current_parameters, not_found, owned_project
@@ -162,6 +163,8 @@ def inputs_hash(inputs: dict[str, Any]) -> str:
         "target_takeoff_mass_kg": inputs.get("target_takeoff_mass_kg"),
         "parts": inputs.get("parts"),
     }
+    if inputs.get("calibration"):  # Phase 6; absent keeps earlier hashes (and reuse) valid
+        hashed["calibration"] = inputs["calibration"]
     return hashlib.sha256(canonical_json(hashed).encode("ascii")).hexdigest()
 
 
@@ -212,6 +215,11 @@ def enqueue(
         if parts:
             inputs["parts"] = parts
             inputs["parts_selection"] = summary
+    if kind == "full":
+        # Phase 6: the project's applied calibration factors (flight logs, built weights).
+        calibration = analysis_calibration(db, project.id)
+        if calibration:
+            inputs["calibration"] = calibration
     digest = inputs_hash(inputs)
     version_id = version.id if version else None
     version_number = version.number if version else None

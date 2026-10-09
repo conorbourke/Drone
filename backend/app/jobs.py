@@ -19,6 +19,9 @@ daemon thread drains a priority queue:
   files" row of the ``exports`` table. The CAD kernel runs in a child process
   (:func:`app.exports.run_export_job`) so OpenCascade's memory goes back to the OS when it
   ends; progress, the time limit and the memory guard are handled there.
+* ``flightlog`` (priority 1, Phase 6): read one uploaded ArduPilot log and compare it with the
+  design (:func:`app.flight_data.run_flight_log_job`); a few seconds each, so they go ahead
+  of exports and supplier refreshes but after analyses.
 
 Image readings keep their own single-worker executor (``app.routers.readings``), so a long
 analysis never holds up a reading for more than the shared CPU does.
@@ -202,6 +205,7 @@ def _run_full(inputs: dict[str, Any], cache_dir: str, prog: _Progress) -> dict[s
         progress=prog.window(0.02, 0.55),
         settings_meta=meta,
         parts=inputs.get("parts"),
+        calibration=inputs.get("calibration"),
     )
     if prog.stop.is_set():  # the solver may have been stopped under the analysis
         raise JobCancelled()
@@ -478,6 +482,11 @@ class AnalysisWorker:
             raise RuntimeError("worker stopped")
         self._queue.put((2, next(self._seq), "export", export_id))
 
+    def submit_flight_log(self, log_id: int) -> None:
+        if self._stop.is_set():
+            raise RuntimeError("worker stopped")
+        self._queue.put((1, next(self._seq), "flightlog", log_id))
+
     def cancel_export(self, export_id: int) -> None:
         """Stop the export if it is the running job (its row is being deleted). A queued one
         is skipped when its turn comes, because the row is gone."""
@@ -516,6 +525,10 @@ class AnalysisWorker:
                     run_export_job(
                         self.session_factory, self.settings, ident, self._stop, self._cancel
                     )
+                elif kind == "flightlog":
+                    from app.flight_data import run_flight_log_job
+
+                    run_flight_log_job(self.session_factory, self.settings, ident, self._stop)
             except BaseException:  # never let the worker thread die
                 log.exception("Job %s %s crashed the worker loop", kind, ident)
             finally:

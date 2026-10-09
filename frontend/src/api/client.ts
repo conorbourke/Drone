@@ -61,6 +61,11 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): voi
   unauthorizedHandler = handler;
 }
 
+/** Tell the auth layer the session has expired (for requests made outside `api`, e.g. XHR uploads). */
+export function notifyUnauthorized(): void {
+  unauthorizedHandler?.();
+}
+
 /** Strip Pydantic's "Value error, " prefix so messages read naturally. */
 function cleanMessage(msg: string): string {
   return msg.replace(/^Value error,\s*/i, '').replace(/^Assertion failed,\s*/i, '');

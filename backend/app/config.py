@@ -210,6 +210,11 @@ class Settings(BaseSettings):
         return self.files_dir / "exports"
 
     @property
+    def flight_logs_dir(self) -> Path:
+        """Phase 6 flight logs: ``{APP_DATA_DIR}/files/logs/{storage_name}``."""
+        return self.files_dir / "logs"
+
+    @property
     def fake_export_generator(self) -> str | None:
         """The export generator test seam, only outside production."""
         if self.is_production:

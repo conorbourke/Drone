@@ -27,6 +27,7 @@ from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory, sqlite_path
 from app.deps import current_user
 from app.exports import recover_exports
+from app.flight_data import MAX_LOG_BYTES, recover_flight_logs
 from app.jobs import (
     AnalysisWorker,
     recover_analyses,
@@ -40,6 +41,7 @@ from app.routers import (
     assistant,
     auth,
     exports,
+    flight_data,
     images,
     parts,
     parts_list,
@@ -56,11 +58,13 @@ from app.security import SESSION_COOKIE, AuthState
 log = logging.getLogger("app")
 
 STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-# The largest legitimate /api body is a settings or draft document (a few kB). The image upload
-# route is the one exception: a 15 MB file plus the multipart envelope.
+# The largest legitimate /api body is a settings or draft document (a few kB). The upload routes
+# are the exceptions: an image (15 MB file plus the multipart envelope) and a flight log (the
+# raw file, at most 200 MB, streamed to disk by the route).
 MAX_API_BODY_BYTES = 1_000_000
 MAX_UPLOAD_BODY_BYTES = 16 * 1024 * 1024
 UPLOAD_ROUTE = re.compile(r"^/api/projects/\d+/images$")
+FLIGHT_LOG_ROUTE = re.compile(r"^/api/projects/\d+/flight-logs$")
 STATIC_ROOT_FILES: dict[str, str] = {
     "favicon.svg": "image/svg+xml",
     "manifest.webmanifest": "application/manifest+json",
@@ -123,21 +127,28 @@ class ApiBodyLimitMiddleware:
         app: ASGIApp,
         limit: int = MAX_API_BODY_BYTES,
         upload_limit: int = MAX_UPLOAD_BODY_BYTES,
+        flight_log_limit: int = MAX_LOG_BYTES,
     ) -> None:
         self.app = app
         self.limit = limit
         self.upload_limit = upload_limit
+        self.flight_log_limit = flight_log_limit
 
     def _limit_for(self, scope: Scope, headers: dict[bytes, bytes]) -> tuple[int, str]:
-        """The image upload route (POST only) gets its own larger limit, and only for a
+        """The upload routes (POST only) get their own larger limits, and only for a
         signed-in owner; nothing else does. Anonymous clients get the normal limit there
-        too, so they cannot make the server receive 15 MB bodies before the 401."""
-        if (
-            scope.get("method", "GET").upper() == "POST"
-            and UPLOAD_ROUTE.match(scope.get("path", ""))
-            and _has_valid_session(scope, headers)
-        ):
-            return self.upload_limit, f"{self.upload_limit // (1024 * 1024)} MB"
+        too, so they cannot make the server receive large bodies before the 401."""
+        if scope.get("method", "GET").upper() == "POST":
+            path = scope.get("path", "")
+            upload = (
+                self.upload_limit
+                if UPLOAD_ROUTE.match(path)
+                else self.flight_log_limit
+                if FLIGHT_LOG_ROUTE.match(path)
+                else None
+            )
+            if upload is not None and _has_valid_session(scope, headers):
+                return upload, f"{upload // (1024 * 1024)} MB"
         return self.limit, f"{self.limit // 1000} kB"
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -264,6 +275,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         log.warning("Marked %d interrupted export(s) as failed", failed_exports)
     for export_id in queued_exports:
         worker.submit_export(export_id)
+    # Phase 6 flight logs: read and compared on the same worker (app.flight_data).
+    failed_logs, queued_logs = recover_flight_logs(app.state.session_factory)
+    if failed_logs:
+        log.warning("Marked %d interrupted flight log(s) as failed", failed_logs)
+    for log_id in queued_logs:
+        worker.submit_flight_log(log_id)
     if settings.validation_on_startup and not validation_report_path(settings).is_file():
         log.info("No validation report yet: running the validation suite in the background")
         worker.submit_validation("startup")
@@ -367,6 +384,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(validation.router)
     app.include_router(assistant.router)
     app.include_router(exports.router)
+    app.include_router(flight_data.router)
 
     @app.api_route(
         "/api/{path:path}",

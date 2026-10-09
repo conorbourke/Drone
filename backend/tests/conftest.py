@@ -80,6 +80,9 @@ def _clean_tables(app: FastAPI, settings: Settings) -> Iterator[None]:
     shutil.rmtree(settings.files_dir, ignore_errors=True)
     with app.state.session_factory() as db:
         for table in (
+            "calibrations",
+            "flight_logs",
+            "built_weights",
             "exports",
             "part_selections",
             "assistant_messages",
