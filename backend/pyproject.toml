@@ -18,6 +18,9 @@ dependencies = [
     "python-multipart>=0.0.20",
     # XFOIL (Fortran) wrapped for Python; needs gfortran and cmake at install time.
     "xfoil @ git+https://github.com/DARcorporation/xfoil-python@0a8c2fce02ba73b7f89f72306e43d78291d1e024",
+    "optvl>=2.5.0",
+    "numpy>=2.5.3",
+    "scipy>=1.18.1",
 ]
 
 [dependency-groups]
