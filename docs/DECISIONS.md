@@ -29,7 +29,7 @@ Roughly $7–8 (≈ €7) a month always on. Phase 3 (AVL/XFOIL) and Phase 5 (Ca
 
 Sources: [Fly.io 2026 pricing update](https://fly.io/pricing-update/), [Fly.io resource pricing](https://fly.io/docs/about/pricing/).
 
-## 2. Rear-tilt layout — enabled as a layout choice, flagged "less common" (needs owner confirmation in Phase 2)
+## 2. Rear-tilt layout — kept as a full layout option, labelled "less common in ArduPilot than front tilt" (owner instruction, 9 Oct 2026: build all phases without stopping to ask; this was the recommended default)
 
 ArduPilot's QuadPlane tiltrotor support uses `Q_TILT_MASK`, a bitmask that says which motors tilt; any motor can be included, so a quad with only the rear pair tilting is configurable. The official guide lists front-pair tilt and all-four tilt as the common setups, and forum threads show people flying rear-tilt quads but also hitting setup pitfalls (tilt type, servo assignment). The data model therefore keeps `rear_tilt` as a first-class layout. Before Phase 2 enables it as a full option, Claude Code should confirm the exact parameter set with ArduPilot's documentation and ideally a SITL (software-in-the-loop) run, and the UI should carry a note that rear tilt is less common in the ArduPilot community than front tilt.
 
