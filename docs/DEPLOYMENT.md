@@ -23,7 +23,7 @@ Everything runs on one small Fly.io machine. The owner never installs anything: 
    - `ANTHROPIC_API_KEY` (optional until Phase 3): your Claude API key.
 4. **Optional variables** (same page, *Variables* tab): `FLY_APP_NAME` if you want a different app name. The name becomes the address `https://<name>.fly.dev` and must be unique across Fly.io; the default is `vtol-drone-designer`. `FLY_ORG` if your token belongs to an organisation other than *personal*.
 5. **Run the deploy.** Open the *Actions* tab, choose *Deploy to Fly.io*, press *Run workflow*, keep the suggested branch, and press the green button. The first run takes about 5 to 8 minutes: it creates the app and its volume, stores the secrets, builds the container on GitHub's servers and starts it.
-6. **Open the app.** The workflow's summary shows the address, normally `https://vtol-drone-designer.fly.dev`. Log in with `APP_PASSWORD`.
+6. **Open the app.** The workflow's summary shows the address, for this project `https://conor-vtol-designer.fly.dev`. Log in with `APP_PASSWORD`.
 
 ## Every later deploy
 
