@@ -13,7 +13,8 @@ and the propulsion, battery and allowances blocks.
 
 Settings: 1 -> 2 (Phase 3) adds ``checks.manoeuvre_load_factor`` (3.0),
 ``checks.structural_safety_factor`` (1.5), ``checks.transition_thrust_margin_min`` (1.3) and
-``analysis.ncrit`` (9). Stored settings rows hold only the owner's overrides; the settings router
+``analysis.ncrit`` (9); 2 -> 3 (Phase 4) adds ``budget.prototype_eur`` (5000). Stored
+settings rows hold only the owner's overrides; the settings router
 diffs the upgraded document against the live defaults again, so a value the step added is not
 mistaken for an override.
 """
@@ -81,9 +82,15 @@ def _settings_1_to_2(doc: dict[str, Any]) -> dict[str, Any]:
     return doc
 
 
+def _settings_2_to_3(doc: dict[str, Any]) -> dict[str, Any]:
+    """Phase 4: the prototype parts budget."""
+    _setdefaults(doc, "budget", {"prototype_eur": 5000.0})
+    return doc
+
+
 _PARAMETER_STEPS: dict[int, Upgrader] = {1: _parameters_1_to_2}
 _MISSION_STEPS: dict[int, Upgrader] = {}
-_SETTINGS_STEPS: dict[int, Upgrader] = {1: _settings_1_to_2}
+_SETTINGS_STEPS: dict[int, Upgrader] = {1: _settings_1_to_2, 2: _settings_2_to_3}
 
 
 def _upgrade(

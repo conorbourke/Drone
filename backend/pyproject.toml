@@ -25,6 +25,7 @@ dependencies = [
     "ezdxf>=1.4",
     "reportlab>=4.2",
     "trimesh>=4.5",
+    "pymavlink>=2.4.41",
 ]
 
 [dependency-groups]

@@ -71,9 +71,21 @@ def pack_model(battery: dict[str, Any], resistance_factor: float = 1.0) -> dict[
     v_nom = s * CELL_NOMINAL_V[chem]
     energy = v_nom * cap_ah
     mass_kg = energy / PACK_SPECIFIC_ENERGY_WH_PER_KG[chem]
+    c_cont = C_RATING[chem]["continuous"]
+    c_burst = C_RATING[chem]["burst"]
+    # Phase 4: a catalogue pack (or a custom pack built from catalogue cells) brings its own
+    # mass and discharge ratings; the electrical model above stays the chemistry model.
+    if battery.get("mass_g"):
+        mass_kg = float(battery["mass_g"]) / 1000
+    if battery.get("discharge_c_continuous"):
+        c_cont = float(battery["discharge_c_continuous"])
+        c_burst = float(battery.get("discharge_c_burst") or c_cont)
+    label = f"{s}S{par}P {CHEMISTRY_LABEL[chem]} {battery['capacity_mah']:g} mAh per group"
+    if battery.get("part_label"):
+        label = f"{battery['part_label']} ({label})"
     return {
         "chemistry": chem,
-        "label": f"{s}S{par}P {CHEMISTRY_LABEL[chem]} {battery['capacity_mah']:g} mAh per group",
+        "label": label,
         "cells_series": s,
         "cells_parallel": par,
         "capacity_ah": cap_ah,
@@ -84,10 +96,10 @@ def pack_model(battery: dict[str, Any], resistance_factor: float = 1.0) -> dict[
         "r_pack_ohm": r_pack,
         "energy_wh": energy,
         "mass_kg": mass_kg,
-        "i_continuous_a": C_RATING[chem]["continuous"] * cap_ah,
-        "i_burst_a": C_RATING[chem]["burst"] * cap_ah,
-        "c_continuous": C_RATING[chem]["continuous"],
-        "c_burst": C_RATING[chem]["burst"],
+        "i_continuous_a": c_cont * cap_ah,
+        "i_burst_a": c_burst * cap_ah,
+        "c_continuous": c_cont,
+        "c_burst": c_burst,
     }
 
 

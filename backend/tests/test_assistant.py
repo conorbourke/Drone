@@ -275,7 +275,7 @@ def test_tools_are_owner_and_project_scoped(
     latest = json.loads(ctx.execute("get_latest_analysis", {"section": "summary"}).content)
     assert latest["available"] is False
     parts = json.loads(ctx.execute("get_parts_list", {}).content)
-    assert parts["parts"] == [] and "Phase 4" in parts["note"]
+    assert parts["parts"] == [] and "catalogue is empty" in parts["note"]
     flights = json.loads(ctx.execute("get_flight_comparisons", {}).content)
     assert flights["flights"] == [] and "Phase 6" in flights["note"]
     tier1 = json.loads(ctx.execute("get_tier1_estimates", {}).content)

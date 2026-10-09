@@ -139,8 +139,10 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "get_parts_list",
-        "description": "The parts selected or recommended for this design (motors, "
-        "propellers, battery, ...). Call it before talking about specific parts.",
+        "description": "The recommended parts list of the current draft: per role the "
+        "selected part (owner-locked or engine-picked), quantity, mass, price and why it was "
+        "chosen, plus totals against the prototype budget and upgrades worth paying for. Call "
+        "it before talking about specific parts or costs.",
         "strict": True,
         "input_schema": _EMPTY,
     },
@@ -455,12 +457,32 @@ class ToolContext:
         }, None
 
     def _tool_get_parts_list(self, args: dict[str, Any]) -> tuple[Any, None]:
-        return {
-            "parts": [],
-            "note": "Part selection arrives in Phase 4. Until then the engine sizes generic "
-            "motors, propellers and a battery from the design and reports them as assumed; "
-            "do not name specific products.",
-        }, None
+        from app import parts_service
+
+        with self.session_factory() as db:
+            project = self._project(db)
+            if not parts_service.load_catalogue(db):
+                return {
+                    "parts": [],
+                    "note": "The parts catalogue is empty, so no parts are selected; the "
+                    "engine uses generic motors, propellers and a battery. Do not name "
+                    "specific products.",
+                }, None
+            settings_doc, _meta = effective_settings(db, self.owner_id)
+            try:
+                result = parts_service.compute(
+                    db,
+                    self.settings,
+                    self.owner_id,
+                    project,
+                    None,
+                    current_parameters(project.draft_parameters),
+                    current_mission(project.draft_mission),
+                    settings_doc,
+                )
+            except parts_service.PartsListError as exc:
+                raise ToolFailure(str(exc)) from None
+        return parts_service.assistant_summary(result), None
 
     def _tool_get_versions(self, args: dict[str, Any]) -> tuple[Any, None]:
         with self.session_factory() as db:

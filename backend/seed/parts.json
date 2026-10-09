@@ -1,0 +1,2374 @@
+[
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "MN3510 KV360 (Navigator)",
+    "mass_g": 119,
+    "price_eur_estimate": 93.48,
+    "source": "https://store.tmotor.com/product/mn3510-motor-navigator-type.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass incl. cable (97 g without). max_current_a/max_power_w are T-Motor's 180 s ratings. Cell range: the spec block says 3-4S but T-Motor publishes 6S test data and resellers list 3-6S; treat 6S as the upper limit. Store page mixes several KV blocks - re-check against the datasheet. Mount: T-Motor store says standard 25x25 mm holes. Light for 2.5 kg on 4 motors (1.9 kg max thrust at 15in/6S).",
+    "spec": {
+      "kv_rpm_per_v": 360,
+      "resistance_ohm": 0.188,
+      "no_load_current_a": 0.5,
+      "max_current_a": 22,
+      "max_power_w": 495,
+      "lipo_cells_min": 3,
+      "lipo_cells_max": 6,
+      "stator_size": "3510",
+      "shaft_mm": 4,
+      "mount_pattern": "25x25 M3 (per T-Motor store text)",
+      "thrust_data": [
+        {
+          "prop": "13x4.4",
+          "voltage_v": 22.2,
+          "throttle_pct": 50,
+          "thrust_g": 460,
+          "current_a": 1.8,
+          "power_w": 39.96,
+          "rpm": 4200
+        },
+        {
+          "prop": "13x4.4",
+          "voltage_v": 22.2,
+          "throttle_pct": 75,
+          "thrust_g": 900,
+          "current_a": 4.8,
+          "power_w": 106.56,
+          "rpm": 5900
+        },
+        {
+          "prop": "13x4.4",
+          "voltage_v": 22.2,
+          "throttle_pct": 100,
+          "thrust_g": 1300,
+          "current_a": 7.5,
+          "power_w": 166.5,
+          "rpm": 6900
+        },
+        {
+          "prop": "14x4.8",
+          "voltage_v": 22.2,
+          "throttle_pct": 50,
+          "thrust_g": 660,
+          "current_a": 2.5,
+          "power_w": 55.5,
+          "rpm": 4000
+        },
+        {
+          "prop": "14x4.8",
+          "voltage_v": 22.2,
+          "throttle_pct": 65,
+          "thrust_g": 1000,
+          "current_a": 4.7,
+          "power_w": 104.34,
+          "rpm": 4900
+        },
+        {
+          "prop": "14x4.8",
+          "voltage_v": 22.2,
+          "throttle_pct": 75,
+          "thrust_g": 1280,
+          "current_a": 6.8,
+          "power_w": 150.96,
+          "rpm": 5500
+        },
+        {
+          "prop": "14x4.8",
+          "voltage_v": 22.2,
+          "throttle_pct": 85,
+          "thrust_g": 1500,
+          "current_a": 8.8,
+          "power_w": 195.36,
+          "rpm": 6000
+        },
+        {
+          "prop": "14x4.8",
+          "voltage_v": 22.2,
+          "throttle_pct": 100,
+          "thrust_g": 1700,
+          "current_a": 10.6,
+          "power_w": 235.32,
+          "rpm": 6500
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 14.8,
+          "throttle_pct": 50,
+          "thrust_g": 340,
+          "current_a": 1.5,
+          "power_w": 22.2,
+          "rpm": 2600
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 14.8,
+          "throttle_pct": 100,
+          "thrust_g": 1000,
+          "current_a": 6.8,
+          "power_w": 100.64,
+          "rpm": 4400
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 50,
+          "thrust_g": 780,
+          "current_a": 3.0,
+          "power_w": 66.6,
+          "rpm": 3800
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 65,
+          "thrust_g": 1180,
+          "current_a": 5.6,
+          "power_w": 124.32,
+          "rpm": 4500
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 75,
+          "thrust_g": 1460,
+          "current_a": 7.7,
+          "power_w": 170.94,
+          "rpm": 5300
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 85,
+          "thrust_g": 1700,
+          "current_a": 10.6,
+          "power_w": 235.32,
+          "rpm": 5720
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 100,
+          "thrust_g": 1900,
+          "current_a": 12.5,
+          "power_w": 277.5,
+          "rpm": 6040
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/product/t-motor-mn3510-kv360/",
+        "price_eur": 93.48,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "MN4012 KV400 (Navigator)",
+    "mass_g": 155,
+    "price_eur_estimate": null,
+    "source": "https://store.tmotor.com/product/mn4012-kv400-motor-navigator-type.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass incl. cables (134 g without). 25 A / 750 W are 180 s ratings. Store page mixes KV340/KV400 blocks; check. 3DXR page price shown in USD ($107) and KV not confirmed on that page, so price_eur left null. 65/75/85% rows exist on the T-Motor page but were not captured.",
+    "spec": {
+      "kv_rpm_per_v": 400,
+      "resistance_ohm": 0.075,
+      "no_load_current_a": 1.0,
+      "max_current_a": 25,
+      "max_power_w": 750,
+      "lipo_cells_min": 4,
+      "lipo_cells_max": 8,
+      "stator_size": "4012",
+      "shaft_mm": 4,
+      "mount_pattern": "not published in sources found - check T-Motor 2D drawing",
+      "thrust_data": [
+        {
+          "prop": "13x4.4",
+          "voltage_v": 22.2,
+          "throttle_pct": 50,
+          "thrust_g": 740,
+          "current_a": 3.7,
+          "power_w": 82.14,
+          "rpm": 4900
+        },
+        {
+          "prop": "13x4.4",
+          "voltage_v": 22.2,
+          "throttle_pct": 100,
+          "thrust_g": 1450,
+          "current_a": 9.4,
+          "power_w": 208.68,
+          "rpm": 7150
+        },
+        {
+          "prop": "14x4.8",
+          "voltage_v": 22.2,
+          "throttle_pct": 50,
+          "thrust_g": 870,
+          "current_a": 4.2,
+          "power_w": 93.24,
+          "rpm": 4500
+        },
+        {
+          "prop": "14x4.8",
+          "voltage_v": 22.2,
+          "throttle_pct": 100,
+          "thrust_g": 1960,
+          "current_a": 13.1,
+          "power_w": 290.82,
+          "rpm": 6700
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 50,
+          "thrust_g": 1010,
+          "current_a": 4.8,
+          "power_w": 106.56,
+          "rpm": 4000
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 100,
+          "thrust_g": 2370,
+          "current_a": 16.2,
+          "power_w": 359.64,
+          "rpm": 6300
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-motors-c35/t-motor-mn4012-p4138",
+        "price_eur": null,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "MN4014 KV400 (Navigator)",
+    "mass_g": 171,
+    "price_eur_estimate": 113.37,
+    "source": "https://store.tmotor.com/product/mn4014-kv400-motor-navigator-type.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Report MN.00025. Mass incl. cables (150 g without). 30 A / 900 W are 180 s ratings. No-load current measured at 10 V. Mount pattern unconfirmed: Flying Tech lists '25 mm M3' (bolt circle?), other MN motors are 25x25 square. 3DXR page covers KV330/KV400 variants. Good match for 2.5-3 kg on 15in props at 6S (2.6 kg max thrust per motor).",
+    "spec": {
+      "kv_rpm_per_v": 400,
+      "resistance_ohm": 0.067,
+      "no_load_current_a": 1.3,
+      "max_current_a": 30,
+      "max_power_w": 900,
+      "lipo_cells_min": 4,
+      "lipo_cells_max": 8,
+      "stator_size": "4014",
+      "shaft_mm": 4,
+      "mount_pattern": "25 mm M3 per Flying Tech (unconfirmed)",
+      "thrust_data": [
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 50,
+          "thrust_g": 1250,
+          "current_a": 5.7,
+          "power_w": 126.54,
+          "rpm": 4500
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 65,
+          "thrust_g": 1630,
+          "current_a": 9.1,
+          "power_w": 202.02,
+          "rpm": 5200
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 75,
+          "thrust_g": 1950,
+          "current_a": 12.0,
+          "power_w": 266.4,
+          "rpm": 5800
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 85,
+          "thrust_g": 2370,
+          "current_a": 15.8,
+          "power_w": 350.76,
+          "rpm": 6400
+        },
+        {
+          "prop": "15x5",
+          "voltage_v": 22.2,
+          "throttle_pct": 100,
+          "thrust_g": 2620,
+          "current_a": 18.7,
+          "power_w": 415.14,
+          "rpm": 6700
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-motors-c35/t-motor-mn4014-p3510",
+        "price_eur": 113.37,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "Antigravity MN5008 KV340",
+    "mass_g": 135,
+    "price_eur_estimate": 105.29,
+    "source": "https://store.tmotor.com/product/mn5008-kv340-motor-antigravity-type.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass incl. cable. 35 A / 760 W are 180 s ratings; no-load current at 22 V. Recommended props 17-18in (larger than the 13-16in prototype range). Some resellers list 50 mOhm or 270 mOhm (KV170 block) - 55 mOhm matches the KV340 block. 3DXR 'Antigravity 5008' page lists several KVs.",
+    "spec": {
+      "kv_rpm_per_v": 340,
+      "resistance_ohm": 0.055,
+      "no_load_current_a": 0.9,
+      "max_current_a": 35,
+      "max_power_w": 760,
+      "lipo_cells_min": 6,
+      "lipo_cells_max": 6,
+      "stator_size": "5008",
+      "shaft_mm": 6,
+      "mount_pattern": "not published in sources found - check T-Motor 2D drawing",
+      "thrust_data": [
+        {
+          "prop": "17x5.8",
+          "voltage_v": 23.38,
+          "throttle_pct": 50,
+          "thrust_g": 1224,
+          "current_a": 5.33,
+          "power_w": 125,
+          "rpm": 3835
+        },
+        {
+          "prop": "17x5.8",
+          "voltage_v": 23.08,
+          "throttle_pct": 75,
+          "thrust_g": 2440,
+          "current_a": 14.71,
+          "power_w": 339,
+          "rpm": 5392
+        },
+        {
+          "prop": "17x5.8",
+          "voltage_v": 22.72,
+          "throttle_pct": 100,
+          "thrust_g": 3556,
+          "current_a": 26.39,
+          "power_w": 600,
+          "rpm": 6482
+        },
+        {
+          "prop": "18x6.1",
+          "voltage_v": 23.33,
+          "throttle_pct": 50,
+          "thrust_g": 1541,
+          "current_a": 6.93,
+          "power_w": 162,
+          "rpm": 3677
+        },
+        {
+          "prop": "18x6.1",
+          "voltage_v": 22.95,
+          "throttle_pct": 75,
+          "thrust_g": 2966,
+          "current_a": 18.83,
+          "power_w": 432,
+          "rpm": 5111
+        },
+        {
+          "prop": "18x6.1",
+          "voltage_v": 22.51,
+          "throttle_pct": 100,
+          "thrust_g": 4215,
+          "current_a": 33.5,
+          "power_w": 754,
+          "rpm": 6049
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-motors-c35/t-motor-antigravity-5008-p3730",
+        "price_eur": 105.29,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "SunnySky",
+    "model": "X4110S KV400",
+    "mass_g": 165,
+    "price_eur_estimate": 45,
+    "source": "https://sunnyskyusa.com/products/sunnysky-x4110s-motors",
+    "verified": false,
+    "notes": "Specs from SunnySky USA (official US distributor) via search extraction; other resellers list older revisions (112 mOhm, 26 A, 577 W). 45 A / 1125 W are 30 s ratings. Published thrust tables give current/thrust/power only (no throttle %, no rpm), e.g. 15x5.5 at 22.2 V: 1000 g @ 4.9 A (109 W), 2000 g @ 14.2 A (315 W), 2430 g @ 18.8 A (417 W) - so thrust_data left empty. No Irish/UK specialist stockist found (only eBay UK resellers shipping from abroad, ~GBP 39); price is an estimate.",
+    "spec": {
+      "kv_rpm_per_v": 400,
+      "resistance_ohm": 0.107,
+      "no_load_current_a": 0.6,
+      "max_current_a": 45,
+      "max_power_w": 1125,
+      "lipo_cells_min": 4,
+      "lipo_cells_max": 6,
+      "stator_size": "4110",
+      "shaft_mm": 4,
+      "mount_pattern": "not published in sources found",
+      "thrust_data": []
+    },
+    "listings": []
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "AT3520 Long Shaft KV550",
+    "mass_g": 218,
+    "price_eur_estimate": 93.59,
+    "source": "https://store.tmotor.com/product/at3520-long-shaft-fixed-wing-motor.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Pusher/cruise motor candidate (fixed-wing AT series, long shaft). T-Motor pages carry conflicting spec blocks (idle 1.1-2.0 A, peak 50-70 A, 1100-1300 W, 4-5S or 4-6S); the 1.6 A / 70 A / 1300 W / 4-6S block is used here - confirm before sizing the ESC. T-Motor recommends AT75A ESC and 13-14in props for 1.8-2.0 kg airframes.",
+    "spec": {
+      "kv_rpm_per_v": 550,
+      "resistance_ohm": 0.031,
+      "no_load_current_a": 1.6,
+      "max_current_a": 70,
+      "max_power_w": 1300,
+      "lipo_cells_min": 4,
+      "lipo_cells_max": 6,
+      "stator_size": "3520",
+      "shaft_mm": 5,
+      "mount_pattern": "not published in sources found - check T-Motor 2D drawing",
+      "thrust_data": [
+        {
+          "prop": "APC 13x6.5",
+          "voltage_v": 22.45,
+          "throttle_pct": 50,
+          "thrust_g": 1208,
+          "current_a": 7.26,
+          "power_w": 163.1,
+          "rpm": 5558
+        },
+        {
+          "prop": "APC 13x6.5",
+          "voltage_v": 22.19,
+          "throttle_pct": 80,
+          "thrust_g": 2711,
+          "current_a": 22.6,
+          "power_w": 501.5,
+          "rpm": 8119
+        },
+        {
+          "prop": "APC 13x6.5",
+          "voltage_v": 21.99,
+          "throttle_pct": 100,
+          "thrust_g": 3575,
+          "current_a": 34.89,
+          "power_w": 767.1,
+          "rpm": 9252
+        },
+        {
+          "prop": "APC 14x7",
+          "voltage_v": 22.34,
+          "throttle_pct": 60,
+          "thrust_g": 1954,
+          "current_a": 13.7,
+          "power_w": 306.0,
+          "rpm": 6192
+        },
+        {
+          "prop": "APC 14x7",
+          "voltage_v": 22.08,
+          "throttle_pct": 80,
+          "thrust_g": 3216,
+          "current_a": 29.2,
+          "power_w": 644.8,
+          "rpm": 7818
+        },
+        {
+          "prop": "APC 14x7",
+          "voltage_v": 21.83,
+          "throttle_pct": 100,
+          "thrust_g": 4116,
+          "current_a": 44.28,
+          "power_w": 966.6,
+          "rpm": 8762
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/products/t-motor-at3520-long-shaft",
+        "price_eur": 93.59,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "AT4120 Long Shaft KV500",
+    "mass_g": 305,
+    "price_eur_estimate": 128.69,
+    "source": "https://store.tmotor.com/product/at4120-long-shaft-fixed-wing-motor.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Pusher motor candidate (also sold as a VTOL pusher). 75 A / 1800 W are 180 s ratings (one listing says 1700 W). 6S. Probably oversized for a 2-3 kg airframe cruise; the 15x10 test runs 'HOT' at full throttle.",
+    "spec": {
+      "kv_rpm_per_v": 500,
+      "resistance_ohm": 0.021,
+      "no_load_current_a": 2.0,
+      "max_current_a": 75,
+      "max_power_w": 1800,
+      "lipo_cells_min": 6,
+      "lipo_cells_max": 6,
+      "stator_size": "4120",
+      "shaft_mm": 6,
+      "mount_pattern": "not published in sources found - check T-Motor 2D drawing",
+      "thrust_data": [
+        {
+          "prop": "APC 15x8",
+          "voltage_v": 22.47,
+          "throttle_pct": 40,
+          "thrust_g": 1222,
+          "current_a": 6.81,
+          "power_w": 153.13,
+          "rpm": 4252
+        },
+        {
+          "prop": "APC 15x8",
+          "voltage_v": 22.41,
+          "throttle_pct": 50,
+          "thrust_g": 1603,
+          "current_a": 10.07,
+          "power_w": 225.68,
+          "rpm": 4901
+        },
+        {
+          "prop": "APC 15x8",
+          "voltage_v": 22.19,
+          "throttle_pct": 70,
+          "thrust_g": 2878,
+          "current_a": 22.75,
+          "power_w": 504.91,
+          "rpm": 6441
+        },
+        {
+          "prop": "APC 15x8",
+          "voltage_v": 22.05,
+          "throttle_pct": 80,
+          "thrust_g": 3583,
+          "current_a": 31.62,
+          "power_w": 697.07,
+          "rpm": 7153
+        },
+        {
+          "prop": "APC 15x8",
+          "voltage_v": 21.75,
+          "throttle_pct": 100,
+          "thrust_g": 4714,
+          "current_a": 49.31,
+          "power_w": 1072.47,
+          "rpm": 8135
+        },
+        {
+          "prop": "APC 15x10",
+          "voltage_v": 22.36,
+          "throttle_pct": 50,
+          "thrust_g": 1701,
+          "current_a": 12.0,
+          "power_w": 268.25,
+          "rpm": 4688
+        },
+        {
+          "prop": "APC 15x10",
+          "voltage_v": 21.4,
+          "throttle_pct": 100,
+          "thrust_g": 4670,
+          "current_a": 70.41,
+          "power_w": 1506.65,
+          "rpm": 7952
+        },
+        {
+          "prop": "APC 16x8",
+          "voltage_v": 22.35,
+          "throttle_pct": 50,
+          "thrust_g": 2123,
+          "current_a": 13.87,
+          "power_w": 309.84,
+          "rpm": 5071
+        },
+        {
+          "prop": "APC 16x8",
+          "voltage_v": 21.49,
+          "throttle_pct": 100,
+          "thrust_g": 5967,
+          "current_a": 65.44,
+          "power_w": 1406.23,
+          "rpm": 8108
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/fixed-wing-c27/fixed-wing-motors-c39/t-motor-at4120-long-shaft-p3429",
+        "price_eur": 128.69,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "MN801-S KV120 (Navigator)",
+    "mass_g": 470,
+    "price_eur_estimate": 292.49,
+    "source": "https://store.tmotor.com/product/mn801-s-kv120-motor-navigator-type.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Phi 89 x 39.4 mm, 24N28P, IP45, shaft 12 mm in / 8 mm out. 45 A / 2200 W are 180 s ratings; one other KV120 listing shows KV150 figures (2800 W, 50 mOhm) - confirm. Test data at 0 deg C ambient, 12S. Recommended props 28-29in, FLAME 60A 12S ESC. ~10.5 kg max thrust on 28in: good fit for a 24 kg quad (6 kg hover per motor ~ 60-65 %). 29in (G29x9.5) points on the page: 50 % 4976 g / 460 W, 100 % 11683 g / 2338 W (current/rpm not captured).",
+    "spec": {
+      "kv_rpm_per_v": 120,
+      "resistance_ohm": 0.08,
+      "no_load_current_a": 1.1,
+      "max_current_a": 45,
+      "max_power_w": 2200,
+      "lipo_cells_min": 6,
+      "lipo_cells_max": 12,
+      "stator_size": "MN801 (89 mm motor, 24N28P)",
+      "shaft_mm": 12,
+      "mount_pattern": "not published in sources found - check T-Motor 2D drawing",
+      "thrust_data": [
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 47.84,
+          "throttle_pct": 50,
+          "thrust_g": 4247,
+          "current_a": 8.48,
+          "power_w": 406,
+          "rpm": 2356
+        },
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 47.82,
+          "throttle_pct": 60,
+          "thrust_g": 5566,
+          "current_a": 12.47,
+          "power_w": 596,
+          "rpm": 2775
+        },
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 47.83,
+          "throttle_pct": 100,
+          "thrust_g": 10472,
+          "current_a": 40.28,
+          "power_w": 1927,
+          "rpm": 4277
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-motors-c35/t-motor-mn801-s-p4141",
+        "price_eur": 292.49,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "MN801-S KV150 (Navigator)",
+    "mass_g": 480,
+    "price_eur_estimate": 292.49,
+    "source": "https://store.tmotor.com/product/mn801-s-kv150-motor-navigator-type.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Same frame as KV120. 60 A / 2800 W are 180 s ratings; idle current at 15 V. Recommended props 26-27in, FLAME 60A/80A 12S. Test data G26x8.5 at 12S, 0 deg C ambient. 3DXR MN801-S page price not tied to a specific KV.",
+    "spec": {
+      "kv_rpm_per_v": 150,
+      "resistance_ohm": 0.05,
+      "no_load_current_a": 1.4,
+      "max_current_a": 60,
+      "max_power_w": 2800,
+      "lipo_cells_min": 6,
+      "lipo_cells_max": 12,
+      "stator_size": "MN801 (89 mm motor, 24N28P)",
+      "shaft_mm": 12,
+      "mount_pattern": "not published in sources found - check T-Motor 2D drawing",
+      "thrust_data": [
+        {
+          "prop": "G26x8.5",
+          "voltage_v": 47.92,
+          "throttle_pct": 50,
+          "thrust_g": 5057,
+          "current_a": 11.91,
+          "power_w": 571,
+          "rpm": 3174
+        },
+        {
+          "prop": "G26x8.5",
+          "voltage_v": 47.9,
+          "throttle_pct": 60,
+          "thrust_g": 6383,
+          "current_a": 17.07,
+          "power_w": 817,
+          "rpm": 3798
+        },
+        {
+          "prop": "G26x8.5",
+          "voltage_v": 47.76,
+          "throttle_pct": 100,
+          "thrust_g": 12076,
+          "current_a": 57.34,
+          "power_w": 2738,
+          "rpm": 5247
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-motors-c35/t-motor-mn801-s-p4141",
+        "price_eur": 292.49,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "U8 II KV85 (U-Efficiency)",
+    "mass_g": 272,
+    "price_eur_estimate": 362.69,
+    "source": "https://store.tmotor.com/product/u8-v2-u-efficiency-kv85.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. 36N42P, IP45, 12S. Peak current 29.3 A (180 s); the page also shows 916.8 W and 1406.4 W - 1406.4 W = 29.3 A x 48 V so that value is used. Idle current at 18 V. SHAFT: not on the KV85 page; 12 mm taken from the U8 II Pro / Lite pages (same family) - confirm. Test tables on T-Motor pages for KV85/KV100 are partly mislabelled; rows below are the KV85 table (G28x9.2, 12S/48 V nominal, 26.9 deg C). Max thrust ~6.4 kg on 28in: marginal for a 24 kg quad (hover ~94 % of max) - better suited to ~16-18 kg.",
+    "spec": {
+      "kv_rpm_per_v": 85,
+      "resistance_ohm": 0.17,
+      "no_load_current_a": 0.7,
+      "max_current_a": 29.3,
+      "max_power_w": 1406.4,
+      "lipo_cells_min": 12,
+      "lipo_cells_max": 12,
+      "stator_size": "U8 (36N42P)",
+      "shaft_mm": 12,
+      "mount_pattern": "not published in sources found - check T-Motor 2D drawing",
+      "thrust_data": [
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 48,
+          "throttle_pct": 50,
+          "thrust_g": 2140,
+          "current_a": 3.2,
+          "power_w": 154,
+          "rpm": 1872
+        },
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 48,
+          "throttle_pct": 60,
+          "thrust_g": 2957,
+          "current_a": 5.1,
+          "power_w": 245,
+          "rpm": 2190
+        },
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 48,
+          "throttle_pct": 70,
+          "thrust_g": 3662,
+          "current_a": 7.1,
+          "power_w": 341,
+          "rpm": 2439
+        },
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 48,
+          "throttle_pct": 80,
+          "thrust_g": 4468,
+          "current_a": 9.5,
+          "power_w": 456,
+          "rpm": 2680
+        },
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 48,
+          "throttle_pct": 90,
+          "thrust_g": 5248,
+          "current_a": 12.2,
+          "power_w": 586,
+          "rpm": 2917
+        },
+        {
+          "prop": "G28x9.2",
+          "voltage_v": 48,
+          "throttle_pct": 100,
+          "thrust_g": 6352,
+          "current_a": 16.5,
+          "power_w": 792,
+          "rpm": 3200
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://3dxr.co.uk/product/t-motor-u8ii-kv85",
+        "price_eur": 362.69,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "motor",
+    "manufacturer": "T-Motor",
+    "model": "U10 II KV100 (U-Efficiency)",
+    "mass_g": 415,
+    "price_eur_estimate": 397.68,
+    "source": "https://store.tmotor.com/product/u10-2-u-efficiency.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Phi 98.6 x 33.1 mm, 36N42P, IP45, 12S, shaft 15 mm. Resistance 101+/-5 mOhm, idle 1 A at 18 V, peak 32.4 A (180 s). MAX POWER was truncated in the extract: 1555 W here is DERIVED as 32.4 A x 48 V - replace with the page value. Test data at 12S (48 V nominal), 20 deg C; column order inferred by the search tool from T-Motor's usual layout. 100 % rows not captured. ~9.3 kg at 90 % on 30in.",
+    "spec": {
+      "kv_rpm_per_v": 100,
+      "resistance_ohm": 0.101,
+      "no_load_current_a": 1.0,
+      "max_current_a": 32.4,
+      "max_power_w": 1555,
+      "lipo_cells_min": 12,
+      "lipo_cells_max": 12,
+      "stator_size": "U10 (36N42P)",
+      "shaft_mm": 15,
+      "mount_pattern": "not published in sources found - check T-Motor 2D drawing",
+      "thrust_data": [
+        {
+          "prop": "G29x9.5",
+          "voltage_v": 48,
+          "throttle_pct": 40,
+          "thrust_g": 2424,
+          "current_a": 3.9,
+          "power_w": 190,
+          "rpm": 1583
+        },
+        {
+          "prop": "G29x9.5",
+          "voltage_v": 48,
+          "throttle_pct": 54,
+          "thrust_g": 4090,
+          "current_a": 7.8,
+          "power_w": 379,
+          "rpm": 2102
+        },
+        {
+          "prop": "G29x9.5",
+          "voltage_v": 48,
+          "throttle_pct": 60,
+          "thrust_g": 4701,
+          "current_a": 9.6,
+          "power_w": 468,
+          "rpm": 2293
+        },
+        {
+          "prop": "G29x9.5",
+          "voltage_v": 48,
+          "throttle_pct": 70,
+          "thrust_g": 5737,
+          "current_a": 12.9,
+          "power_w": 627,
+          "rpm": 2561
+        },
+        {
+          "prop": "G29x9.5",
+          "voltage_v": 48,
+          "throttle_pct": 80,
+          "thrust_g": 6938,
+          "current_a": 16.9,
+          "power_w": 821,
+          "rpm": 2833
+        },
+        {
+          "prop": "G29x9.5",
+          "voltage_v": 48,
+          "throttle_pct": 90,
+          "thrust_g": 8350,
+          "current_a": 21.7,
+          "power_w": 1055,
+          "rpm": 3114
+        },
+        {
+          "prop": "G30x10.5",
+          "voltage_v": 48,
+          "throttle_pct": 40,
+          "thrust_g": 2921,
+          "current_a": 4.6,
+          "power_w": 226,
+          "rpm": 1544
+        },
+        {
+          "prop": "G30x10.5",
+          "voltage_v": 48,
+          "throttle_pct": 54,
+          "thrust_g": 4698,
+          "current_a": 9.2,
+          "power_w": 446,
+          "rpm": 2023
+        },
+        {
+          "prop": "G30x10.5",
+          "voltage_v": 48,
+          "throttle_pct": 62,
+          "thrust_g": 5478,
+          "current_a": 12.0,
+          "power_w": 582,
+          "rpm": 2270
+        },
+        {
+          "prop": "G30x10.5",
+          "voltage_v": 48,
+          "throttle_pct": 66,
+          "thrust_g": 6012,
+          "current_a": 13.5,
+          "power_w": 656,
+          "rpm": 2375
+        },
+        {
+          "prop": "G30x10.5",
+          "voltage_v": 48,
+          "throttle_pct": 90,
+          "thrust_g": 9343,
+          "current_a": 25.3,
+          "power_w": 1229,
+          "rpm": 2977
+        }
+      ]
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-motors-c35/t-motor-u10ii-kv100-p3639",
+        "price_eur": 397.68,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "T-Motor",
+    "model": "P15x5 Polish carbon (CW/CCW pair)",
+    "mass_g": 21,
+    "price_eur_estimate": 65.4,
+    "source": "https://store.tmotor.com/product/polish-carbon-fiber-15x5-prop.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass per propeller (T-Motor 'single blade' = one prop), +/-1.5 g. Thrust limit 6 kg, optimum 5200-7000 rpm (no hard max published). 6 mm centre hole per 3DXR listing; mounts on MN motors with adapter/cover and M3 screws. Price is per CW/CCW pair.",
+    "spec": {
+      "diameter_mm": 381.0,
+      "pitch_mm": 127.0,
+      "trade_size": "15x5",
+      "blades": 2,
+      "folding": false,
+      "hub_bore_mm": 6,
+      "material": "carbon fibre + epoxy",
+      "max_rpm": null
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-props-c265/t-motor-carbon-prop-p15x5-p2789",
+        "price_eur": 65.4,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "T-Motor",
+    "model": "P16x5.4 Polish carbon (CW/CCW pair)",
+    "mass_g": 25,
+    "price_eur_estimate": null,
+    "source": "https://store.tmotor.com/product/polish-carbon-fiber-16x5_4-prop.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass per propeller +/-1.5 g. Thrust limit 7 kg, optimum 4000-6000 rpm. Hub bore 6 mm INFERRED from the bundled '06*04' copper adapter (6 mm OD to 4 mm shaft) - confirm. 3DXR page price shown in USD ($71/pair), so price left null.",
+    "spec": {
+      "diameter_mm": 406.4,
+      "pitch_mm": 137.2,
+      "trade_size": "16x5.4",
+      "blades": 2,
+      "folding": false,
+      "hub_bore_mm": 6,
+      "material": "carbon fibre + epoxy",
+      "max_rpm": null
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-props-c265/t-motor-carbon-prop-p16x5-4-p2708",
+        "price_eur": null,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "APC",
+    "model": "12x8E Thin Electric",
+    "mass_g": 26.1,
+    "price_eur_estimate": 5.38,
+    "source": "https://www.apcprop.com/product/12x8e/",
+    "verified": false,
+    "notes": "Specs from APC product page via search extraction. Weight 0.92 oz; hub 0.80 in dia; 1/4 in shaft (LPAR06E adapter rings included). Max rpm = APC rule 150000/diameter(in). Pusher version: 12x8EP. Fits a 2-3 kg wing pusher.",
+    "spec": {
+      "diameter_mm": 304.8,
+      "pitch_mm": 203.2,
+      "trade_size": "12x8",
+      "blades": 2,
+      "folding": false,
+      "hub_bore_mm": 6.35,
+      "material": "composite (APC thin electric)",
+      "max_rpm": 12500
+    },
+    "listings": [
+      {
+        "supplier_name": "MWM Warbirds",
+        "country": "UK",
+        "url": "https://www.mwmwarbirds.co.uk/shop/apc-propeller-12x8e-0711/",
+        "price_eur": 5.38,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Rapid RC Models",
+        "country": "UK",
+        "url": "https://www.rapidrcmodels.com/apc-12x8e-thin-electric-propeller-lp12080e-6968-p.asp",
+        "price_eur": 6.43,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Radio Controlled Shop (Rathcoole, Dublin)",
+        "country": "IE",
+        "url": "https://www.radiocontrolledshop.ie/apc-rc-plane-props-electric-apc-propellers/10508-apc-propellers-12-x-8-thin-electric-propelle-apclp12080e-e-lp12080e-dublin-ireland-686661120068.html",
+        "price_eur": 6.34,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "APC",
+    "model": "13x8E Thin Electric",
+    "mass_g": 30.9,
+    "price_eur_estimate": 6.79,
+    "source": "https://www.apcprop.com/product/13x8e/",
+    "verified": false,
+    "notes": "Specs from APC product page via search extraction. Weight 1.09 oz; 1/4 in shaft. Max rpm = 150000/13. Pusher version: 13x8EP. Radio Controlled Shop (IE) lists a 13x8 thin electric at EUR 6.84 but only its category page was found, so no IE listing recorded.",
+    "spec": {
+      "diameter_mm": 330.2,
+      "pitch_mm": 203.2,
+      "trade_size": "13x8",
+      "blades": 2,
+      "folding": false,
+      "hub_bore_mm": 6.35,
+      "material": "composite (APC thin electric)",
+      "max_rpm": 11538
+    },
+    "listings": [
+      {
+        "supplier_name": "Rapid RC Models",
+        "country": "UK",
+        "url": "https://www.rapidrcmodels.com/apc-13x8e-thin-electric-propeller-lp13080e-6967-p.asp",
+        "price_eur": 6.79,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "APC",
+    "model": "14x8.5E Thin Electric",
+    "mass_g": 37.1,
+    "price_eur_estimate": 8.42,
+    "source": "https://www.apcprop.com/product/14x8-5e/",
+    "verified": false,
+    "notes": "Specs from APC product page via search extraction. Weight 1.31 oz; 1/4 in shaft (the black B14x8.5E-T variant uses 6 mm). Max rpm = 150000/14. Pusher version: 14x8.5EP.",
+    "spec": {
+      "diameter_mm": 355.6,
+      "pitch_mm": 215.9,
+      "trade_size": "14x8.5",
+      "blades": 2,
+      "folding": false,
+      "hub_bore_mm": 6.35,
+      "material": "composite (APC thin electric)",
+      "max_rpm": 10714
+    },
+    "listings": [
+      {
+        "supplier_name": "RC World",
+        "country": "UK",
+        "url": "https://www.rcworld.co.uk/acatalog/APC-14x8.5-Thin-Electric-Propeller-E-LP14085E.html",
+        "price_eur": 8.42,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Kings Lynn Model Shop",
+        "country": "UK",
+        "url": "https://www.kingslynnmodelshop.co.uk/apc-14x8-5-electric-propellor/",
+        "price_eur": 8.07,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "T-Motor",
+    "model": "NS26x8.5 ultra-light carbon (10 mm hole)",
+    "mass_g": 48,
+    "price_eur_estimate": null,
+    "source": "https://store.tmotor.com/product/ns26x8_5-prop-uav-carbon-fiber.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass per propeller. Recommended 4-8 kg at 2850-3970 rpm; recommended max 16 kg at 5480 rpm (used as max_rpm). 10 mm hole per 3DXR listing title. Price not captured.",
+    "spec": {
+      "diameter_mm": 660.4,
+      "pitch_mm": 215.9,
+      "trade_size": "26x8.5",
+      "blades": 2,
+      "folding": false,
+      "hub_bore_mm": 10,
+      "material": "carbon fibre + epoxy",
+      "max_rpm": 5480
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-props-c265/t-motor-ns-ultra-light-carbon-prop-26-x-8-5-10mm-hole-p4081",
+        "price_eur": null,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "T-Motor",
+    "model": "NS28x9.2 ultra-light carbon (10 mm hole)",
+    "mass_g": 59,
+    "price_eur_estimate": 369.71,
+    "source": "https://store.tmotor.com/product/ns28x9_2-prop-uav-carbon-fiber.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass per propeller. Recommended 5-9.5 kg at 2900-3940 rpm; recommended max 19 kg at 5490 rpm. 3DXR GBP 315.99 inc VAT as listed (pack size not confirmed - looks high for one pair).",
+    "spec": {
+      "diameter_mm": 711.2,
+      "pitch_mm": 233.7,
+      "trade_size": "28x9.2",
+      "blades": 2,
+      "folding": false,
+      "hub_bore_mm": 10,
+      "material": "carbon fibre + epoxy",
+      "max_rpm": 5490
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-props-c265/t-motor-ns-ultra-light-carbon-prop-28-x-9-2-10mm-hole-p4083",
+        "price_eur": 369.71,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "propeller",
+    "manufacturer": "T-Motor",
+    "model": "NS30x10 ultra-light carbon (10 mm hole)",
+    "mass_g": 72,
+    "price_eur_estimate": 397.79,
+    "source": "https://store.tmotor.com/product/ns30x10-prop-uav-carbon-fiber.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass per propeller. Recommended 6-10.5 kg at 2580-3350 rpm; recommended max 22 kg at 4710 rpm. 3DXR GBP 339.99 inc VAT as listed (pack size not confirmed).",
+    "spec": {
+      "diameter_mm": 762.0,
+      "pitch_mm": 254.0,
+      "trade_size": "30x10",
+      "blades": 2,
+      "folding": false,
+      "hub_bore_mm": 10,
+      "material": "carbon fibre + epoxy",
+      "max_rpm": 4710
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-props-c265/t-motor-ns-ultra-light-carbon-prop-30-x-10-10mm-hole-p4094",
+        "price_eur": 397.79,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "esc",
+    "manufacturer": "T-Motor",
+    "model": "ALPHA 60A 12S V1.2 (HV)",
+    "mass_g": 73,
+    "price_eur_estimate": 128.69,
+    "source": "https://store.tmotor.com/product/alpha-60a-12s-esc.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. FOC (vector control) ESC, 18-50.4 V, burst = 80 A for 10 s, no BEC, 78.7x32.5x16.2 mm. Telemetry=true is from the ALPHA-series data-output description (RPM/current/temperature via T-Motor Data Link), not from this model's spec table - confirm. Suits MN801-S / U8 II / U10 II.",
+    "spec": {
+      "continuous_current_a": 60,
+      "burst_current_a": 80,
+      "lipo_cells_min": 6,
+      "lipo_cells_max": 12,
+      "firmware": "T-Motor ALPHA FOC (proprietary)",
+      "bec_v": null,
+      "telemetry": true
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-escs-c48/t-motor-alpha-60a-12s-hv-v1-2-p2935",
+        "price_eur": 128.69,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "esc",
+    "manufacturer": "T-Motor",
+    "model": "ALPHA 40A 6S (LV)",
+    "mass_g": 54.5,
+    "price_eur_estimate": 81.89,
+    "source": "https://store.tmotor.com/product/alpha-40a-6s-esc.html",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. FOC ESC, 4-6S (18-25.2 V), no BEC, 64.5x29.4x14.7 mm, IP55. Reports throttle, rpm, current, capacity and temperatures; firmware update via Data Link. CURRENT RATING CONFLICT: current store page says 20 A continuous, 2018 sheet says 40 A peak (10 s) - 20/40 used here.",
+    "spec": {
+      "continuous_current_a": 20,
+      "burst_current_a": 40,
+      "lipo_cells_min": 4,
+      "lipo_cells_max": 6,
+      "firmware": "T-Motor ALPHA FOC (proprietary)",
+      "bec_v": null,
+      "telemetry": true
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/multirotor-c3/multirotor-escs-c48/t-motor-alpha-40a-lv-p2833",
+        "price_eur": 81.89,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "esc",
+    "manufacturer": "Hobbywing",
+    "model": "XRotor Pro 40A 3-6S (version A)",
+    "mass_g": 50,
+    "price_eur_estimate": 29.245,
+    "source": "https://www.hobbywing.com/en/products/xrotor-pro-40a120",
+    "verified": false,
+    "notes": "Specs from Hobbywing product page via search extraction. 40 A / 60 A peak, 3-6S, no BEC, 66x21.8x11 mm (version B 45 g). No telemetry output listed (telemetry=false is 'not listed', not confirmed absent). Flying Tech price GBP 49.99 is for a DUAL pack; listing price_eur is for the pack.",
+    "spec": {
+      "continuous_current_a": 40,
+      "burst_current_a": 60,
+      "lipo_cells_min": 3,
+      "lipo_cells_max": 6,
+      "firmware": "Hobbywing XRotor (proprietary)",
+      "bec_v": null,
+      "telemetry": false
+    },
+    "listings": [
+      {
+        "supplier_name": "Flying Tech",
+        "country": "UK",
+        "url": "https://www.flyingtech.co.uk/product/hobbywing-xrotor-pro-40a-2-6s-opto-multirotor-esc-dual-pack/",
+        "price_eur": 58.49,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "esc",
+    "manufacturer": "Hobbywing",
+    "model": "SkyWalker 60A V2 (UBEC)",
+    "mass_g": 68,
+    "price_eur_estimate": 33.58,
+    "source": "https://www.hobbywing.com/en/products/skywalker-v2-series274",
+    "verified": false,
+    "notes": "Specs from Hobbywing V2 series page/manual via search extraction. Fixed-wing ESC for the pusher motor: 60 A / 80 A peak, 3-6S, 5 V 7 A switch-mode BEC, 73x30x12 mm. No telemetry listed.",
+    "spec": {
+      "continuous_current_a": 60,
+      "burst_current_a": 80,
+      "lipo_cells_min": 3,
+      "lipo_cells_max": 6,
+      "firmware": "Hobbywing SkyWalker (proprietary)",
+      "bec_v": 5.0,
+      "telemetry": false
+    },
+    "listings": [
+      {
+        "supplier_name": "RC World",
+        "country": "UK",
+        "url": "https://www.rcworld.co.uk/acatalog/Skywalker-60A-V2-ESC-ESC-Skywalker60A.html",
+        "price_eur": 33.58,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Component Shop",
+        "country": "UK",
+        "url": "https://www.componentshop.co.uk/hobbywing-skywalker-60a-esc.html",
+        "price_eur": 36.21,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "servo",
+    "manufacturer": "KST",
+    "model": "BLS815 V8.0",
+    "mass_g": 70,
+    "price_eur_estimate": 92.41,
+    "source": "https://kstservos.com/products/bls815-digital-20kg-metal-gear-0-07sec-rc-brushless-standard-servo",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Torque and speed given at 7.4 V (2S HV BEC) for comparability. Brushless, aluminium case, potentiometer. 14/17/20 kg.cm and 0.09/0.08/0.07 s at 6.0/7.4/8.4 V. Travel +/-50 deg (100 deg total) - check it covers the tilt range.",
+    "spec": {
+      "torque_kg_cm": 17,
+      "speed_s_per_60deg": 0.08,
+      "voltage_min_v": 6.0,
+      "voltage_max_v": 8.4,
+      "gear_material": "hardened steel",
+      "width_mm": 20,
+      "length_mm": 40.5,
+      "height_mm": 38,
+      "digital": true
+    },
+    "listings": [
+      {
+        "supplier_name": "Align-Trex UK",
+        "country": "UK",
+        "url": "https://www.align-trex.co.uk/kst-bls815-v2-hv-20kg-cmat8-4v-mw-kstbls815v2.html",
+        "price_eur": 92.41,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "servo",
+    "manufacturer": "Savox",
+    "model": "SV-1270TG+",
+    "mass_g": 64,
+    "price_eur_estimate": 77.8,
+    "source": "https://savox-servo.com/en/product/SV-1270TGplus/",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Torque and speed given at 7.4 V (2S HV BEC) for comparability. Coreless HV digital, soft start, 25T spline. 30/40/45 kg.cm at 6.0/7.4/8.4 V; 0.11 s at 7.4 V, 0.10 s at 8.4 V.",
+    "spec": {
+      "torque_kg_cm": 40,
+      "speed_s_per_60deg": 0.11,
+      "voltage_min_v": 6.0,
+      "voltage_max_v": 8.4,
+      "gear_material": "titanium",
+      "width_mm": 20.2,
+      "length_mm": 40.3,
+      "height_mm": 37.2,
+      "digital": true
+    },
+    "listings": [
+      {
+        "supplier_name": "Kings Lynn Model Shop",
+        "country": "UK",
+        "url": "https://www.kingslynnmodelshop.co.uk/savox-sv-1270tg-plus-hv-digital-standard-size-servo-45kg-0-10s/",
+        "price_eur": 77.8,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Nexus Models",
+        "country": "UK",
+        "url": "https://nexusmodels.co.uk/products/savox-sv-1270tg-hv-standard-size-servo-soft-start-ultra-torque-45kg-0-10s-8-4v-sv1270tgp",
+        "price_eur": 64.84,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "West London Models",
+        "country": "UK",
+        "url": "https://westlondonmodels.com/product/savox-high-voltage-std-size-ultra-torque-servo-35kg7-4v-sav-sv1270tg/",
+        "price_eur": 78.38,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "servo",
+    "manufacturer": "MKS",
+    "model": "HBL599",
+    "mass_g": 73.12,
+    "price_eur_estimate": 207.6,
+    "source": "https://mks-servo.com/HBL599",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Torque and speed given at 7.4 V (2S HV BEC) for comparability. Brushless HV, 30/38/42 kg.cm at 6.0/7.4/8.2 V; 0.11/0.09/0.08 s. Stall current up to 11 A at 8.2 V - size the servo BEC accordingly. A DroneCAN version (HBL599-DroneCAN) exists. No UK/IE stockist found; price estimate from Mibosport (EU, EUR 207.60).",
+    "spec": {
+      "torque_kg_cm": 38,
+      "speed_s_per_60deg": 0.09,
+      "voltage_min_v": 6.0,
+      "voltage_max_v": 8.4,
+      "gear_material": "metal alloy (titanium per distributors)",
+      "width_mm": 20,
+      "length_mm": 40,
+      "height_mm": 38.8,
+      "digital": true
+    },
+    "listings": []
+  },
+  {
+    "category": "servo",
+    "manufacturer": "MKS",
+    "model": "HV1220",
+    "mass_g": 57.6,
+    "price_eur_estimate": 89.3,
+    "source": "https://mks-servo.com/HV1220",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Torque and speed given at 7.4 V (2S HV BEC) for comparability. Coreless HV, 16.6/22.1/23 kg.cm at 6.0/7.4/8.2 V; 0.159/0.129/0.115 s. No UK/IE stockist found; price estimate from Mibosport (EU, EUR 89.30).",
+    "spec": {
+      "torque_kg_cm": 22.1,
+      "speed_s_per_60deg": 0.129,
+      "voltage_min_v": 6.0,
+      "voltage_max_v": 8.4,
+      "gear_material": "metal alloy (titanium per distributors)",
+      "width_mm": 20,
+      "length_mm": 40,
+      "height_mm": 37,
+      "digital": true
+    },
+    "listings": []
+  },
+  {
+    "category": "battery",
+    "manufacturer": "Gens ace",
+    "model": "G-Tech 5000mAh 6S 45C (EC5)",
+    "mass_g": 682,
+    "price_eur_estimate": 155.61,
+    "source": "https://genstattu.com/gens-ace-5000mah-6s-45c-22-2v-g-tech-lipo-battery-pack-with-ec5-plug/",
+    "verified": false,
+    "notes": "Specs from Grepow's official Gens ace/Tattu store (genstattu.com) via search extraction. 682 g +/-20 g; Gens ace EU store lists 683 g / 155x46x44 mm. 10 AWG.",
+    "spec": {
+      "chemistry": "lipo",
+      "cells_series": 6,
+      "cells_parallel": 1,
+      "capacity_mah": 5000,
+      "nominal_voltage_v": 22.2,
+      "discharge_c_continuous": 45,
+      "discharge_c_burst": 90,
+      "length_mm": 157,
+      "width_mm": 46,
+      "height_mm": 44,
+      "connector": "EC5"
+    },
+    "listings": [
+      {
+        "supplier_name": "Al's Hobbies",
+        "country": "UK",
+        "url": "https://alshobbies.co.uk/gens-ace/GensAce-Li-Po-6S-222V-5000mAh-45C-with-EC5-O-G6S5000-45E5",
+        "price_eur": 155.61,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "ProBuild UK",
+        "country": "UK",
+        "url": "https://www.probuild-uk.co.uk/gens-ace-li-po-6s-22-2v-5000mah-45c-with-ec5.html",
+        "price_eur": 175.49,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Appliance Electronics",
+        "country": "UK",
+        "url": "https://www.applianceelectronics.co.uk/viewproduct/22357/gens-ace-lipo-battery-6s-5000mah-222v-45c-softcase-ec5-o-g6s5000-45e5",
+        "price_eur": 156.78,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/electronics-c78/batteries-c144/gensace-gens-ace-5000mah-45c-6s1p-22-2v-lipo-with-ec5-p5720",
+        "price_eur": 142.73,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "battery",
+    "manufacturer": "Tattu",
+    "model": "Plus 10000mAh 6S 25C (AS150+XT150)",
+    "mass_g": 1517,
+    "price_eur_estimate": null,
+    "source": "https://www.genstattu.com/tattu-plus-22-2v-25c-6s-liPo-battery-10000-mah-with-as150-xt150-plug.html",
+    "verified": false,
+    "notes": "Specs from genstattu.com via search extraction. 1517 g +/-20 g, 186x70x63 mm; older listings give 1400 g / 165x64x59 mm. Smart pack (Molex 9-pin charge). 3DXR price shown as 247 with a $ sign - currency unclear, so price_eur null. Also sold with EC5.",
+    "spec": {
+      "chemistry": "lipo",
+      "cells_series": 6,
+      "cells_parallel": 1,
+      "capacity_mah": 10000,
+      "nominal_voltage_v": 22.2,
+      "discharge_c_continuous": 25,
+      "discharge_c_burst": 50,
+      "length_mm": 186,
+      "width_mm": 70,
+      "height_mm": 63,
+      "connector": "AS150+XT150"
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/products/gensace-gens-ace-tattu-plus-10000mah-25c-6s1p-22-2v-lipo-with-as150-xt150",
+        "price_eur": null,
+        "in_stock": true,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "battery",
+    "manufacturer": "Tattu",
+    "model": "Semi-solid 300Wh/kg 30000mAh 12S 10C (AS150U-F)",
+    "mass_g": 4672,
+    "price_eur_estimate": null,
+    "source": "https://www.tattuworld.com/products/tattu-300wh-kg-30000mah-12s1p-44-4v-10c-semi-solid-state-uav-lipo-battery.html",
+    "verified": false,
+    "notes": "Specs from Tattu (tattuworld.com) via search extraction. 1332 Wh; max continuous 90 A (3C), max pulse 150 A (5C, <=15 s) - the '10C' in the name is not the continuous rating. Resellers list 4900 g and 212x90.5x132 mm. Semi-solid NMC chemistry sold as 'LiPo'; stored as lipo. No UK/IE stockist found.",
+    "spec": {
+      "chemistry": "lipo",
+      "cells_series": 12,
+      "cells_parallel": 1,
+      "capacity_mah": 30000,
+      "nominal_voltage_v": 44.4,
+      "discharge_c_continuous": 3,
+      "discharge_c_burst": 5,
+      "length_mm": 212,
+      "width_mm": 91.5,
+      "height_mm": 117.2,
+      "connector": "AS150U-F"
+    },
+    "listings": []
+  },
+  {
+    "category": "battery",
+    "manufacturer": "Tattu",
+    "model": "Semi-solid 350Wh/kg 33000mAh 14S 10C (AS150U-F)",
+    "mass_g": 5500,
+    "price_eur_estimate": null,
+    "source": "https://www.tattuworld.com/products/tattu-350wh-kg-33000mah-14s1p-51-8v-10c-semi-solid-state-uav-lipo-battery.html",
+    "verified": false,
+    "notes": "Specs from Tattu (tattuworld.com) via search extraction. Max continuous 33 A (1C!), max pulse 330 A (10C, <=15 s). 1C continuous is too low for 24 kg VTOL hover (~4x 1-2 kW) unless several packs are paralleled; good for cruise endurance. Semi-solid, stored as lipo. No UK/IE stockist found.",
+    "spec": {
+      "chemistry": "lipo",
+      "cells_series": 14,
+      "cells_parallel": 1,
+      "capacity_mah": 33000,
+      "nominal_voltage_v": 51.8,
+      "discharge_c_continuous": 1,
+      "discharge_c_burst": 10,
+      "length_mm": 210,
+      "width_mm": 90,
+      "height_mm": 139,
+      "connector": "AS150U-F"
+    },
+    "listings": []
+  },
+  {
+    "category": "battery",
+    "manufacturer": "Tattu",
+    "model": "Pro 22000mAh 14S 25C smart (AS150U-F)",
+    "mass_g": 7350,
+    "price_eur_estimate": null,
+    "source": "https://genstattu.com/tattu-pro-22000mah-51-8v-25c-14s-1p-lipo-smart-battery-pack-with-as150u-f-plug/",
+    "verified": false,
+    "notes": "Specs from genstattu.com via search extraction. Conventional LiPo reference for the 24 kg version (heavy: ~155 Wh/kg). No UK/IE stockist found.",
+    "spec": {
+      "chemistry": "lipo",
+      "cells_series": 14,
+      "cells_parallel": 1,
+      "capacity_mah": 22000,
+      "nominal_voltage_v": 51.8,
+      "discharge_c_continuous": 25,
+      "discharge_c_burst": 50,
+      "length_mm": 238,
+      "width_mm": 174,
+      "height_mm": 117,
+      "connector": "AS150U-F"
+    },
+    "listings": []
+  },
+  {
+    "category": "cell",
+    "manufacturer": "Molicel",
+    "model": "INR-21700-P45B",
+    "mass_g": 70,
+    "price_eur_estimate": 4.55,
+    "source": "https://www.molicel.com/inr-21700-p45b/",
+    "verified": false,
+    "notes": "Molicel product page + cell specification PDF via search extraction. 4.5 Ah typ (4.35 Ah min), 45 A continuous (80 deg C cut-off). Mass 70 g max (product page says 69 g). Dims 21.40x70.00 mm nominal. EU price reference: nkon.nl EUR 4.55 inc VAT (NL - not a valid listing country). Fogstar (UK) price is a wholesale tier (min spend GBP 75; page ~2 years old) and Fogstar says it is phasing out cylindrical cells.",
+    "spec": {
+      "chemistry": "li-ion",
+      "capacity_mah": 4500,
+      "nominal_voltage_v": 3.6,
+      "max_continuous_discharge_a": 45,
+      "diameter_mm": 21.4,
+      "length_mm": 70.0,
+      "format": "21700"
+    },
+    "listings": [
+      {
+        "supplier_name": "Fogstar Wholesale",
+        "country": "UK",
+        "url": "https://www.fogstar-wholesale.co.uk/product/molicel-p45b/",
+        "price_eur": 6.96,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "cell",
+    "manufacturer": "Molicel",
+    "model": "INR-21700-P50B",
+    "mass_g": 70,
+    "price_eur_estimate": 6.75,
+    "source": "https://www.molicel.com/inr-21700-p50b/",
+    "verified": false,
+    "notes": "Molicel product page via search extraction: 5.0 Ah typ (4.85 Ah min), 60 A discharge. Mass from Voltt cell library (~70 g); diameter/length are the nominal 21700 envelope (21.4x70 mm, same volume as P45B) - official dims not captured. EU price reference: nkon.nl EUR 6.75 inc VAT, in stock.",
+    "spec": {
+      "chemistry": "li-ion",
+      "capacity_mah": 5000,
+      "nominal_voltage_v": 3.6,
+      "max_continuous_discharge_a": 60,
+      "diameter_mm": 21.4,
+      "length_mm": 70.0,
+      "format": "21700"
+    },
+    "listings": [
+      {
+        "supplier_name": "Nu Battery",
+        "country": "UK",
+        "url": "https://www.nubattery.co.uk/molicel-inr21700-p50b---21700-battery---5000mah---60a",
+        "price_eur": 11.69,
+        "in_stock": false,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Cell Supply",
+        "country": "UK",
+        "url": "https://www.cellsupply.co.uk/molicel-inr21700-p50b---21700-battery---5000mah---60a",
+        "price_eur": 8.21,
+        "in_stock": false,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "cell",
+    "manufacturer": "Samsung SDI",
+    "model": "INR21700-50S",
+    "mass_g": 72,
+    "price_eur_estimate": null,
+    "source": "https://www.aboutenergy.io/voltt-battery-library/samsung-50s",
+    "verified": false,
+    "notes": "No Samsung SDI page reachable; specs from reseller reproductions of the datasheet: 5000 mAh typ (4800-4900 min), 25 A continuous without temp cut-off (45 A with 80 deg C cut-off; UK resellers say 35 A). Dims max 21.45x70.55 mm, mass 72 g max.",
+    "spec": {
+      "chemistry": "li-ion",
+      "capacity_mah": 5000,
+      "nominal_voltage_v": 3.6,
+      "max_continuous_discharge_a": 25,
+      "diameter_mm": 21.45,
+      "length_mm": 70.55,
+      "format": "21700"
+    },
+    "listings": [
+      {
+        "supplier_name": "Nu Battery",
+        "country": "UK",
+        "url": "https://www.nubattery.co.uk/samsung-50s---21700-battery",
+        "price_eur": 11.69,
+        "in_stock": false,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Cell Supply",
+        "country": "UK",
+        "url": "https://www.cellsupply.co.uk/samsung-50s---21700-battery-1",
+        "price_eur": 4.7,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "autopilot",
+    "manufacturer": "Holybro",
+    "model": "Pixhawk 6C (aluminium case)",
+    "mass_g": 59.3,
+    "price_eur_estimate": 139.22,
+    "source": "https://docs.holybro.com/autopilot/pixhawk-6c/technical-specification",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. 16 PWM (8 IO + 8 FMU; comparison table says 8/6 FMU), 2 CAN, 3 telemetry UARTs + GPS1 + GPS2 = 5 serial. IMUs ICM-42688-P + BMI088 (heated). Power input via power module; max input 6 V, USB 4.75-5.25 V. 34.6 g in plastic case. Unmanned Tech price may be board-only; Flying Tech kit (with PM02 + M10 GPS) GBP 184.90-234.90.",
+    "spec": {
+      "firmware": "ardupilot",
+      "pwm_outputs": 16,
+      "can_ports": 2,
+      "uarts": 5,
+      "imu_count": 2,
+      "voltage_in_min_v": 4.75,
+      "voltage_in_max_v": 6.0
+    },
+    "listings": [
+      {
+        "supplier_name": "Unmanned Tech",
+        "country": "UK",
+        "url": "https://www.unmannedtechshop.co.uk/products/pixhawk-6c-flight-controller-aluminium-case",
+        "price_eur": 139.22,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Flying Tech",
+        "country": "UK",
+        "url": "https://www.flyingtech.co.uk/product/holybro-pixhawk-6c-autopilot-kit-px4-flight-controller/",
+        "price_eur": 216.33,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "autopilot",
+    "manufacturer": "Holybro",
+    "model": "Pixhawk 6X Rev 8 (standard baseboard)",
+    "mass_g": 103.8,
+    "price_eur_estimate": 491.28,
+    "source": "https://docs.holybro.com/autopilot/pixhawk-6x/technical-specification",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass = FC module 31.3 g + aluminium standard baseboard 72.5 g. 16 PWM (8 IO + 8 FMU), 2 CAN, 4 general serial + 2 GPS = 6. Rev 8: 3x ICM-45686. Max input 6 V via power module (PM02D HV up to 12S). Flying Tech price range GBP 419.90-479.90 (Standard/Mini kit).",
+    "spec": {
+      "firmware": "ardupilot",
+      "pwm_outputs": 16,
+      "can_ports": 2,
+      "uarts": 6,
+      "imu_count": 3,
+      "voltage_in_min_v": 4.75,
+      "voltage_in_max_v": 6.0
+    },
+    "listings": [
+      {
+        "supplier_name": "Flying Tech",
+        "country": "UK",
+        "url": "https://www.flyingtech.co.uk/product/holybro-pixhawk-6x-icm-45686-autopilot-kit-px4-flight-controller/",
+        "price_eur": 491.28,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "autopilot",
+    "manufacturer": "CubePilot",
+    "model": "Cube Orange+ Standard Set (ADS-B carrier)",
+    "mass_g": 73,
+    "price_eur_estimate": 489,
+    "source": "https://docs.cubepilot.org/autopilot/the-cube/introduction/specifications",
+    "verified": false,
+    "notes": "CubePilot docs + ArduPilot Cube Orange page via search extraction. 14 PWM (8 IO + 6 FMU), 2 CAN, 5 serial (serial 5 used by ADS-B receiver), 3 IMUs (2 isolated + heated). Input 4.0-5.5 V compliant (lock-out above 5.7 V). Mass 73 g is the Cube only (carrier board not included; whole set ~250-330 g boxed). 3DXR (UK Cube distributor) price shown as $506 - currency unclear, so null; EU reference Aeroboticshop EUR 489.",
+    "spec": {
+      "firmware": "ardupilot",
+      "pwm_outputs": 14,
+      "can_ports": 2,
+      "uarts": 5,
+      "imu_count": 3,
+      "voltage_in_min_v": 4.0,
+      "voltage_in_max_v": 5.5
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/products/cubepilot-the-cube-orange-standard-set-with-ads-b-carrier-board-hx4-06222",
+        "price_eur": null,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "gps",
+    "manufacturer": "Holybro",
+    "model": "M10 GPS (standard, V1)",
+    "mass_g": 32,
+    "price_eur_estimate": 51.47,
+    "source": "https://holybro.com/products/m10-gps",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. u-blox M10, 4 concurrent GNSS (+QZSS, SBAS). 10 Hz with 4 constellations (25 Hz single). 50 mm dia. IST8310 compass on I2C in the same 10-pin GPS1 plug. V2 (IP67) is 36.8 g.",
+    "spec": {
+      "constellations": [
+        "GPS",
+        "Galileo",
+        "GLONASS",
+        "BeiDou"
+      ],
+      "rtk": false,
+      "update_rate_hz": 10,
+      "interface": "UART (+I2C compass)"
+    },
+    "listings": [
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/autopilots-c2/fc-gps-rtk-c456/holybro-m10-gps-standard-p5696",
+        "price_eur": 51.47,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Flying Tech",
+        "country": "UK",
+        "url": "https://www.flyingtech.co.uk/product/holybro-ublox-m10-gps-compass-module-w-mount/",
+        "price_eur": 51.36,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Unmanned Tech",
+        "country": "UK",
+        "url": "https://www.unmannedtechshop.co.uk/products/holybro-m10-gps-module",
+        "price_eur": 36.45,
+        "in_stock": false,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "gps",
+    "manufacturer": "CubePilot",
+    "model": "Here4 Multiband RTK GNSS",
+    "mass_g": 60,
+    "price_eur_estimate": 217.8,
+    "source": "https://docs.cubepilot.org/here-4/here-4-manual",
+    "verified": false,
+    "notes": "Specs via search extraction from reseller pages summarising the CubePilot manual (manual not read directly). u-blox F9P dual-band L1/L5, RTK 0.01 m + 1 ppm, 20 Hz RTK nav rate, DroneCAN (UART/I2C also). ~60 g incl. cable (one listing says 70 g).",
+    "spec": {
+      "constellations": [
+        "GPS",
+        "GLONASS",
+        "Galileo",
+        "BeiDou",
+        "QZSS"
+      ],
+      "rtk": true,
+      "update_rate_hz": 20,
+      "interface": "DroneCAN (CAN)"
+    },
+    "listings": [
+      {
+        "supplier_name": "Unmanned Tech",
+        "country": "UK",
+        "url": "https://www.unmannedtechshop.co.uk/product/hex-here4-multiband-rtk-gnss/",
+        "price_eur": 217.8,
+        "in_stock": false,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/products/cubepilot-here4-multiband-rtk-gps-with-moving-baseline-hx4-06248",
+        "price_eur": null,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "gps",
+    "manufacturer": "Matek / UMT",
+    "model": "M10Q-5883",
+    "mass_g": 8,
+    "price_eur_estimate": 39.77,
+    "source": "https://www.mateksys.com/",
+    "verified": false,
+    "notes": "Specs from reseller pages (Matek page not captured). u-blox SAM-M10Q, 4 GNSS; UBX 5 Hz with GPS+GAL+BDS+GLO (1 Hz NMEA); QMC5883L compass. Unmanned Tech now sells a UMT-made version (same design, Matek export restrictions); Flying Tech lists the Matek original as discontinued (replacement M10Q-5883P GBP 29.90).",
+    "spec": {
+      "constellations": [
+        "GPS",
+        "GLONASS",
+        "Galileo",
+        "BeiDou"
+      ],
+      "rtk": false,
+      "update_rate_hz": 5,
+      "interface": "UART (+I2C compass)"
+    },
+    "listings": [
+      {
+        "supplier_name": "Unmanned Tech",
+        "country": "UK",
+        "url": "https://www.unmannedtechshop.co.uk/products/matek-m10q-5883-gps-module",
+        "price_eur": 39.77,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "radio",
+    "manufacturer": "TBS (Team BlackSheep)",
+    "model": "Crossfire Nano RX",
+    "mass_g": 0.5,
+    "price_eur_estimate": 30.3,
+    "source": "https://www.team-blacksheep.com/products/prod:crossfire_nano_rx",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. 868/915 MHz receiver - use the 868 MHz CE/LBT mode in Ireland (25 mW). 12 channels over CRSF/SBUS (4-6 PWM). Telemetry downlink 40 mW (Nano RX Pro up to 500 mW). 40 km is TBS's marketing range (A2 rules: VLOS only). Mass excludes antenna. 3.3-8.4 V.",
+    "spec": {
+      "kind": "rc_link",
+      "frequency_mhz": 868,
+      "range_km_los": 40,
+      "channels": 12,
+      "telemetry": true
+    },
+    "listings": [
+      {
+        "supplier_name": "HobbyRC",
+        "country": "UK",
+        "url": "https://www.hobbyrc.co.uk/tbs-crossfire-nano-receiver",
+        "price_eur": 30.3,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Flying Tech",
+        "country": "UK",
+        "url": "https://www.flyingtech.co.uk/product/team-blacksheep-tbs-crossfire-nano-receiver/",
+        "price_eur": 31.58,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Unmanned Tech",
+        "country": "UK",
+        "url": "https://www.unmannedtechshop.co.uk/products/tbs-crossfire-nano-rx",
+        "price_eur": 19.67,
+        "in_stock": false,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "radio",
+    "manufacturer": "RadioMaster",
+    "model": "ER8 2.4GHz ELRS PWM receiver",
+    "mass_g": 16.5,
+    "price_eur_estimate": 40.83,
+    "source": "https://radiomasterrc.com/products/er8-2-4ghz-elrs-pwm-receiver",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. 8 PWM outputs + CRSF/SBUS serial, telemetry up to 100 mW, 4.5-8.4 V, 43x30x15 mm. Flash the ExpressLRS LBT (EU) build for CE compliance (2.4 GHz limit 100 mW EIRP). Range: 5 km is the ExpressLRS docs' conservative figure (ceramic antenna, no PA/LNA, 250 Hz/100 mW, clear LOS); far more is achievable.",
+    "spec": {
+      "kind": "rc_link",
+      "frequency_mhz": 2440,
+      "range_km_los": 5,
+      "channels": 8,
+      "telemetry": true
+    },
+    "listings": [
+      {
+        "supplier_name": "Flying Tech",
+        "country": "UK",
+        "url": "https://www.flyingtech.co.uk/product/radiomaster-er8-8ch-elrs-pwm-receiver/",
+        "price_eur": 40.83,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "HobbyRC",
+        "country": "UK",
+        "url": "https://www.hobbyrc.co.uk/radiomaster-er8-8ch-elrs-receiver",
+        "price_eur": 40.94,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/radio-gear-c33/transmitters-c58/radiomaster-er8-receiver-p5771",
+        "price_eur": 40.94,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Unmanned Tech",
+        "country": "UK",
+        "url": "https://www.unmannedtechshop.co.uk/products/radiomaster-er8-2-4ghz-pwm-expresslrs-8-channel-receiver",
+        "price_eur": 34.8,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "telemetry",
+    "manufacturer": "RFDesign",
+    "model": "RFD868x-EU (bundle)",
+    "mass_g": 14.5,
+    "price_eur_estimate": 195.9,
+    "source": "https://rfdesign.com.au/modems/",
+    "verified": false,
+    "notes": "RFDesign modem page + reseller datasheets via search extraction. EU variant: 868-869 MHz, up to 500 mW (+27 dBm), air rate up to 200 kbps (64 kbps default used here), SiK firmware, MAVLink, AES-128. 40 km is RFDesign's claim with suitable antennas. Mass = one modem. Legal note: only the 869.40-869.65 MHz sub-band allows 500 mW ERP (10 % duty cycle); elsewhere in 863-870 MHz the limit is 25 mW - set frequency/power accordingly. Price is for the air+ground bundle.",
+    "spec": {
+      "frequency_mhz": 868,
+      "range_km_los": 40,
+      "air_rate_kbps": 64,
+      "interface": "UART 3.3 V TTL"
+    },
+    "listings": [
+      {
+        "supplier_name": "Unmanned Tech",
+        "country": "UK",
+        "url": "https://www.unmannedtechshop.co.uk/products/rf-design-rfd-868x-eu-long-range-telemetry-modem-bundle",
+        "price_eur": 195.9,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/radio-gear-c33/telemetry-c31/868-mhz-telemetry-c65/rf-design-rfdesign-rfd-868x-eu-radio-modem-uk-and-europe-bundle-p4243",
+        "price_eur": 327.6,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "telemetry",
+    "manufacturer": "Holybro",
+    "model": "SiK Telemetry Radio V3 100mW 433MHz (set)",
+    "mass_g": 23.5,
+    "price_eur_estimate": 84.12,
+    "source": "https://docs.holybro.com/radio/sik-telemetry-radio-v3",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. 414-460 MHz variant, 20 dBm (100 mW) max, air rate 2-250 kbps (64 default), JST-GH 6-pin UART + micro-USB. Holybro quotes 300-500 m LOS with stock 2 dBi antennas. LEGAL NOTE (IE/EU): the 433.05-434.79 MHz SRD band allows 10 mW ERP - set TXPOWER to 10 dBm or below; 100 mW is not legal. Do NOT buy the 915 MHz version (not an EU band). Prefer RFD868x-EU or ELRS MAVLink.",
+    "spec": {
+      "frequency_mhz": 433,
+      "range_km_los": 0.5,
+      "air_rate_kbps": 64,
+      "interface": "UART (JST-GH 6-pin, 3.3 V TTL)"
+    },
+    "listings": [
+      {
+        "supplier_name": "Flying Tech",
+        "country": "UK",
+        "url": "https://www.flyingtech.co.uk/product/holybro-100mw-500mw-sik-telemetry-radio-set-v3/",
+        "price_eur": 84.12,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "3DXR",
+        "country": "UK",
+        "url": "https://www.3dxr.co.uk/products/holybro-sik-telemetry-radio-set-v3-100mw-433mhz",
+        "price_eur": null,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      },
+      {
+        "supplier_name": "Unmanned Tech",
+        "country": "UK",
+        "url": "https://www.unmannedtechshop.co.uk/products/100mw-sik-telemetry-radio-kit-v3-433mhz",
+        "price_eur": 59.58,
+        "in_stock": false,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "telemetry",
+    "manufacturer": "RadioMaster / ExpressLRS",
+    "model": "RP3 V2 ELRS 2.4GHz receiver in MAVLink mode",
+    "mass_g": 4.6,
+    "price_eur_estimate": null,
+    "source": "https://www.expresslrs.org/software/mavlink/",
+    "verified": false,
+    "notes": "Hardware specs from RadioMaster RP3 V2 page (4.6 g incl. antennas, 100 mW telemetry, CRSF); MAVLink throughput from ExpressLRS docs (ELRS >= 3.5): ~590 B/s downlink at 250 Hz (= 4.7 kbps, used here), ~1470 B/s at 333 Hz Full, ~2375 B/s at F1000. Combines RC + telemetry on one 2.4 GHz link (EU LBT build). Range = ExpressLRS conservative 5 km figure. No UK listing captured for RP3 V2.",
+    "spec": {
+      "frequency_mhz": 2440,
+      "range_km_los": 5,
+      "air_rate_kbps": 4.7,
+      "interface": "UART (MAVLink, 460800 baud)"
+    },
+    "listings": []
+  },
+  {
+    "category": "carbon_tube",
+    "manufacturer": "Easy Composites",
+    "model": "12mm (10mm) roll-wrapped carbon tube, plain finish, 1 m",
+    "mass_g": 55,
+    "price_eur_estimate": null,
+    "source": "https://www.easycomposites.co.uk/12mm-roll-wrapped-carbon-fibre-tube-metric",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass for the 1 m length. Price = EC ex-VAT 1-off price x 1.2 (UK VAT) then GBP->EUR; trade tiers are cheaper. 1 mm wall. Price not captured. 2 m also sold.",
+    "spec": {
+      "outer_diameter_mm": 12,
+      "inner_diameter_mm": 10,
+      "length_mm": 1000,
+      "layup": "roll_wrapped",
+      "mass_per_m_g": 55,
+      "youngs_modulus_gpa": null,
+      "tensile_strength_mpa": null
+    },
+    "listings": [
+      {
+        "supplier_name": "Easy Composites",
+        "country": "UK",
+        "url": "https://www.easycomposites.co.uk/12mm-roll-wrapped-carbon-fibre-tube-metric",
+        "price_eur": null,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "carbon_tube",
+    "manufacturer": "Easy Composites",
+    "model": "14mm (12mm) roll-wrapped carbon tube, woven finish, 1 m",
+    "mass_g": 65.7,
+    "price_eur_estimate": 18.6,
+    "source": "https://www.easycomposites.co.uk/14mm-woven-finish-carbon-fibre-tube",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass for the 1 m length. Price = EC ex-VAT 1-off price x 1.2 (UK VAT) then GBP->EUR; trade tiers are cheaper. 1 mm wall. Modulus/strength as published on this product page.",
+    "spec": {
+      "outer_diameter_mm": 14,
+      "inner_diameter_mm": 12,
+      "length_mm": 1000,
+      "layup": "roll_wrapped",
+      "mass_per_m_g": 65.7,
+      "youngs_modulus_gpa": 64,
+      "tensile_strength_mpa": 650
+    },
+    "listings": [
+      {
+        "supplier_name": "Easy Composites",
+        "country": "UK",
+        "url": "https://www.easycomposites.co.uk/14mm-woven-finish-carbon-fibre-tube",
+        "price_eur": 18.6,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "carbon_tube",
+    "manufacturer": "Easy Composites",
+    "model": "16mm (14mm) roll-wrapped carbon tube, woven finish, 1 m",
+    "mass_g": 74.2,
+    "price_eur_estimate": null,
+    "source": "https://www.easycomposites.co.uk/16mm-woven-finish-carbon-fibre-tube",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass for the 1 m length. Price = EC ex-VAT 1-off price x 1.2 (UK VAT) then GBP->EUR; trade tiers are cheaper. 1 mm wall. Category page shows 'from GBP 13.88/m' (probably a trade tier) - 1-off price not captured.",
+    "spec": {
+      "outer_diameter_mm": 16,
+      "inner_diameter_mm": 14,
+      "length_mm": 1000,
+      "layup": "roll_wrapped",
+      "mass_per_m_g": 74.2,
+      "youngs_modulus_gpa": null,
+      "tensile_strength_mpa": null
+    },
+    "listings": [
+      {
+        "supplier_name": "Easy Composites",
+        "country": "UK",
+        "url": "https://www.easycomposites.co.uk/16mm-woven-finish-carbon-fibre-tube",
+        "price_eur": null,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "carbon_tube",
+    "manufacturer": "Easy Composites",
+    "model": "20mm (17mm) roll-wrapped carbon tube, plain finish, 1 m",
+    "mass_g": 139,
+    "price_eur_estimate": 34.68,
+    "source": "https://www.easycomposites.co.uk/20mm-roll-wrapped-carbon-fibre-tube-metric",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass for the 1 m length. Price = EC ex-VAT 1-off price x 1.2 (UK VAT) then GBP->EUR; trade tiers are cheaper. 1.5 mm wall, 'high strength'. Prototype boom/spar candidate.",
+    "spec": {
+      "outer_diameter_mm": 20,
+      "inner_diameter_mm": 17,
+      "length_mm": 1000,
+      "layup": "roll_wrapped",
+      "mass_per_m_g": 139,
+      "youngs_modulus_gpa": null,
+      "tensile_strength_mpa": null
+    },
+    "listings": [
+      {
+        "supplier_name": "Easy Composites",
+        "country": "UK",
+        "url": "https://www.easycomposites.co.uk/20mm-roll-wrapped-carbon-fibre-tube-metric",
+        "price_eur": 34.68,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "carbon_tube",
+    "manufacturer": "Easy Composites",
+    "model": "20mm (18mm) roll-wrapped carbon tube, woven finish, 1 m",
+    "mass_g": 86.5,
+    "price_eur_estimate": 28.64,
+    "source": "https://www.easycomposites.co.uk/20mm-woven-finish-carbon-fibre-tube",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass for the 1 m length. Price = EC ex-VAT 1-off price x 1.2 (UK VAT) then GBP->EUR; trade tiers are cheaper. 1 mm wall. Prototype boom candidate.",
+    "spec": {
+      "outer_diameter_mm": 20,
+      "inner_diameter_mm": 18,
+      "length_mm": 1000,
+      "layup": "roll_wrapped",
+      "mass_per_m_g": 86.5,
+      "youngs_modulus_gpa": null,
+      "tensile_strength_mpa": null
+    },
+    "listings": [
+      {
+        "supplier_name": "Easy Composites",
+        "country": "UK",
+        "url": "https://www.easycomposites.co.uk/20mm-woven-finish-carbon-fibre-tube",
+        "price_eur": 28.64,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "carbon_tube",
+    "manufacturer": "Easy Composites",
+    "model": "25mm (22mm) roll-wrapped carbon tube, plain finish, 1 m",
+    "mass_g": 178,
+    "price_eur_estimate": 41.0,
+    "source": "https://www.easycomposites.co.uk/25mm-roll-wrapped-carbon-fibre-tube-metric",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass for the 1 m length. Price = EC ex-VAT 1-off price x 1.2 (UK VAT) then GBP->EUR; trade tiers are cheaper. 1.5 mm wall.",
+    "spec": {
+      "outer_diameter_mm": 25,
+      "inner_diameter_mm": 22,
+      "length_mm": 1000,
+      "layup": "roll_wrapped",
+      "mass_per_m_g": 178,
+      "youngs_modulus_gpa": null,
+      "tensile_strength_mpa": null
+    },
+    "listings": [
+      {
+        "supplier_name": "Easy Composites",
+        "country": "UK",
+        "url": "https://www.easycomposites.co.uk/25mm-roll-wrapped-carbon-fibre-tube-metric",
+        "price_eur": 41.0,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  },
+  {
+    "category": "carbon_tube",
+    "manufacturer": "Easy Composites",
+    "model": "25mm (23mm) roll-wrapped carbon tube, woven finish, 1 m",
+    "mass_g": 113.1,
+    "price_eur_estimate": 38.68,
+    "source": "https://www.easycomposites.co.uk/25mm-23mm-woven-finish-carbon-fibre-tube",
+    "verified": false,
+    "notes": "Specs extracted from the manufacturer page via web-search page reading (direct page fetch was blocked in the research environment), so verified=false. Mass for the 1 m length. Price = EC ex-VAT 1-off price x 1.2 (UK VAT) then GBP->EUR; trade tiers are cheaper. 1 mm wall.",
+    "spec": {
+      "outer_diameter_mm": 25,
+      "inner_diameter_mm": 23,
+      "length_mm": 1000,
+      "layup": "roll_wrapped",
+      "mass_per_m_g": 113.1,
+      "youngs_modulus_gpa": null,
+      "tensile_strength_mpa": null
+    },
+    "listings": [
+      {
+        "supplier_name": "Easy Composites",
+        "country": "UK",
+        "url": "https://www.easycomposites.co.uk/25mm-23mm-woven-finish-carbon-fibre-tube",
+        "price_eur": 38.68,
+        "in_stock": null,
+        "last_checked_at": "2026-10-09"
+      }
+    ]
+  }
+]

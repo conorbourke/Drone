@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app import suppliers
+from app.db import utcnow
 from app.deps import DbSession, current_user
 from app.models import Part, PartListing
 from app.parts_catalog import CATEGORY_KEYS, category_payloads, validate_spec
@@ -167,3 +171,58 @@ def delete_listing(listing_id: int, db: DbSession) -> None:
         raise not_found("Listing")
     db.delete(listing)
     db.commit()
+
+
+@router.post("/{part_id}/refresh-listings")
+def refresh_listings(
+    part_id: int,
+    request: Request,
+    db: DbSession,
+    wait: bool = Query(
+        True,
+        description="true: search now and answer when done (up to a few minutes); false: queue "
+        "it on the worker and answer 202 at once (poll GET /api/parts/{id}).",
+    ),
+) -> Any:
+    """Phase 4: Claude with web search looks up current Irish and UK listings for this part;
+    every link is checked before it is stored as working. One refresh per part per hour."""
+    settings = request.app.state.settings
+    if not suppliers.is_available(settings):
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": suppliers.MISSING_KEY_MESSAGE},
+        )
+    part = _load_part(db, part_id)
+    until = suppliers.rate_limited_until(part)
+    if until is not None:
+        wait_s = max(1, int((until - utcnow()).total_seconds()))
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": str(wait_s)},
+            content={
+                "detail": "This part's listings were refreshed less than an hour ago. Try "
+                f"again after {until:%H:%M} UTC.",
+                "retry_after_s": wait_s,
+            },
+        )
+    if not wait:
+        worker = getattr(request.app.state, "analysis_worker", None)
+        if worker is None or not worker.running:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"detail": "The worker is starting up. Try again in a moment."},
+            )
+        suppliers.mark_queued(db, part)
+        db.commit()
+        with contextlib.suppress(RuntimeError):
+            worker.submit_refresh(part.id)
+        body = PartOut.model_validate(_load_part(db, part_id)).model_dump(mode="json")
+        return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"part": body})
+    db.close()  # the refresh uses its own sessions; do not hold this one for minutes
+    try:
+        summary = suppliers.refresh_part(request.app.state.session_factory, settings, part_id)
+    except suppliers.SupplierError as exc:
+        return JSONResponse(status_code=status.HTTP_502_BAD_GATEWAY, content={"detail": str(exc)})
+    with request.app.state.session_factory() as fresh:
+        body = PartOut.model_validate(_load_part(fresh, part_id)).model_dump(mode="json")
+    return {"part": body, "refresh": summary}

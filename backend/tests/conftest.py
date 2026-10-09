@@ -64,7 +64,14 @@ def settings(data_dir: Path) -> Settings:
 @pytest.fixture(scope="session")
 def app(settings: Settings) -> FastAPI:
     run_migrations(settings.resolved_database_url)
-    return create_app(settings)
+    application = create_app(settings)
+    # Migration 0004 seeds the real parts catalogue; tests start from an empty catalogue and
+    # load it explicitly where they need it (tests/test_phase4_*.py).
+    with application.state.session_factory() as db:
+        db.execute(text("DELETE FROM part_listings"))
+        db.execute(text("DELETE FROM parts"))
+        db.commit()
+    return application
 
 
 @pytest.fixture(autouse=True)
@@ -73,6 +80,7 @@ def _clean_tables(app: FastAPI, settings: Settings) -> Iterator[None]:
     shutil.rmtree(settings.files_dir, ignore_errors=True)
     with app.state.session_factory() as db:
         for table in (
+            "part_selections",
             "assistant_messages",
             "assistant_threads",
             "analyses",

@@ -112,3 +112,8 @@ class VersionOut(BaseModel):
     mission: dict[str, Any] = Field(description="Mission at the current schema.")
     parent_version_id: int | None
     created_at: datetime
+    parts_selection: dict[str, Any] | None = Field(
+        None,
+        description="Phase 4: the stored parts selection of this version (per role: part, "
+        "quantity, locked, masses; plus 'masses_g' by Tier 1 mass component), or null.",
+    )

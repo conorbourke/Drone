@@ -5,7 +5,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 Country = Literal["IE", "UK"]
 
@@ -49,8 +56,20 @@ class ListingOut(BaseModel):
     price_eur: float | None
     in_stock: bool | None
     last_checked_at: datetime | None
+    url_ok: bool | None = Field(
+        None, description="Server-side link check: true for HTTP 200-399; null if never checked."
+    )
+    url_status: int | None = Field(None, description="HTTP status of the last link check.")
+    url_checked_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+    @computed_field(description="Not checked in the last 30 days (or never).")  # type: ignore[prop-decorator]
+    @property
+    def stale(self) -> bool:
+        from app.engine.selection import listing_is_stale
+
+        return listing_is_stale({"last_checked_at": self.last_checked_at})
 
 
 class PartBase(BaseModel):
@@ -121,6 +140,13 @@ class PartOut(PartBase):
     category: str
     spec: dict[str, Any]
     listings: list[ListingOut]
+    listings_refreshed_at: datetime | None = Field(
+        None, description="Last supplier lookup (one per part per hour)."
+    )
+    listings_refresh_status: str | None = Field(
+        None, description="queued | running | done | refused | error, or null if never run."
+    )
+    listings_refresh_message: str | None = None
     created_at: datetime
     updated_at: datetime
 

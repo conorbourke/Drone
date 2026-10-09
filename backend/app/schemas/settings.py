@@ -137,16 +137,29 @@ class Analysis(_Doc):
         return self
 
 
+class Budget(_Doc):
+    prototype_eur: float = Field(_S["budget"]["prototype_eur"])
+
+    @model_validator(mode="after")
+    def _sane(self) -> Budget:
+        if not 0 < self.prototype_eur <= 1_000_000:
+            raise ValueError(
+                "The prototype budget must be more than EUR 0 and at most EUR 1,000,000."
+            )
+        return self
+
+
 class Units(_Doc):
     system: Literal["metric"] = Field(_S["units"]["system"])
 
 
 class SettingsDocument(_Doc):
-    schema_version: Literal[2] = SETTINGS_SCHEMA_VERSION
+    schema_version: Literal[3] = SETTINGS_SCHEMA_VERSION
     printer: Printer = Field(default_factory=Printer)
     limits: Limits = Field(default_factory=Limits)
     checks: Checks = Field(default_factory=Checks)
     analysis: Analysis = Field(default_factory=Analysis)
+    budget: Budget = Field(default_factory=Budget)
     units: Units = Field(default_factory=Units)
 
     @model_validator(mode="before")

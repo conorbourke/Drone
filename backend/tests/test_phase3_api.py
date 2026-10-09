@@ -36,7 +36,7 @@ PHASE3_PATHS = {
 
 def test_settings_upgrade_1_to_2() -> None:
     upgraded = upgrade_settings({"schema_version": 1, "checks": {"static_margin_min": 0.06}})
-    assert upgraded["schema_version"] == 2
+    assert upgraded["schema_version"] == 3
     assert upgraded["checks"]["static_margin_min"] == 0.06
     for path, value in PHASE3_PATHS.items():
         block, key = path.split(".")
@@ -45,6 +45,7 @@ def test_settings_upgrade_1_to_2() -> None:
     v1 = copy.deepcopy(DEFAULT_SETTINGS)
     v1["schema_version"] = 1
     del v1["analysis"]
+    del v1["budget"]
     for key in (
         "manoeuvre_load_factor",
         "structural_safety_factor",
@@ -67,7 +68,7 @@ def test_stored_v1_settings_read_back_as_v2(app: FastAPI, auth_client: TestClien
         db.commit()
     body = auth_client.get("/api/settings").json()
     assert body["warnings"] == []
-    assert body["settings"]["schema_version"] == 2
+    assert body["settings"]["schema_version"] == 3
     assert body["settings"]["checks"]["static_margin_min"] == 0.06
     assert body["meta"]["checks.static_margin_min"]["is_default"] is False
     for path, value in PHASE3_PATHS.items():
@@ -101,7 +102,7 @@ def test_put_settings_v2_invariants_and_v1_documents(app: FastAPI, auth_client: 
     with app.state.session_factory() as db:
         row = db.scalar(select(AppSettings))
         assert row is not None
-        assert row.data == {"schema_version": 2, "checks": {"manoeuvre_load_factor": 3.8}}
+        assert row.data == {"schema_version": 3, "checks": {"manoeuvre_load_factor": 3.8}}
 
     # A browser tab opened before the update sends a v1 document: upgraded, not refused.
     v1 = copy.deepcopy(DEFAULT_SETTINGS)

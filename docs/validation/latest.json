@@ -1,6 +1,6 @@
 {
  "schema": "validation-report/1",
- "generated_at": "2026-10-09T07:17:00Z",
+ "generated_at": "2026-10-09T08:07:45Z",
  "engine_version": "tier2-1.0",
  "summary": {
   "pass": 24,
@@ -640,10 +640,10 @@
   }
  ],
  "timings": {
-  "textbook": 0.84,
-  "avl_reference": 0.73,
-  "xfoil_reference": 1.39,
-  "published_design": 15.92,
-  "total_s": 18.88
+  "textbook": 1.12,
+  "avl_reference": 1.21,
+  "xfoil_reference": 1.56,
+  "published_design": 17.42,
+  "total_s": 21.31
  }
 }

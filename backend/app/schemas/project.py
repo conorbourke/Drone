@@ -67,6 +67,11 @@ class DraftOut(BaseModel):
         description="Version the draft was last restored from or saved as; null if none."
     )
     updated_at: datetime = Field(description="When the draft was last written (UTC).")
+    parts_selection: dict[str, Any] | None = Field(
+        None,
+        description="Phase 4: the stored parts selection of the draft (per role: part, "
+        "quantity, locked, masses; plus 'masses_g' by Tier 1 mass component), or null.",
+    )
 
 
 class ProjectOut(BaseModel):

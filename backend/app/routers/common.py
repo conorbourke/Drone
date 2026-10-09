@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.models import DesignVersion, Project, User
 from app.schemas.design import DesignParameters
@@ -50,6 +50,7 @@ def draft_payload(project: Project) -> dict[str, Any]:
         "mission": current_mission(project.draft_mission),
         "based_on_version_id": project.draft_based_on_version_id,
         "updated_at": project.draft_updated_at,
+        "parts_selection": _parts_selection(project.id, None, object_session(project)),
     }
 
 
@@ -64,4 +65,18 @@ def version_payload(version: DesignVersion) -> dict[str, Any]:
         "mission": current_mission(version.mission),
         "parent_version_id": version.parent_version_id,
         "created_at": version.created_at,
+        "parts_selection": _parts_selection(
+            version.project_id, version.id, object_session(version)
+        ),
     }
+
+
+def _parts_selection(
+    project_id: int, version_id: int | None, db: Session | None
+) -> dict[str, Any] | None:
+    """Phase 4: the stored parts selection (see ``app.parts_service.selection_payload``)."""
+    if db is None:
+        return None
+    from app.parts_service import selection_payload
+
+    return selection_payload(db, project_id, version_id)

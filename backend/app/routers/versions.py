@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.db import utcnow
 from app.deps import CurrentUser, DbSession, current_user
 from app.models import Analysis, DesignVersion, Project
+from app.parts_service import copy_selection
 from app.patching import PatchError, apply_patch
 from app.routers.common import (
     conflict,
@@ -143,6 +144,8 @@ def create_version(
             parent_version_id=project.draft_based_on_version_id,
         )
         project.draft_based_on_version_id = version.id
+        # Phase 4: the version keeps the draft's parts list (locked choices and picks).
+        copy_selection(db, project.id, None, version.id)
     _commit_or_conflict(db, body.name)
     return VersionOut(**version_payload(version))
 
@@ -187,6 +190,14 @@ def create_version_from_patch(
         parameters=parameters,
         mission=mission,
         parent_version_id=parent_id,
+    )
+    # Phase 4: the owner's locked parts carry over; the engine picks the rest for the patch.
+    copy_selection(
+        db,
+        project.id,
+        body.base.version_id if isinstance(body.base, PatchBase) else None,
+        version.id,
+        locked_only=True,
     )
     _commit_or_conflict(db, body.name)
     return VersionOut(**version_payload(version))
@@ -253,6 +264,7 @@ def duplicate_version(
             mission=current_mission(source.mission),
             parent_version_id=source.id,
         )
+        copy_selection(db, project.id, source.id, copy.id)
         try:
             db.commit()
         except IntegrityError:
@@ -272,6 +284,8 @@ def restore_version(version_id: int, db: DbSession, user: CurrentUser) -> DraftO
     project.draft_mission = current_mission(version.mission)
     project.draft_based_on_version_id = version.id
     project.draft_updated_at = utcnow()
+    # Phase 4: the draft takes the version's parts list with it.
+    copy_selection(db, project.id, version.id, None)
     db.commit()
     return DraftOut(**draft_payload(project))
 

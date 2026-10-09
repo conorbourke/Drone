@@ -476,8 +476,10 @@ def run_analysis(
 ) -> dict[str, Any]:
     """Analyse one design. Never raises for bad input: returns ``valid: False`` with fail checks.
 
-    ``parts`` (optional, Phase 4): ``{"lift_motor": MotorSpec dict, "lift_prop": PropellerSpec
-    dict}``; a motor with ``thrust_data`` replaces the generic propeller static coefficients.
+    ``parts`` (optional, Phase 4): the selected catalogue parts, each a spec dict plus
+    ``label`` and ``mass_g`` (see :func:`apply_parts` for every key). A lift motor with
+    ``thrust_data`` for the selected propeller replaces the generic propeller's static
+    coefficients; the parts' masses replace the statistical ones in the mass model.
     """
     t0 = time.time()
     timings: dict[str, float] = {}
@@ -534,13 +536,15 @@ def _prepare(
 ) -> dict[str, Any]:
     t = time.time()
     scale = "final" if mission.get("scale") == "final" else "prototype"
+    parts = parts or {}
+    p, mass_parts, parts_used = apply_parts(p, parts)
     g = build_geometry(p)
     w = g["wing"]
     v = mission["cruise_speed_mps"]
     s_ref = w["area_m2"]
     mac_m = w["mac_mm"] / 1000
     report(0.06, "Weights and balance")
-    ms = solve_mass(p, g, mission, settings)
+    ms = solve_mass(p, g, mission, settings, parts=mass_parts)
     t = _tick(timings, "mass_s", t)
 
     # ----- Polars at the operating Reynolds numbers -----
@@ -583,12 +587,16 @@ def _prepare(
     spar_sizing = None
     sf = settings["checks"]["structural_safety_factor"]
     n_man = settings["checks"]["manoeuvre_load_factor"]
-    if scale == "prototype":
+    if scale == "prototype" and "spar_tube" in mass_parts:
+        # Phase 4: the selected catalogue tube is the spar; the strength check below runs on
+        # it with AVL's span loading.
+        pass
+    elif scale == "prototype":
         # The spar tube is sized on Schrenk's span loading (NACA TM 948) so that a single AVL
         # pass is needed; the strength check below then uses AVL's own span loading.
         spar_sizing = stc.size_spar_tube(g, stc.schrenk_strips(g), weight_max, 1.0, n_man, sf)
         tube = {"outer_mm": spar_sizing["outer_mm"], "wall_mm": spar_sizing["wall_mm"]}
-        ms = solve_mass(p, g, mission, settings, spar_tube=tube)
+        ms = solve_mass(p, g, mission, settings, spar_tube=tube, parts=mass_parts)
     avl = _avl_cases(g, ms, mission, s_ref, claf_w, claf_t)
     t = _tick(timings, "avl_s", t)
     cr_max, cr_min, hi = avl["cases"]
@@ -647,33 +655,34 @@ def _prepare(
         vbus = bat.loaded_voltage(pack, full_power)["voltage_v"]
         lift_motor = prp.size_generic_motor(lift_prop, max_thrust_req, vbus)
     parts_note = None
-    if parts and parts.get("lift_motor", {}).get("thrust_data"):
-        spec = parts["lift_motor"]
-        motor = prp.Motor(
-            spec["kv_rpm_per_v"],
-            spec["resistance_ohm"],
-            spec["no_load_current_a"],
-            spec["max_current_a"],
-            source="Catalogue motor",
-            assumed=False,
+    lm_spec, lp_spec = parts.get("lift_motor"), parts.get("lift_prop")
+    if lm_spec and (lp_spec or lm_spec.get("thrust_data")):
+        # Phase 3 behaviour kept: a motor alone is used only with its test data (fitted at
+        # the design's propeller size); with a selected propeller the catalogue motor is
+        # always used, fitted to the test points taken with that propeller when they exist.
+        motor = prp.catalogue_motor(lm_spec)
+        prop, fit = prp.catalogue_propeller(
+            lp_spec,
+            lm_spec,
+            motor,
+            pr["prop_diameter_mm"],
+            pr["prop_pitch_mm"],
+            pr["prop_blades"],
         )
-        fit = prp.fit_thrust_data(spec["thrust_data"], pr["prop_diameter_mm"], motor)
-        if fit:
-            lift_prop.ct0 = fit["ct0"]
-            if fit["cp0"]:
-                lift_prop.cp0 = fit["cp0"]
-            lift_prop.fitted = True
-            lift_prop.source = (
-                f"Static CT0/CP0 fitted to {fit['points']} catalogue thrust-test "
-                "points; advance-ratio fall-off from the generic UIUC-trend shape."
-            )
-            lift_motor = motor
-            parts_note = lift_prop.source
+        if fit or lp_spec:
+            lift_prop, lift_motor = prop, motor
+            parts_note = prop.source
     pusher_prop = pusher_motor = None
     if p["layout"] == "quad_pusher":
         dp = p["pusher"]["prop_diameter_mm"]
         pusher_prop = prp.generic_propeller(dp, prp.PUSHER_PITCH_RATIO * dp, 2)
         pusher_motor = prp.size_generic_motor(pusher_prop, 0.5 * weight_max, vbus)
+        cm_spec, pp_spec = parts.get("cruise_motor"), parts.get("pusher_prop")
+        if cm_spec:
+            pusher_motor = prp.catalogue_motor(cm_spec)
+            pusher_prop, _fit = prp.catalogue_propeller(
+                pp_spec, cm_spec, pusher_motor, dp, prp.PUSHER_PITCH_RATIO * dp, 2
+            )
     t = _tick(timings, "propulsion_setup_s", t)
 
     state = {
@@ -712,10 +721,112 @@ def _prepare(
         "spar_sizing": spar_sizing,
         "table_wing": table_wing,
         "parts_note": parts_note,
+        "parts_used": parts_used,
         "mode": mode,
         "claf": {"wing": claf_w, "tail": claf_t},
     }
     return state
+
+
+PART_ROLE_LABELS = {
+    "lift_motor": "Lift motors",
+    "lift_prop": "Lift propellers",
+    "cruise_motor": "Pusher motor",
+    "pusher_prop": "Pusher propeller",
+    "esc": "ESCs",
+    "battery": "Battery",
+    "tilt_servo": "Tilt servos",
+    "avionics": "Avionics",
+    "spar_tube": "Wing spar tube",
+    "boom_tube": "Boom tubes",
+}
+
+
+def apply_parts(
+    p: dict[str, Any], parts: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Fold the selected catalogue parts (Phase 4) into the design for the analysis.
+
+    ``parts`` keys (all optional; each a catalogue spec dict plus ``label`` and ``mass_g``):
+    ``lift_motor``, ``lift_prop``, ``cruise_motor``, ``pusher_prop``, ``esc``, ``tilt_servo``
+    (MotorSpec, PropellerSpec, EscSpec, ServoSpec dicts); ``battery``: ``{chemistry,
+    cells_series, cells_parallel, capacity_mah, discharge_c_continuous, discharge_c_burst,
+    mass_g, label}`` (a pack, or a custom pack of catalogue cells); ``avionics``: ``{mass_g,
+    label, detail}`` (autopilot, GPS, receiver, telemetry and power module together);
+    ``spar_tube`` / ``boom_tube``: CarbonTubeSpec dicts plus ``label``.
+
+    Returns (design copy with the real propeller sizes, battery and boom tube written in,
+    mass-model parts for :func:`solve_mass`, summary of what was used for the result).
+    """
+    if not parts:
+        return p, {}, {}
+    q = copy.deepcopy(p)
+    mass: dict[str, Any] = {}
+    used: dict[str, Any] = {}
+
+    def note(role: str, spec: dict[str, Any]) -> None:
+        used[role] = {
+            "role_label": PART_ROLE_LABELS.get(role, role),
+            "label": spec.get("label") or role,
+            "mass_g": spec.get("mass_g"),
+            "part_id": spec.get("part_id"),
+        }
+
+    for role in ("lift_motor", "lift_prop", "cruise_motor", "pusher_prop", "esc", "tilt_servo"):
+        spec = parts.get(role)
+        if spec:
+            note(role, spec)
+            if spec.get("mass_g"):
+                mass[role] = {"mass_g": float(spec["mass_g"]), "label": spec.get("label", role)}
+    lp = parts.get("lift_prop")
+    if lp:
+        q["propulsion"]["prop_diameter_mm"] = float(lp["diameter_mm"])
+        q["propulsion"]["prop_pitch_mm"] = float(lp["pitch_mm"])
+        q["propulsion"]["prop_blades"] = int(lp.get("blades") or 2)
+    pp = parts.get("pusher_prop")
+    if pp:
+        q["pusher"]["prop_diameter_mm"] = float(pp["diameter_mm"])
+    b = parts.get("battery")
+    if b:
+        note("battery", b)
+        q["battery"] = {
+            **q["battery"],
+            "chemistry": b["chemistry"],
+            "cells_series": int(b["cells_series"]),
+            "cells_parallel": int(b["cells_parallel"]),
+            "capacity_mah": float(b["capacity_mah"]),
+            "discharge_c_continuous": b.get("discharge_c_continuous"),
+            "discharge_c_burst": b.get("discharge_c_burst"),
+            "mass_g": b.get("mass_g"),
+            "part_label": b.get("label"),
+        }
+        if b.get("mass_g"):
+            mass["battery"] = {"mass_g": float(b["mass_g"]), "label": b.get("label", "battery")}
+    av = parts.get("avionics")
+    if av and av.get("mass_g"):
+        note("avionics", av)
+        mass["avionics"] = {
+            "mass_g": float(av["mass_g"]),
+            "label": av.get("label", "avionics"),
+            "detail": av.get("detail", av.get("label", "")),
+        }
+    for role in ("spar_tube", "boom_tube"):
+        tube = parts.get(role)
+        if tube:
+            note(role, tube)
+            entry = {
+                "mass_g": float(tube["mass_per_m_g"]),
+                "mass_per_m_g": float(tube["mass_per_m_g"]),
+                "outer_mm": float(tube["outer_diameter_mm"]),
+                "wall_mm": (float(tube["outer_diameter_mm"]) - float(tube["inner_diameter_mm"]))
+                / 2,
+                "label": tube.get("label", role),
+            }
+            mass[role] = entry
+            if role == "boom_tube":
+                q["booms"]["diameter_mm"] = entry["outer_mm"]
+                q["booms"]["wall_mm"] = entry["wall_mm"]
+    return q, mass, used
 
 
 def json_safe(v: Any) -> Any:
@@ -1143,14 +1254,18 @@ def _assemble(
     pack = st["pack_nominal"]
     lift_motor = st["lift_motor"]
     lift_prop = st["lift_prop"]
-    max_static = prp.max_thrust(
-        lift_prop,
-        lift_motor,
-        0.0,
-        bat.loaded_voltage(pack, 4 * lift_motor.i_max_a * pack["v_nominal"] / prp.ETA_ESC)[
-            "voltage_v"
-        ],
-    )
+    v_full = bat.loaded_voltage(pack, 4 * lift_motor.i_max_a * pack["v_nominal"] / prp.ETA_ESC)[
+        "voltage_v"
+    ]
+    if not lift_motor.assumed:
+        # Phase 4 catalogue motor: its published current rating is usually above what it draws
+        # at full throttle, so the pack sag comes from the full-throttle current itself.
+        v_full = pack["v_nominal"]
+        for _ in range(4):
+            full = prp.max_thrust(lift_prop, lift_motor, 0.0, v_full)
+            i_full = min(full["current_a"], lift_motor.i_max_a)
+            v_full = bat.loaded_voltage(pack, 4 * i_full * v_full / prp.ETA_ESC)["voltage_v"]
+    max_static = prp.max_thrust(lift_prop, lift_motor, 0.0, v_full)
     weight_max = st["mass_max_kg"] * G0
     share = clamp(ms["front_share_max"], 0, 1)
     tw_total = 4 * max_static["thrust_n"] / weight_max
@@ -1289,7 +1404,13 @@ def _assemble(
         ),
         "continuous_rating_a": pack["i_continuous_a"],
         "burst_rating_a": pack["i_burst_a"],
-        "rating_source": bat.SOURCES["rating"],
+        "rating_source": (
+            f"Catalogue rating of {st['parts_used']['battery']['label']}: "
+            f"{pack['c_continuous']:g} C continuous / {pack['c_burst']:g} C burst "
+            "(manufacturer figures, unverified)."
+            if st["parts_used"].get("battery")
+            else bat.SOURCES["rating"]
+        ),
         "peak_c_rate": peak_lv["current_a"] / pack["capacity_ah"],
         "temperature_rise_k": t_rise,
         "temperature_note": (
@@ -1594,9 +1715,17 @@ def _assemble(
         "strip-integrated with "
         "AVL local lift; laminar-flow assumptions in XFOIL suit a smooth, sanded and painted "
         "surface.",
-        "Generic propellers fitted to UIUC propeller-database trends (+/-15 % CT, CP) and generic "
-        "motors (Kv, R, I0) sized to the hover thrust-to-weight minimum: assumed until Phase 4 "
-        "parts.",
+        (
+            "Selected catalogue parts: "
+            + "; ".join(f"{v['role_label']}: {v['label']}" for v in st["parts_used"].values())
+            + ". Motor constants as published; propeller coefficients fitted to the motor's "
+            "thrust tests for that propeller where the catalogue has them, otherwise the "
+            "generic UIUC-trend propeller (+/-15 % CT, CP)."
+            if st["parts_used"]
+            else "Generic propellers fitted to UIUC propeller-database trends (+/-15 % CT, CP) "
+            "and generic motors (Kv, R, I0) sized to the hover thrust-to-weight minimum: "
+            "assumed until parts are selected (Parts tab)."
+        ),
         "Battery: per-cell internal resistance and open-circuit voltage by chemistry (estimates), "
         "discharge ratings are placeholders until Phase 4 packs.",
         f"Mission: 45 s take-off hover, modelled transitions ({trn.ACCELERATION:g} m/s² to "
@@ -1676,6 +1805,7 @@ def _assemble(
         "assumptions": assumptions,
         "polar_log": st["store"].log,
         "a3_note": A3_NOTE,
+        "parts": st["parts_used"] or None,
         "inputs": {"parameters": p, "mission": mission, "settings": settings},
     }
 
@@ -1757,6 +1887,39 @@ def _geometry_summary(g: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def tier1_cruise_propeller(p: dict[str, Any]) -> tuple[prp.Propeller, int]:
+    """The browser's (Tier 1) cruise propeller and how many share the thrust: the pusher
+    (pitch assumed ``PUSHER_PITCH_RATIO`` x diameter, two blades) or the two tilted lift
+    propellers (frontend/src/engine/estimate.ts)."""
+    if p["layout"] == "quad_pusher":
+        dp = p["pusher"]["prop_diameter_mm"]
+        return prp.generic_propeller(dp, prp.PUSHER_PITCH_RATIO * dp, 2), 1
+    pr = p["propulsion"]
+    return prp.generic_propeller(pr["prop_diameter_mm"], pr["prop_pitch_mm"], pr["prop_blades"]), 2
+
+
+def tier1_propeller_efficiency(
+    prop: prp.Propeller, thrust_n: float, speed: float, rho: float = RHO_SL
+) -> tuple[float, float]:
+    """(efficiency J CT / CP, J) of one propeller giving ``thrust_n`` at ``speed``: a port of
+    the browser's ``propOperatingPoint`` (frontend/src/engine/propeller.ts). With n = V / (J D),
+    T = CT(J) rho V^2 D^2 / J^2 falls monotonically to zero at the zero-thrust advance ratio,
+    so J is found by bisection. (0, 0) when there is no thrust or speed."""
+    d = prop.diameter_m
+    if not (speed > 0 and thrust_n > 0 and d > 0):
+        return 0.0, 0.0
+    target = thrust_n / (rho * speed * speed * d * d)
+    lo, hi = 1e-6, prop.j_zero_thrust
+    for _ in range(80):
+        mid = 0.5 * (lo + hi)
+        if prop.ct(mid) / (mid * mid) > target:
+            lo = mid
+        else:
+            hi = mid
+    j = 0.5 * (lo + hi)
+    return prop.efficiency(j), j
+
+
 def _tier1_comparison(
     st: dict[str, Any],
     t1: dict[str, float],
@@ -1776,9 +1939,16 @@ def _tier1_comparison(
     ms = st["ms"]
     v = st["mission"]["cruise_speed_mps"]
     weight = st["mass_max_kg"] * G0
-    # Tier 1 powers: fixed efficiencies (docs/ENGINE.md "Performance").
-    eta_prop = 0.75 if st["p"]["layout"] == "quad_pusher" else 0.65
-    t1_cruise = t1["drag_n"] * v / (eta_prop * 0.85 * 0.95) + st["avionics_w"]
+    # Tier 1 powers as the browser computes them (docs/ENGINE.md "Performance"): the cruise
+    # propeller efficiency from the same generic CT(J), CP(J) curves at thrust = Tier 1 drag /
+    # cruise propeller count, then fixed motor 0.85 and ESC 0.95.
+    t1_prop, t1_count = tier1_cruise_propeller(st["p"])
+    eta_prop, j_t1 = tier1_propeller_efficiency(t1_prop, t1["drag_n"] / t1_count, v)
+    t1_cruise = (
+        t1["drag_n"] * v / (eta_prop * 0.85 * 0.95) + st["avionics_w"]
+        if eta_prop > 0
+        else float("nan")
+    )
     share = clamp(ms["front_share_max"], 0, 1)
     disc = math.pi * (st["p"]["propulsion"]["prop_diameter_mm"] / 2000) ** 2
     from app.engine.mass import ideal_hover_power
@@ -1887,12 +2057,14 @@ def _tier1_comparison(
         t1_cruise,
         nmax["cruise_power_w"],
         "W",
-        f"Tier 1 assumes a fixed propeller efficiency of {eta_prop}; the propeller model gives "
-        f"{nmax['cruise_op']['eta_prop']:.2f} at the cruise advance ratio "
-        f"J = {nmax['cruise_op']['j']:.2f}"
+        "Same generic propeller curves in both (Tier 1 propeller efficiency "
+        f"{eta_prop:.2f} at J = {j_t1:.2f}, Tier 2 {nmax['cruise_op']['eta_prop']:.2f} at "
+        f"J = {nmax['cruise_op']['j']:.2f}); Tier 1 uses its own drag build-up "
+        f"({t1['drag_n']:.2f} N against {nmax['drag_n']:.2f} N) and a fixed motor efficiency "
+        f"0.85, Tier 2 the motor model ({nmax['cruise_op']['eta_motor']:.2f})"
         + (
-            " (hover propellers are lightly loaded and near their "
-            "zero-thrust advance ratio in cruise)"
+            "; hover propellers are lightly loaded and near their zero-thrust advance ratio "
+            "in cruise, so their efficiency is low in both"
             if nmax["cruise_op"]["eta_prop"] < 0.5
             else ""
         )

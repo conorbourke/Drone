@@ -116,7 +116,13 @@ def test_unknown_project_is_404(auth_client: TestClient) -> None:
 def test_draft_get_and_put(auth_client: TestClient, project: dict) -> None:
     pid = project["id"]
     draft = auth_client.get(f"/api/projects/{pid}/draft").json()
-    assert set(draft) == {"parameters", "mission", "based_on_version_id", "updated_at"}
+    assert set(draft) == {
+        "parameters",
+        "mission",
+        "based_on_version_id",
+        "updated_at",
+        "parts_selection",
+    }
     params = copy.deepcopy(draft["parameters"])
     mission = copy.deepcopy(draft["mission"])
     params["wing"]["span_mm"] = 2000

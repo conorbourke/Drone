@@ -19,7 +19,7 @@ def test_get_settings_returns_defaults_with_meta(auth_client: TestClient) -> Non
     assert set(body) == {"settings", "meta", "warnings"}
     assert body["warnings"] == []
     assert body["settings"] == DEFAULT_SETTINGS
-    assert body["settings"]["schema_version"] == 2
+    assert body["settings"]["schema_version"] == 3
     paths = set(body["meta"])
     assert paths == set(
         flatten({k: v for k, v in DEFAULT_SETTINGS.items() if k != "schema_version"})
@@ -49,7 +49,7 @@ def test_put_persists_only_the_diff(app: FastAPI, auth_client: TestClient) -> No
         row = db.scalar(select(AppSettings))
         assert row is not None
         assert row.data == {
-            "schema_version": 2,
+            "schema_version": 3,
             "limits": {"warn_mtow_kg": 22.0},
             "printer": {"name": "Other printer"},
         }
@@ -62,7 +62,7 @@ def test_put_persists_only_the_diff(app: FastAPI, auth_client: TestClient) -> No
     assert all(m["is_default"] for m in response.json()["meta"].values())
     with app.state.session_factory() as db:
         row = db.scalar(select(AppSettings))
-        assert row is not None and row.data == {"schema_version": 2}
+        assert row is not None and row.data == {"schema_version": 3}
 
 
 def test_put_invariants_give_plain_language_422(auth_client: TestClient) -> None:

@@ -18,6 +18,7 @@ VERSION_KEYS = {
     "mission",
     "parent_version_id",
     "created_at",
+    "parts_selection",
 }
 
 
@@ -146,7 +147,13 @@ def test_restore_copies_documents_into_draft(auth_client: TestClient, project: d
     restored = auth_client.post(f"/api/versions/{v1['id']}/restore")
     assert restored.status_code == 200
     body = restored.json()
-    assert set(body) == {"parameters", "mission", "based_on_version_id", "updated_at"}
+    assert set(body) == {
+        "parameters",
+        "mission",
+        "based_on_version_id",
+        "updated_at",
+        "parts_selection",
+    }
     assert body["based_on_version_id"] == v1["id"]
     assert body["parameters"]["wing"]["span_mm"] == v1["parameters"]["wing"]["span_mm"]
     assert body["mission"]["target_takeoff_mass_kg"] == 2.5

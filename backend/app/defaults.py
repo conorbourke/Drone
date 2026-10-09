@@ -15,7 +15,7 @@ from typing import Any
 
 DESIGN_SCHEMA_VERSION = 2
 MISSION_SCHEMA_VERSION = 1
-SETTINGS_SCHEMA_VERSION = 2
+SETTINGS_SCHEMA_VERSION = 3
 
 DEFAULTS_NOTE = (
     "Starting values for a new project, not an analysed design. "
@@ -133,6 +133,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "transition_thrust_margin_min": 1.3,
     },
     "analysis": {"ncrit": 9.0},
+    "budget": {"prototype_eur": 5000.0},
     "units": {"system": "metric"},
 }
 
@@ -264,6 +265,13 @@ SETTINGS_META: dict[str, dict[str, str]] = {
         "model a rougher printed surface or gusty air and give more drag.",
         "source": "Drela, XFOIL 6.9 user guide: Ncrit 9 for an average wind tunnel or clean "
         "air; 1-14 is the usable range.",
+    },
+    "budget.prototype_eur": {
+        "label": "Prototype budget",
+        "description": "Money available for the prototype's bought parts, in euro. The Parts "
+        "tab compares the recommended parts list (best Irish or UK listing per part, plus "
+        "consumables) against it.",
+        "source": "Build brief: prototype parts budget of EUR 5,000.",
     },
     "units.system": {
         "label": "Unit system",

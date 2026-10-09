@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import parts_service
 from app.db import utcnow
 from app.deps import CurrentUser, DbSession, current_user
 from app.engine.analysis import ENGINE_VERSION
@@ -104,6 +105,7 @@ def list_item(
         "started_at": row.started_at,
         "finished_at": row.finished_at,
         "headline": _headline(row),
+        "parts": "selected" if row.inputs.get("parts") else "generic",
     }
 
 
@@ -158,6 +160,7 @@ def inputs_hash(inputs: dict[str, Any]) -> str:
         "engine_version": inputs["engine_version"],
         "job_version": inputs["job_version"],
         "target_takeoff_mass_kg": inputs.get("target_takeoff_mass_kg"),
+        "parts": inputs.get("parts"),
     }
     return hashlib.sha256(canonical_json(hashed).encode("ascii")).hexdigest()
 
@@ -170,6 +173,7 @@ def enqueue(
     source: Source,
     kind: str,
     target_takeoff_mass_kg: float | None = None,
+    parts_mode: str = "generic",
 ) -> Any:
     worker = _worker(request)
     if worker is None or not worker.running:
@@ -192,6 +196,22 @@ def enqueue(
     }
     if target_takeoff_mass_kg is not None:
         inputs["target_takeoff_mass_kg"] = float(target_takeoff_mass_kg)
+    if kind == "full" and parts_mode == "selected":
+        # Phase 4: the parts list (locked parts and the engine's picks) goes into the inputs,
+        # so it is part of the hash; the picks are stored as the draft's or version's record.
+        parts, summary = parts_service.analysis_parts_for(
+            db,
+            request.app.state.settings,
+            user.id,
+            project,
+            version,
+            parameters,
+            mission,
+            settings_doc,
+        )
+        if parts:
+            inputs["parts"] = parts
+            inputs["parts_selection"] = summary
     digest = inputs_hash(inputs)
     version_id = version.id if version else None
     version_number = version.number if version else None
@@ -281,7 +301,7 @@ def create_analysis(
     project_id: int, body: AnalysisCreate, request: Request, db: DbSession, user: CurrentUser
 ) -> Any:
     project = owned_project(db, user, project_id)
-    return enqueue(request, db, user, project, body.source, body.kind)
+    return enqueue(request, db, user, project, body.source, body.kind, parts_mode=body.parts)
 
 
 @router.post(

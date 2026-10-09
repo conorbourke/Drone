@@ -143,3 +143,44 @@ def test_progress_and_catalogue_thrust_data(
     fractions = [f for f, _ in seen]
     assert fractions[0] < 0.1 and fractions[-1] == 1.0
     assert fractions == sorted(fractions)
+
+
+# Browser (Tier 1) cruise power for the same designs, from frontend/src/engine/estimate.ts with
+# the fixtures in frontend/src/engine/__fixtures__/designs.ts (defaultInput, quadPusherInput):
+# the generic CT(J), CP(J) propeller at thrust = drag / cruise propeller count.
+BROWSER_TIER1_CRUISE_POWER_W = {"front_tilt": 218.07, "quad_pusher": 127.50}
+
+
+def _tier1_row(r: dict[str, Any], key: str) -> dict[str, Any]:
+    return next(row for row in r["tier1_comparison"] if row["key"] == key)
+
+
+def test_tier1_cruise_power_matches_browser(default_full: dict[str, Any]) -> None:
+    row = _tier1_row(default_full, "cruise_power")
+    assert row["tier1"] == pytest.approx(BROWSER_TIER1_CRUISE_POWER_W["front_tilt"], rel=0.03)
+    assert "propeller" in row["why"]
+
+
+def test_tier1_cruise_power_matches_browser_quad_pusher(
+    polar_cache: str, params: dict[str, Any], mission: dict[str, Any]
+) -> None:
+    params["layout"] = "quad_pusher"
+    r = run_analysis(params, mission, None, mode="fast", cache_dir=polar_cache)
+    row = _tier1_row(r, "cruise_power")
+    assert row["tier1"] == pytest.approx(BROWSER_TIER1_CRUISE_POWER_W["quad_pusher"], rel=0.03)
+
+
+def test_tier1_propeller_efficiency_matches_the_browser_port() -> None:
+    from app.engine.analysis import tier1_propeller_efficiency
+    from app.engine.propulsion import generic_propeller
+
+    # frontend/src/engine/propeller.test.ts style check: 330 x 140 mm lift propeller sharing
+    # 3.63 N of drag between two at 16 m/s (default design, browser value 0.342 at J ~ 0.47).
+    prop = generic_propeller(330, 140, 2)
+    eta, j = tier1_propeller_efficiency(prop, 3.6287 / 2, 16.0)
+    assert eta == pytest.approx(0.3423, rel=0.01)
+    assert 0 < j < prop.j_zero_thrust
+    # Thrust balance at the solved point: T = CT rho n^2 D^4.
+    n = 16.0 / (j * prop.diameter_m)
+    assert prop.ct(j) * 1.225 * n * n * prop.diameter_m**4 == pytest.approx(3.6287 / 2, rel=1e-6)
+    assert tier1_propeller_efficiency(prop, 0.0, 16.0) == (0.0, 0.0)

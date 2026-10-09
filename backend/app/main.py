@@ -26,7 +26,12 @@ from app.backup import BackupManager
 from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory, sqlite_path
 from app.deps import current_user
-from app.jobs import AnalysisWorker, recover_analyses, validation_report_path
+from app.jobs import (
+    AnalysisWorker,
+    recover_analyses,
+    recover_refreshes,
+    validation_report_path,
+)
 from app.models import User
 from app.routers import (
     airfoils,
@@ -35,6 +40,7 @@ from app.routers import (
     auth,
     images,
     parts,
+    parts_list,
     projects,
     readings,
     schema,
@@ -241,6 +247,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     failed, queued = recover_analyses(app.state.session_factory)
     if failed:
         log.warning("Marked %d interrupted analysis(es) as failed", failed)
+    if recover_refreshes(app.state.session_factory):
+        log.warning("Marked interrupted listing refresh(es) as failed")
     worker = AnalysisWorker(app.state.session_factory, settings)
     worker.start()
     app.state.analysis_worker = worker
@@ -340,6 +348,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(projects.router)
     app.include_router(versions.router)
     app.include_router(parts.router)
+    app.include_router(parts_list.router)
     app.include_router(settings_router.router)
     app.include_router(schema.router)
     app.include_router(system.router)

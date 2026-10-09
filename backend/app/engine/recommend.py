@@ -294,8 +294,14 @@ def run_recommendations(
     progress: ProgressFn | None = None,
     settings_meta: dict[str, Any] | None = None,
     max_results: int = 8,
+    parts: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Sensitivity sweep. ``baseline`` may be a fast-mode result for the same inputs."""
+    """Sensitivity sweep. ``baseline`` may be a fast-mode result for the same inputs.
+
+    ``parts`` (Phase 4): the selected catalogue parts, passed to every analysis of the sweep so
+    the comparisons are made with the real parts (a nudge of a size the parts fix, such as the
+    propeller diameter or the battery capacity, then changes nothing and is not recommended).
+    """
     t0 = time.time()
     p, m, problems = validate_inputs(parameters, mission)
     if p is None or m is None:
@@ -307,7 +313,7 @@ def run_recommendations(
             "checks": problems,
         }
     s = resolve_settings(settings)
-    kw = {"cache_dir": cache_dir, "settings_meta": settings_meta}
+    kw = {"cache_dir": cache_dir, "settings_meta": settings_meta, "parts": parts}
     if baseline is None or baseline.get("mode") != "fast":
         baseline = run_analysis(p, m, s, mode="fast", **kw)
     if not baseline.get("valid"):
@@ -340,6 +346,7 @@ def run_recommendations(
                     mode="fast",
                     settings_meta=settings_meta,
                     polar_store=PolarStore(cache_dir, ncrit, allow_xfoil=False, use_cache=False),
+                    parts=parts,
                 )
             ref = table_baseline
             r = run_analysis(
@@ -349,6 +356,7 @@ def run_recommendations(
                 mode="fast",
                 settings_meta=settings_meta,
                 polar_store=PolarStore(cache_dir, ncrit, allow_xfoil=False, use_cache=False),
+                parts=parts,
             )
         else:
             r = run_analysis(q, m, s, mode="fast", **kw)

@@ -9,6 +9,12 @@ balance"; the Tier 1 values are repeated here with their sources so the two engi
 One addition for the server: ``spar_tube`` lets the structure module replace the Tier 1 guessed
 prototype spar tube by the tube it sized for the bending check (docs/phases/PHASE3.md section 2,
 "a default tube sized by the engine until Phase 4").
+
+Phase 4: ``parts`` (see :func:`solve_mass`) replaces the statistical motor, propeller, ESC, tilt
+servo, avionics and battery masses and the tube masses by the selected catalogue parts' masses.
+Each replaced component says so in its label and source and carries a 3 % uncertainty
+(catalogue masses, unverified). Mounts (20 % of motor mass), hinges, control-surface servos,
+landing gear and the wiring fraction stay allowances.
 """
 
 from __future__ import annotations
@@ -72,6 +78,11 @@ ESC_CURRENT_MARGIN = 1.2
 CELL_NOMINAL_V = {"lipo": 3.7, "li-ion": 3.6}
 PACK_SPECIFIC_ENERGY_WH_PER_KG = {"lipo": 145.0, "li-ion": 200.0}
 PACK_SPECIFIC_ENERGY_UNCERTAINTY = 0.1
+#: Catalogue part masses: manufacturer figures, unverified (Phase 4).
+PART_MASS_UNCERTAINTY = 0.03
+#: Tilt hinge, bearing and linkage hardware per side when a catalogue servo is selected
+#: (estimate: printed or aluminium hinge, two bearings, a ball link; 15-30 g).
+TILT_HINGE_HARDWARE_G = 20.0
 MASS_MAX_ITERATIONS = 20
 MASS_TOLERANCE_G = 0.05
 
@@ -186,6 +197,7 @@ def _build(
     mtow_kg: float,
     cg_guess: float,
     spar_tube: dict[str, float] | None,
+    parts: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     scale = "final" if mission.get("scale") == "final" else "prototype"
     dens = AREAL_DENSITY[scale]
@@ -193,6 +205,15 @@ def _build(
     pack = pack_electrics(p)
     weight = mtow_kg * G0
     comps: list[dict[str, Any]] = []
+    parts = parts or {}
+
+    def part(key: str) -> dict[str, Any] | None:
+        """A selected catalogue part's mass entry ``{mass_g, label, ...}``, or None."""
+        entry = parts.get(key)
+        return entry if isinstance(entry, dict) and entry.get("mass_g") else None
+
+    def part_src(entry: dict[str, Any], what: str) -> str:
+        return f"Selected catalogue part {entry['label']}: {what} (manufacturer figure)."
 
     def add(**c: Any) -> None:
         if math.isfinite(c["mass_g"]) and c["mass_g"] > 0:
@@ -222,7 +243,21 @@ def _build(
     t_root_mm = wing["thickness_ratio"] * wing["root_chord_mm"]
     spar_x = wing["mac_x_le_mm"] + wing["x_max_thickness"] * wing["mac_mm"]
     spar_info: dict[str, Any]
-    if scale == "prototype":
+    spar_part = part("spar_tube")
+    if scale == "prototype" and spar_part is not None:
+        tube = {"outer_mm": spar_part["outer_mm"], "wall_mm": spar_part["wall_mm"]}
+        add(
+            key="wing_spar",
+            label=f"Wing spar ({spar_part['label']}, full span)",
+            group="structure",
+            mass_g=spar_part["mass_per_m_g"] * wing["span_mm"] / 1000,
+            uncertainty=PART_MASS_UNCERTAINTY,
+            x_mm=spar_x,
+            source=part_src(spar_part, f"{spar_part['mass_per_m_g']:g} g/m x the span"),
+            explain="The carbon tube running through the wing that carries the bending load.",
+        )
+        spar_info = {"kind": "tube", **tube, "sized_by_structure": False, "catalogue": True}
+    elif scale == "prototype":
         tube = spar_tube or default_spar_tube(g)
         sized = spar_tube is not None
         add(
@@ -287,17 +322,30 @@ def _build(
         "(estimate).",
         explain="The tail panels that keep the aircraft pointing straight and level.",
     )
-    boom_per_m = carbon_tube_mass_per_m(p["booms"]["diameter_mm"])
+    boom_part = part("boom_tube")
+    boom_per_m = (
+        boom_part["mass_per_m_g"]
+        if boom_part is not None
+        else carbon_tube_mass_per_m(p["booms"]["diameter_mm"])
+    )
     boom_count = max(1, round(p["booms"]["count"]))
     add(
         key="booms",
-        label=f"Motor booms ({boom_count} carbon tubes, {p['booms']['diameter_mm']:g} mm)",
+        label=(
+            f"Motor booms ({boom_count} x {boom_part['label']})"
+            if boom_part is not None
+            else f"Motor booms ({boom_count} carbon tubes, {p['booms']['diameter_mm']:g} mm)"
+        ),
         group="structure",
         mass_g=boom_count * boom_per_m * p["booms"]["length_mm"] / 1000,
-        uncertainty=CARBON_TUBE_UNCERTAINTY,
+        uncertainty=PART_MASS_UNCERTAINTY if boom_part is not None else CARBON_TUBE_UNCERTAINTY,
         x_mm=g["booms"][0]["start"][0] + p["booms"]["length_mm"] / 2,
-        source="Carbon tube mass per metre from diameter (tube geometry, 1550 kg/m³, wall "
-        "max(1 mm, 5 % of D)).",
+        source=(
+            part_src(boom_part, f"{boom_per_m:g} g/m x the boom length")
+            if boom_part is not None
+            else "Carbon tube mass per metre from diameter (tube geometry, 1550 kg/m³, wall "
+            "max(1 mm, 5 % of D))."
+        ),
         explain="The carbon tubes that hold the four lift motors.",
     )
     if tail["support_length_mm"] > 0:
@@ -341,15 +389,25 @@ def _build(
     esc_rating = motor_max_power / pack["voltage"] * ESC_CURRENT_MARGIN
     esc_g = esc_mass_g(esc_rating)
     prop_g = prop_mass_g(dia, p["propulsion"]["prop_blades"])
+    m_part, e_part, pr_part = part("lift_motor"), part("esc"), part("lift_prop")
+    if m_part is not None:
+        motor_g = m_part["mass_g"]
+    if e_part is not None:
+        esc_g = e_part["mass_g"]
+    if pr_part is not None:
+        prop_g = pr_part["mass_g"]
     for pos, x in (("front", xf), ("rear", xr)):
         add(
             key=f"motors_{pos}",
-            label=f"Lift motors, {pos} pair",
+            label=f"Lift motors, {pos} pair"
+            + (f" ({m_part['label']})" if m_part is not None else ""),
             group="propulsion",
             mass_g=2 * motor_g,
-            uncertainty=MOTOR_MASS_UNCERTAINTY,
+            uncertainty=PART_MASS_UNCERTAINTY if m_part is not None else MOTOR_MASS_UNCERTAINTY,
             x_mm=x,
-            source=f"Statistical motor mass 1.2 x P^0.73 g for {round(motor_max_power)} W each, "
+            source=part_src(m_part, f"{motor_g:g} g each")
+            if m_part is not None
+            else f"Statistical motor mass 1.2 x P^0.73 g for {round(motor_max_power)} W each, "
             f"sized so the four motors give {tw:g} x the weight (momentum theory, figure of "
             "merit 0.55 at full power).",
             explain="Two of the four lift motors, sized so that together they lift the aircraft "
@@ -357,23 +415,28 @@ def _build(
         )
         add(
             key=f"escs_{pos}",
-            label=f"ESCs, {pos} pair",
+            label=f"ESCs, {pos} pair" + (f" ({e_part['label']})" if e_part is not None else ""),
             group="propulsion",
             mass_g=2 * esc_g,
-            uncertainty=ESC_MASS_UNCERTAINTY,
+            uncertainty=PART_MASS_UNCERTAINTY if e_part is not None else ESC_MASS_UNCERTAINTY,
             x_mm=x,
-            source="Statistical ESC mass 1.0 g per amp of rating + 5 g; rating 1.2 x the "
+            source=part_src(e_part, f"{esc_g:g} g each")
+            if e_part is not None
+            else "Statistical ESC mass 1.0 g per amp of rating + 5 g; rating 1.2 x the "
             "full-power current.",
             explain="The speed controllers that drive the motors.",
         )
         add(
             key=f"props_{pos}",
-            label=f"Lift propellers, {pos} pair",
+            label=f"Lift propellers, {pos} pair"
+            + (f" ({pr_part['label']})" if pr_part is not None else ""),
             group="propulsion",
             mass_g=2 * prop_g,
-            uncertainty=PROP_MASS_UNCERTAINTY,
+            uncertainty=PART_MASS_UNCERTAINTY if pr_part is not None else PROP_MASS_UNCERTAINTY,
             x_mm=x,
-            source="Statistical propeller mass 20 g x (D / 305 mm)^2.5 per two blades.",
+            source=part_src(pr_part, f"{prop_g:g} g each")
+            if pr_part is not None
+            else "Statistical propeller mass 20 g x (D / 305 mm)^2.5 per two blades.",
             explain="Two lift propellers, estimated from their diameter.",
         )
         add(
@@ -388,15 +451,24 @@ def _build(
         )
     if p["layout"] != "quad_pusher":
         per_side = TILT_MECH_FIXED_G + TILT_MECH_FRACTION * (motor_g + prop_g)
+        s_part = part("tilt_servo")
+        source = "Per side 25 g + 25 % of the tilted motor and propeller mass (estimate)."
+        if s_part is not None:
+            per_side = s_part["mass_g"] + TILT_HINGE_HARDWARE_G
+            source = part_src(s_part, f"{s_part['mass_g']:g} g per servo") + (
+                f" Plus {TILT_HINGE_HARDWARE_G:g} g of hinge, bearing and linkage hardware per "
+                "side (estimate)."
+            )
         hinge_x = g["tilt_hinge_x_mm"]
         add(
             key="tilt_mechanism",
-            label="Tilt mechanism (2 servos and hinges)",
+            label="Tilt mechanism (2 servos and hinges)"
+            + (f" ({s_part['label']})" if s_part is not None else ""),
             group="systems",
             mass_g=2 * per_side,
-            uncertainty=0.5,
+            uncertainty=0.15 if s_part is not None else 0.5,
             x_mm=hinge_x if hinge_x is not None else (xf if p["layout"] == "front_tilt" else xr),
-            source="Per side 25 g + 25 % of the tilted motor and propeller mass (estimate).",
+            source=source,
             explain="The servos, hinges and bearings that tilt the motors for wing flight.",
         )
     pusher_power = 0.0
@@ -410,36 +482,47 @@ def _build(
             / ETA_MOTOR_MAX
         )
         pusher_motor = motor_mass_g(pusher_power)
+        pm_part, pp_part = part("cruise_motor"), part("pusher_prop")
+        if pm_part is not None:
+            pusher_motor = pm_part["mass_g"]
         px = p["pusher"]["x_mm"]
         add(
             key="pusher_motor",
-            label="Pusher motor",
+            label="Pusher motor" + (f" ({pm_part['label']})" if pm_part is not None else ""),
             group="propulsion",
             mass_g=pusher_motor,
-            uncertainty=MOTOR_MASS_UNCERTAINTY,
+            uncertainty=PART_MASS_UNCERTAINTY if pm_part is not None else MOTOR_MASS_UNCERTAINTY,
             x_mm=px,
-            source=f"Statistical motor mass for {round(pusher_power)} W, sized for a static "
+            source=part_src(pm_part, f"{pusher_motor:g} g")
+            if pm_part is not None
+            else f"Statistical motor mass for {round(pusher_power)} W, sized for a static "
             f"thrust of {PUSHER_THRUST_TO_WEIGHT} x the weight (momentum theory, FM 0.6).",
             explain="The separate motor that pushes the aircraft in wing flight.",
         )
         add(
             key="pusher_esc",
-            label="Pusher ESC",
+            label="Pusher ESC" + (f" ({e_part['label']})" if e_part is not None else ""),
             group="propulsion",
-            mass_g=esc_mass_g(pusher_power / pack["voltage"] * ESC_CURRENT_MARGIN),
-            uncertainty=ESC_MASS_UNCERTAINTY,
+            mass_g=esc_g
+            if e_part is not None
+            else esc_mass_g(pusher_power / pack["voltage"] * ESC_CURRENT_MARGIN),
+            uncertainty=PART_MASS_UNCERTAINTY if e_part is not None else ESC_MASS_UNCERTAINTY,
             x_mm=px,
-            source="Statistical ESC mass 1.0 g per amp + 5 g.",
+            source=part_src(e_part, f"{esc_g:g} g")
+            if e_part is not None
+            else "Statistical ESC mass 1.0 g per amp + 5 g.",
             explain="The speed controller for the pusher motor.",
         )
         add(
             key="pusher_prop",
-            label="Pusher propeller",
+            label="Pusher propeller" + (f" ({pp_part['label']})" if pp_part is not None else ""),
             group="propulsion",
-            mass_g=prop_mass_g(dp, 2),
-            uncertainty=PROP_MASS_UNCERTAINTY,
+            mass_g=pp_part["mass_g"] if pp_part is not None else prop_mass_g(dp, 2),
+            uncertainty=PART_MASS_UNCERTAINTY if pp_part is not None else PROP_MASS_UNCERTAINTY,
             x_mm=px,
-            source="Statistical propeller mass 20 g x (D / 305 mm)^2.5.",
+            source=part_src(pp_part, f"{pp_part['mass_g']:g} g")
+            if pp_part is not None
+            else "Statistical propeller mass 20 g x (D / 305 mm)^2.5.",
             explain="The pusher propeller.",
         )
         add(
@@ -474,15 +557,21 @@ def _build(
         source="Each 6 g + 0.25 % of take-off mass (estimate).",
         explain="Servos that move the tail control surfaces.",
     )
+    av_part = part("avionics")
     add(
         key="avionics",
-        label="Avionics allowance",
+        label="Avionics" + (f" ({av_part['label']})" if av_part is not None else " allowance"),
         group="systems",
-        mass_g=p["allowances"]["avionics_g"],
-        uncertainty=ALLOWANCE_UNCERTAINTY,
+        mass_g=av_part["mass_g"] if av_part is not None else p["allowances"]["avionics_g"],
+        uncertainty=0.1 if av_part is not None else ALLOWANCE_UNCERTAINTY,
         x_mm=p["wing"]["x_le_mm"],
-        source="Owner allowance (allowances.avionics_g), under the wing leading edge; replaced "
-        "by real parts in Phase 4.",
+        source=(
+            f"Selected catalogue parts: {av_part['detail']} (manufacturer figures), under the "
+            "wing leading edge."
+            if av_part is not None
+            else "Owner allowance (allowances.avionics_g), under the wing leading edge; "
+            "replaced by the selected parts when a parts list exists (Phase 4)."
+        ),
         explain="Autopilot, GPS, receiver, telemetry radio and power module.",
     )
     gear = p["landing_gear"]["type"]
@@ -497,14 +586,20 @@ def _build(
         explain="The skids or legs the aircraft stands and lands on.",
     )
     chem = "LiPo" if p["battery"]["chemistry"] == "lipo" else "Li-ion"
+    b_part = part("battery")
     add(
         key="battery",
-        label=f"Battery {p['battery']['cells_series']}S{p['battery']['cells_parallel']}P {chem}",
+        label=f"Battery {p['battery']['cells_series']}S{p['battery']['cells_parallel']}P {chem}"
+        + (f" ({b_part['label']})" if b_part is not None else ""),
         group="energy",
-        mass_g=pack["mass_g"],
-        uncertainty=PACK_SPECIFIC_ENERGY_UNCERTAINTY,
+        mass_g=b_part["mass_g"] if b_part is not None else pack["mass_g"],
+        uncertainty=(
+            PART_MASS_UNCERTAINTY if b_part is not None else PACK_SPECIFIC_ENERGY_UNCERTAINTY
+        ),
         x_mm=p["battery"]["x_mm"],
-        source=f"Pack energy {pack['energy_wh']:.0f} Wh at "
+        source=part_src(b_part, f"{b_part['mass_g']:g} g")
+        if b_part is not None
+        else f"Pack energy {pack['energy_wh']:.0f} Wh at "
         f"{PACK_SPECIFIC_ENERGY_WH_PER_KG[p['battery']['chemistry']]:g} Wh/kg pack-level "
         "specific energy (typical datasheet value).",
         explain="The flight battery, from its energy and a typical energy per kilogram.",
@@ -553,12 +648,19 @@ def solve_mass(
     settings: dict[str, Any],
     spar_tube: dict[str, float] | None = None,
     start_kg: float | None = None,
+    parts: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Iterate the build-up to a fixed point at the maximum payload (as Tier 1)."""
+    """Iterate the build-up to a fixed point at the maximum payload (as Tier 1).
+
+    ``parts`` (Phase 4, optional): selected catalogue masses by key, each ``{mass_g, label}``:
+    ``lift_motor``, ``lift_prop``, ``esc`` (each), ``cruise_motor``, ``pusher_prop``,
+    ``tilt_servo`` (each), ``avionics`` (total, plus ``detail``), ``battery`` (pack), and the
+    tubes ``spar_tube`` / ``boom_tube`` with ``outer_mm``, ``wall_mm`` and ``mass_per_m_g``.
+    """
     target = mission.get("target_takeoff_mass_kg") or 2.5
     m = start_kg if start_kg and start_kg > 0 else (target if target > 0 else 2.5)
     cg = (g["front_rotor_x_mm"] + g["rear_rotor_x_mm"]) / 2
-    build = _build(p, g, mission, settings, m, cg, spar_tube)
+    build = _build(p, g, mission, settings, m, cg, spar_tube, parts)
     converged = False
     iterations = 0
     for i in range(MASS_MAX_ITERATIONS):
@@ -570,7 +672,7 @@ def solve_mass(
         m, cg = m_new, c["x"]
         if not math.isfinite(m) or m > 1e4:
             break
-        build = _build(p, g, mission, settings, m, cg, spar_tube)
+        build = _build(p, g, mission, settings, m, cg, spar_tube, parts)
         if d_g < MASS_TOLERANCE_G and d_cg < 0.05:
             converged = True
             break

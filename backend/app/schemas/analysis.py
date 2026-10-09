@@ -28,6 +28,12 @@ class AnalysisCreate(_In):
         description="Only 'full' here (analysis, then recommendations); scale-to-weight has "
         "its own endpoint.",
     )
+    parts: Literal["selected", "generic"] = Field(
+        default="selected",
+        description="Phase 4: 'selected' analyses the design with its parts list (the owner's "
+        "locked parts and the engine's picks; generic parts when the catalogue is empty); "
+        "'generic' uses the statistical motors, propellers, battery and allowances.",
+    )
 
 
 class ScaleCreate(_In):
@@ -66,6 +72,11 @@ class AnalysisListItem(BaseModel):
     finished_at: datetime | None
     headline: dict[str, Any] | None = Field(
         description="A few key numbers (Quantity objects) once done, for lists."
+    )
+    parts: Literal["selected", "generic"] = Field(
+        "generic",
+        description="Whether the analysis used the selected catalogue parts ('selected') or "
+        "the generic statistical ones ('generic', also when no part was selected).",
     )
 
 

@@ -11,6 +11,10 @@ daemon thread drains a priority queue:
 * ``validation`` (priority 1): the validation suite (:mod:`app.validation`); its state lives in
   memory and its report in ``{APP_DATA_DIR}/validation/latest.json``. Analyses queued while a
   validation is waiting go first.
+* ``refresh`` (priority 2, Phase 4): one part's supplier-listing refresh (Claude with web
+  search, :func:`app.suppliers.refresh_part`), queued by "refresh all in this parts list". One
+  item per part, so an analysis queued meanwhile runs before the next part; the state lives
+  on the part row (``listings_refresh_status`` / ``_message``).
 
 Image readings keep their own single-worker executor (``app.routers.readings``), so a long
 analysis never holds up a reading for more than the shared CPU does.
@@ -65,7 +69,7 @@ REQUEUED_STAGE = "Waiting (the server restarted)"
 
 #: Bumped when the composition of a job (not the engine) changes, so ``inputs_hash`` reuse
 #: never hands back a result made by an older job shape.
-JOB_VERSION = "jobs-1"
+JOB_VERSION = "jobs-2"  # jobs-2: Phase 4 selected parts in the inputs
 
 
 class JobCancelled(BaseException):
@@ -191,6 +195,7 @@ def _run_full(inputs: dict[str, Any], cache_dir: str, prog: _Progress) -> dict[s
         cache_dir=cache_dir,
         progress=prog.window(0.02, 0.55),
         settings_meta=meta,
+        parts=inputs.get("parts"),
     )
     if prog.stop.is_set():  # the solver may have been stopped under the analysis
         raise JobCancelled()
@@ -218,6 +223,7 @@ def _run_full(inputs: dict[str, Any], cache_dir: str, prog: _Progress) -> dict[s
             cache_dir=cache_dir,
             progress=prog.window(0.56, 0.99),
             settings_meta=meta,
+            parts=inputs.get("parts"),
         )
     except JobCancelled:
         raise
@@ -320,6 +326,36 @@ def _safe_write(prog: _Progress, **values: Any) -> None:
         prog.write(**values)
     except Exception:
         log.exception("Could not store the outcome of analysis %s", prog.analysis_id)
+
+
+def run_refresh_job(
+    settings: Settings, session_factory: sessionmaker[Session], part_id: int
+) -> None:
+    from app.suppliers import SupplierError, refresh_part
+
+    try:
+        refresh_part(session_factory, settings, part_id)
+    except SupplierError as exc:  # stored on the part by refresh_part
+        log.info("Listing refresh of part %s failed: %s", part_id, exc)
+
+
+def recover_refreshes(session_factory: sessionmaker[Session]) -> int:
+    """At startup: listing refreshes left queued or running by a stopped process are marked
+    interrupted (the owner can queue them again; the hourly limit is lifted for them)."""
+    from app.models import Part
+
+    with session_factory() as db:
+        result = db.execute(
+            update(Part)
+            .where(Part.listings_refresh_status.in_(("queued", "running")))
+            .values(
+                listings_refresh_status="error",
+                listings_refresh_message="Interrupted because the server restarted. Refresh again.",
+                listings_refreshed_at=None,
+            )
+        )
+        db.commit()
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 def run_validation_job(settings: Settings, state: ValidationJob, stop: threading.Event) -> None:
@@ -425,6 +461,11 @@ class AnalysisWorker:
         self._queue.put((1, next(self._seq), "validation", 0))
         return True
 
+    def submit_refresh(self, part_id: int) -> None:
+        if self._stop.is_set():
+            raise RuntimeError("worker stopped")
+        self._queue.put((2, next(self._seq), "refresh", part_id))
+
     def queue_position(self, analysis_id: int) -> int | None:
         """How many jobs run before this analysis (0 = it is next or running)."""
         with self._queue.mutex:
@@ -448,6 +489,8 @@ class AnalysisWorker:
                     run_analysis_job(self.session_factory, self.settings, ident, self._stop)
                 elif kind == "validation":
                     run_validation_job(self.settings, self.validation, self._stop)
+                elif kind == "refresh":
+                    run_refresh_job(self.settings, self.session_factory, ident)
             except BaseException:  # never let the worker thread die
                 log.exception("Job %s %s crashed the worker loop", kind, ident)
             finally:

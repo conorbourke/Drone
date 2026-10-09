@@ -46,6 +46,7 @@ So hover sits at the throttle implied by the thrust-to-weight minimum (about 70 
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -326,3 +327,94 @@ def with_factors(
     prop: Propeller, motor: Motor, ct: float = 1.0, cp: float = 1.0, loss: float = 1.0
 ) -> tuple[Propeller, Motor]:
     return replace(prop, ct_factor=ct, cp_factor=cp), replace(motor, loss_factor=loss)
+
+
+_TRADE = re.compile(r"(\d+(?:\.\d+)?)\s*[xX\u00d7]\s*(\d+(?:\.\d+)?)")
+
+
+def trade_size(text: str | None) -> tuple[float, float] | None:
+    """(diameter, pitch) in inches from a trade size such as '15x5', 'APC 13x6.5' or
+    'G28x9.2'; None when the text holds none."""
+    if not text:
+        return None
+    m = _TRADE.search(text)
+    return (float(m.group(1)), float(m.group(2))) if m else None
+
+
+def prop_trade_size(prop_spec: dict[str, Any]) -> tuple[float, float]:
+    """A catalogue propeller's trade size in inches (from ``trade_size`` or its millimetres)."""
+    ts = trade_size(prop_spec.get("trade_size"))
+    if ts:
+        return ts
+    return (prop_spec["diameter_mm"] / 25.4, prop_spec["pitch_mm"] / 25.4)
+
+
+def matching_thrust_points(
+    motor_spec: dict[str, Any], prop_spec: dict[str, Any] | None
+) -> list[dict[str, Any]]:
+    """The motor's catalogue test points taken with this propeller (same trade size within
+    0.15 in on diameter and pitch). Without a propeller, every point (Phase 3 behaviour)."""
+    points = list(motor_spec.get("thrust_data") or [])
+    if prop_spec is None:
+        return points
+    d, pitch = prop_trade_size(prop_spec)
+    out = []
+    for pt in points:
+        ts = trade_size(pt.get("prop"))
+        if ts and abs(ts[0] - d) <= 0.15 and abs(ts[1] - pitch) <= 0.15:
+            out.append(pt)
+    return out
+
+
+def catalogue_motor(spec: dict[str, Any]) -> Motor:
+    """First-order model of a catalogue motor (Kv, R, I0 and the current limit as published)."""
+    label = spec.get("label") or "catalogue motor"
+    return Motor(
+        float(spec["kv_rpm_per_v"]),
+        float(spec["resistance_ohm"]),
+        float(spec["no_load_current_a"]),
+        float(spec["max_current_a"]),
+        source=f"Catalogue motor {label}: Kv, winding resistance, no-load current and maximum "
+        "current as published by the manufacturer (unverified); first-order DC motor model.",
+        assumed=False,
+        extra={"part": label, "max_power_w": spec.get("max_power_w")},
+    )
+
+
+def catalogue_propeller(
+    prop_spec: dict[str, Any] | None,
+    motor_spec: dict[str, Any] | None,
+    motor: Motor | None,
+    diameter_mm: float,
+    pitch_mm: float,
+    blades: int,
+) -> tuple[Propeller, dict[str, Any] | None]:
+    """Propeller model for a selected part (or the design's sizes): generic UIUC-trend
+    coefficients, with the static CT0/CP0 fitted to the motor's test points for this
+    propeller when the catalogue has them. Returns (propeller, fit or None)."""
+    if prop_spec is not None:
+        diameter_mm = float(prop_spec["diameter_mm"])
+        pitch_mm = float(prop_spec["pitch_mm"])
+        blades = int(prop_spec.get("blades") or 2)
+    prop = generic_propeller(diameter_mm, pitch_mm, blades)
+    if prop_spec is not None:
+        prop.source = (
+            f"Catalogue propeller {prop_spec.get('label') or ''} "
+            f"({diameter_mm:g} x {pitch_mm:g} mm): " + PROP_SOURCE
+        )
+    fit = None
+    if motor_spec is not None:
+        points = matching_thrust_points(motor_spec, prop_spec)
+        if points:
+            fit = fit_thrust_data(points, diameter_mm, motor)
+    if fit:
+        prop.ct0 = fit["ct0"]
+        if fit["cp0"]:
+            prop.cp0 = fit["cp0"]
+        prop.fitted = True
+        prop.source = (
+            f"Static CT0/CP0 fitted to {fit['points']} catalogue thrust-test points"
+            + (f" of {motor_spec.get('label')}" if motor_spec and motor_spec.get("label") else "")
+            + "; advance-ratio fall-off from the generic UIUC-trend shape."
+        )
+    return prop, fit

@@ -15,10 +15,12 @@ from sqlalchemy import (
     Boolean,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -111,6 +113,11 @@ class Part(TimestampMixin, Base):
     source: Mapped[str] = mapped_column(Text, nullable=False, default="")
     verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Phase 4 supplier lookup: when Claude last refreshed this part's listings (the one-per-hour
+    # rate limit), and the outcome of the latest refresh for the UI.
+    listings_refreshed_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    listings_refresh_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    listings_refresh_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # cascade handles children already loaded in the session; passive_deletes leaves the
     # rest to the DDL ON DELETE CASCADE instead of nulling their foreign key.
@@ -134,6 +141,11 @@ class PartListing(TimestampMixin, Base):
     price_eur: Mapped[float | None] = mapped_column(Float, nullable=True)
     in_stock: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    # Phase 4: result of the server-side link check (HEAD/GET, 200-399 is working); null when
+    # never checked (seed data).
+    url_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    url_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    url_checked_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
 
     part: Mapped[Part] = relationship(back_populates="listings")
 
@@ -250,3 +262,52 @@ class AssistantMessage(TimestampMixin, Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False)
     meta: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class PartSelection(TimestampMixin, Base):
+    """The part chosen for one role of a project's draft (``version_id`` null) or of a version
+    (Phase 4). ``locked`` rows are the owner's choices and win over the engine; unlocked rows
+    record the engine's latest pick.
+
+    ``version_id`` is ``ON DELETE CASCADE``, not the Phase 1 RESTRICT policy: a selection is
+    derived design data, not a measurement, so it goes with its version (and its project) and
+    must never block deleting one. ``part_id`` is ``ON DELETE CASCADE`` too: deleting a part
+    from the catalogue drops the selections that used it and the engine fills the role again.
+    One row per role: unique ``(version_id, role)`` for versions and a partial unique index on
+    ``(project_id, role) WHERE version_id IS NULL`` for the draft (migration 0004).
+    """
+
+    __tablename__ = "part_selections"
+    __table_args__ = (
+        Index(
+            "uq_part_selections_version_role",
+            "version_id",
+            "role",
+            unique=True,
+            sqlite_where=text("version_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_part_selections_draft_role",
+            "project_id",
+            "role",
+            unique=True,
+            sqlite_where=text("version_id IS NULL"),
+        ),
+    )
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("design_versions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    role: Mapped[str] = mapped_column(String(40), nullable=False)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
+    part_id: Mapped[int] = mapped_column(
+        ForeignKey("parts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

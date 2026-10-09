@@ -250,7 +250,9 @@ def boom_check(
     else:
         m_land = 0.0
     d = p["booms"]["diameter_mm"]
-    wall = carbon_tube_wall_m(d) * 1000
+    # Phase 4: a catalogue boom tube brings its own wall (``booms.wall_mm``, set by the
+    # analysis from the selected part); otherwise the Tier 1 wall rule.
+    wall = p["booms"].get("wall_mm") or carbon_tube_wall_m(d) * 1000
     sec = tube_section(d, wall)
     m_max = max(m_thrust, m_land)
     stress = m_max * sec["c_m"] / sec["I_m4"]
@@ -282,7 +284,8 @@ def min_boom_diameter(
 ) -> float:
     """Smallest standard boom diameter (Tier 1 wall rule) with MS >= 0.25."""
     for od in STANDARD_TUBES_MM:
-        q = {**p, "booms": {**p["booms"], "diameter_mm": float(od)}}
+        booms = {k: v for k, v in p["booms"].items() if k != "wall_mm"}
+        q = {**p, "booms": {**booms, "diameter_mm": float(od)}}
         if boom_check(q, g, max_thrust_n, weight_n, sf)["margin"] >= MARGIN_WARN:
             return float(od)
     return float(STANDARD_TUBES_MM[-1])
