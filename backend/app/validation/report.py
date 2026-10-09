@@ -11,7 +11,8 @@ from typing import Any
 
 REPORT_SCHEMA = "validation-report/1"
 TOLERANCE_NOTE = (
-    "Tolerances are per case. Textbook and vortex-lattice cases use 0.1-4 %; airfoil data 10-20 % "
+    "Tolerances are per case. Textbook and vortex-lattice cases use 0.1-5 % (5 % only where the "
+    "reference is itself an approximation, e.g. Helmbold's lift slope); airfoil data 10-20 % "
     "(wind-tunnel scatter); published aircraft +/-30 %, deliberately wide because their geometry "
     "is partly assumed: those cases show the size of the error honestly rather than prove accuracy."
 )

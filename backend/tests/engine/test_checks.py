@@ -152,3 +152,47 @@ def test_cg_envelope_flags_out_of_range(engine_settings: dict[str, Any]) -> None
     env[0]["static_margin"] = 0.08
     env[0]["front_share"] = 0.7
     assert _levels(build_checks({**s, "envelope": env}))["cg_envelope"] == "warn"
+
+
+def _transition(top_margin: float, top_level: str) -> dict[str, Any]:
+    return {
+        "min_thrust_margin": 2.0,
+        "min_margin_speed_mps": 0.0,
+        "min_margin_group": "tilting pair",
+        "transition_end_speed_mps": 14.7,
+        "transition_complete_within_sweep": True,
+        "speed_wing_80pct_mps": 11.9,
+        "speed_wing_100pct_mps": 13.3,
+        "peak_power_w": 420.0,
+        "level": "ok",
+        "top_speed": {
+            "margin_min": top_margin,
+            "margin_min_speed_mps": 20.8,
+            "margin_at_sweep_end": top_margin,
+            "sweep_end_speed_mps": 20.8,
+            "required_margin": 1.15,
+            "top_speed_mps": 19.7 if top_margin < 1 else None,
+            "top_speed_beyond_sweep": False,
+            "propeller": "tilted lift propellers",
+            "advance_ratio_at_sweep_end": 0.5,
+            "zero_thrust_advance_ratio": 0.52,
+            "level": top_level,
+        },
+    }
+
+
+@pytest.mark.parametrize(("margin", "level"), [(0.8, "warn"), (1.1, "warn"), (1.6, "ok")])
+def test_top_speed_margin_is_separate(
+    engine_settings: dict[str, Any], margin: float, level: str
+) -> None:
+    checks = {
+        c["key"]: c
+        for c in build_checks(_state(engine_settings, transition=_transition(margin, level)))
+    }
+    assert checks["transition_margin"]["level"] == "ok"
+    assert checks["transition_margin"]["value"] == 2.0
+    top = checks["top_speed_margin"]
+    assert top["level"] == level and top["value"] == margin and top["threshold"] == 1.15
+    assert "uncertainty" in top["threshold_source"]
+    if level == "warn":
+        assert "unloading" in top["message"]

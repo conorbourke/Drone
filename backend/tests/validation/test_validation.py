@@ -10,9 +10,6 @@ from app.validation import run_validation, text_summary, write_report
 #: The committed snapshot (docs/phases/PHASE3.md section 5), refreshed by every full test run.
 SNAPSHOT = Path(__file__).resolve().parents[3] / "docs" / "validation" / "latest.json"
 
-#: Cases that fail and are reported as such (see the case notes); everything else must pass.
-KNOWN_DEVIATIONS = {"textbook.helmbold_ar4"}
-
 
 def test_runner_writes_report(tmp_path: Path, polar_cache: str) -> None:
     path = tmp_path / "validation" / "latest.json"
@@ -27,8 +24,16 @@ def test_runner_writes_report(tmp_path: Path, polar_cache: str) -> None:
         assert c["compared"], c["id"]
         if c["status"] in ("pass", "fail") and c["tolerance_pct"] is not None:
             assert c["error_pct"] is not None
-    failing = {c["id"] for c in report["cases"] if c["status"] == "fail"}
-    assert failing <= KNOWN_DEVIATIONS, failing
+    # Phase 3 acceptance: the suite passes. Skipped (no published reference found) and
+    # informational rows are allowed; no case may fail.
+    failing = {c["id"]: c["error_pct"] for c in report["cases"] if c["status"] == "fail"}
+    assert not failing, failing
+    assert report["summary"]["fail"] == 0
+    # Lift slope is checked against exact / published lifting-surface values, not only Helmbold.
+    by_id = {c["id"]: c for c in report["cases"]}
+    for cid in ("textbook.circular_wing_exact", "avl.elliptic_ar10_published_vlm"):
+        assert by_id[cid]["status"] == "pass", by_id[cid]
+        assert by_id[cid]["tolerance_pct"] == 2.0
     published = [c for c in report["cases"] if c["id"].endswith(".endurance")]
     assert len(published) == 2
     for c in published:

@@ -77,6 +77,32 @@ def helmbold(ar: float, a0: float = 2 * math.pi) -> float:
     return a0 / (math.sqrt(1 + k * k) + k)
 
 
+#: Exact linear lifting-surface lift slope of a flat circular wing (AR 4/pi), per radian
+#: (P. F. Jordan, AIAA J. 11(8), 1973).
+CIRCULAR_WING_CLA = 1.7900
+#: Published vortex-lattice lift slope of an elliptic wing, AR 10, unswept half-chord line, per
+#: radian (S. Gudmundsson, General Aviation Aircraft Design, 2014, ch. 9 lift-slope table).
+ELLIPTIC_AR10_VLM_CLA = 5.02
+#: AVL vs Helmbold tolerance: 3 % for Helmbold's own error (ESDU TM 169 band for the improved
+#: Helmbold-Diederich form; the original formula is no better) + 2 % lattice allowance.
+HELMBOLD_TOL_PCT = 5.0
+
+
+def _elliptic_sections(
+    span: float, c_root: float, straight_frac: float, n: int = 24
+) -> list[tuple[float, float, float]]:
+    """(x_le, y, chord) sections of an elliptic planform with a straight line at
+    ``straight_frac`` of the chord (0.25: straight quarter-chord line; 0.5: straight half-chord
+    line, which for span = c_root is a flat disc). Cosine-spaced towards the tip."""
+    secs = []
+    for i in range(n + 1):
+        th = math.pi / 2 * i / n
+        y = span / 2 * math.sin(th)
+        c = max(1e-3, c_root * math.sqrt(max(0.0, 1 - (2 * y / span) ** 2)))
+        secs.append((straight_frac * (c_root - c), y, c))
+    return secs
+
+
 def lifting_line(
     chord_fn: Callable[[float], float],
     span: float,
@@ -229,16 +255,37 @@ def textbook_cases() -> list[Row]:
             5.0,
         )
     )
-    # Lift-curve slope vs Helmbold for AR 4, 8, 16.
+    # Lift-curve slope: first against exact and published lifting-surface results (the real
+    # accuracy test of AVL's CL_alpha), then against Helmbold's approximate formula for AR 4, 8
+    # and 16 with a tolerance that includes Helmbold's own error.
+    disc = _avl_alpha(
+        _wing_avl("Circular wing", _elliptic_sections(2.0, 2.0, 0.5), math.pi, 2.0, 2.0, 8, 40)
+    )
+    out.append(
+        row(
+            "textbook.circular_wing_exact",
+            g,
+            "Lift-curve slope, flat circular wing (AR 4/pi)",
+            "AVL CL_alpha of a flat disc vs the exact linear lifting-surface solution",
+            CIRCULAR_WING_CLA,
+            "/rad",
+            "P. F. Jordan, 'Exact Solutions for Lifting Surfaces', AIAA Journal 11(8), "
+            "1973, pp. 1123-1129 (flat circular wing, CL/alpha = 1.7900; Kinner 1937 gave the "
+            "first solution)",
+            disc["stab"]["dCL/dalpha"],
+            2.0,
+            "Exact lifting-surface reference, no approximation in the reference: the 2 % "
+            "tolerance is the vortex-lattice discretisation allowance used for the other "
+            "lattice cases. Helmbold's formula gives "
+            f"{helmbold(4 / math.pi):.3f}/rad here, "
+            f"{(helmbold(4 / math.pi) / CIRCULAR_WING_CLA - 1) * 100:+.1f} % from the exact "
+            "value.",
+        )
+    )
     for ar in (4, 8, 16):
         span = float(ar)
         c_root = 4 / math.pi  # elliptic: area = pi b c0 / 4 = b -> AR = b
-        secs = []
-        for i in range(25):
-            th = math.pi / 2 * i / 24
-            y = span / 2 * math.sin(th)
-            c = max(1e-3, c_root * math.sqrt(max(0.0, 1 - (2 * y / span) ** 2)))
-            secs.append((0.25 * c_root - 0.25 * c, y, c))
+        secs = _elliptic_sections(span, c_root, 0.25)
         res = _avl_alpha(_wing_avl(f"Elliptic AR {ar}", secs, span, 1.0, span, 8, 40, 1.0))
         cla = res["stab"]["dCL/dalpha"]
         out.append(
@@ -246,13 +293,25 @@ def textbook_cases() -> list[Row]:
                 f"textbook.helmbold_ar{ar}",
                 g,
                 f"Lift-curve slope, elliptic wing AR {ar}",
-                "AVL CL_alpha (flat-plate elliptic planform) vs Helmbold's equation (a0 = 2 pi)",
+                "AVL CL_alpha (flat-plate elliptic planform, straight quarter-chord line) vs "
+                "Helmbold's equation (a0 = 2 pi)",
                 helmbold(ar),
                 "/rad",
                 "Helmbold (1942) as given in Anderson, Fundamentals of Aerodynamics, "
-                "eq. 5.81 (derived for elliptic loading, valid down to low aspect ratio)",
+                "eq. 5.81. Accuracy of the reference: ESDU TM 169 (comparison with the "
+                "lifting-surface data for 80 planforms behind ESDU 70011) gives an error band "
+                "of about +2 % to -3 % even for its improved Helmbold-Diederich form; the "
+                "original formula sits 2.2 % above the exact circular-wing value (Jordan 1973) "
+                "and 2.6 % above the published VLM value for an elliptic AR 10 wing "
+                "(Gudmundsson 2014: 5.15 vs 5.02/rad)",
                 cla,
-                4.0,
+                HELMBOLD_TOL_PCT,
+                "Helmbold's equation is itself an approximation (downwash taken at the "
+                "three-quarter chord, chordwise loading simplified), and it lies above "
+                "lifting-surface results, most at moderate aspect ratio. Tolerance 5 % = 3 % "
+                "for the reference (ESDU TM 169 band) + 2 % lattice allowance. AVL itself is "
+                "checked tightly (2 %) against exact and published lifting-surface values in "
+                "textbook.circular_wing_exact and avl.elliptic_ar10_published_vlm.",
             )
         )
     # ISA density.
@@ -426,6 +485,30 @@ def avl_reference_cases(cache_dir: str | None = None) -> list[Row]:
             "lift, AVL's e is inviscid only (the engine adds XFOIL profile drag separately), "
             "so they are not expected to agree; Tier 1 is conservative here.",
             status="info",
+        )
+    )
+    # Elliptic AR 10 with a straight half-chord line against a published VLM lift slope.
+    res = _avl_alpha(
+        _wing_avl(
+            "Elliptic AR 10", _elliptic_sections(10.0, 4 / math.pi, 0.5), 10.0, 1.0, 10.0, 8, 40
+        )
+    )
+    out.append(
+        row(
+            "avl.elliptic_ar10_published_vlm",
+            g,
+            "Elliptic wing AR 10 (half-chord line unswept): published vortex-lattice lift slope",
+            "AVL CL_alpha vs the published VLM CL_alpha for the same planform",
+            ELLIPTIC_AR10_VLM_CLA,
+            "/rad",
+            "S. Gudmundsson, General Aviation Aircraft Design: Applied Methods and Procedures, "
+            "Butterworth-Heinemann 2014, ch. 9 (The Anatomy of the Wing), lift-curve slope "
+            "table: elliptical, sweep of the half-chord line 0, AR 10: VLM 5.02/rad (lifting "
+            "line 5.24, Helmbold 5.15)",
+            res["stab"]["dCL/dalpha"],
+            2.0,
+            "The published value is given to three figures and its lattice is not stated; "
+            "2 % is the lattice allowance used for the other vortex-lattice cases.",
         )
     )
     # (b) Swept wing: AR 5, taper 1, quarter-chord sweep 45 deg (Bertin & Smith example).

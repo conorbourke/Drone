@@ -18,6 +18,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from app.engine import transition as trn
 from app.engine.avl_model import TRIM_LIMIT_DEG
 from app.engine.quantity import fmt, sort_statuses, status
 
@@ -54,6 +55,42 @@ def _src(meta: dict[str, Any], path: str) -> str:
     m = meta.get(path) or PHASE3_META.get(path) or {}
     label = m.get("label", path)
     return f"Settings: {label} ({path}). {m.get('source', '')}".strip()
+
+
+def _top_speed_message(top: dict[str, Any]) -> str:
+    fm = top["margin_min"]
+    end = top["sweep_end_speed_mps"]
+    if fm is None:
+        return (
+            "The wing never carries the full weight within the sweep, so there is no "
+            "wing-borne flight to check."
+        )
+    msg = (
+        f"In wing-borne flight the {top['propeller']} give at least {fm:.2f} x the forward "
+        f"force needed (lowest at {top['margin_min_speed_mps']:.1f} m/s; "
+        f"{top['margin_at_sweep_end']:.2f} x at {end:.1f} m/s, {trn.SWEEP_END_FACTOR:g} x cruise)."
+    )
+    v_top = top["top_speed_mps"]
+    if v_top is not None:
+        msg += f" Estimated top speed {v_top:.1f} m/s at full throttle."
+    else:
+        msg += f" Top speed above {2 * end:.0f} m/s (not limited by thrust in this model)."
+    j, j0 = top.get("advance_ratio_at_sweep_end"), top.get("zero_thrust_advance_ratio")
+    if top["level"] != "ok":
+        msg += (
+            " What limits it: propeller unloading. At full throttle at "
+            f"{end:.1f} m/s the propellers run at advance ratio J = V / (n D) = "
+            + (f"{j:.2f}" if j is not None else "n/a")
+            + (
+                f", close to J = {j0:.2f} where a propeller of this pitch gives no thrust"
+                if j0
+                else ""
+            )
+            + "; low-pitch hover propellers cannot push much faster than this. Use a "
+            "higher-pitch cruise propeller (or a pusher), a higher-Kv or higher-voltage "
+            "motor, or less drag."
+        )
+    return msg
 
 
 def build_checks(
@@ -288,18 +325,31 @@ def build_checks(
         _src(meta, "limits.legal_mtow_kg"),
     )
 
-    # 7. Transition thrust margin
+    # 7. Transition thrust margin (hover to the end of the transition range) and the separate
+    # top-speed thrust margin (wing-borne flight up to 1.3 x cruise speed).
     tr = s["transition"]
     if tr:
         mm = tr["min_thrust_margin"]
+        tr_end = tr.get("transition_end_speed_mps")
+        incomplete = tr.get("transition_complete_within_sweep") is False
         add(
             "transition_margin",
             "Transition thrust margin",
             tr["level"],
             f"Lowest thrust margin {mm:.2f} at {tr['min_margin_speed_mps']:.1f} m/s "
-            f"({tr['min_margin_group']}); the wing carries 80 % of the weight from "
+            f"({tr['min_margin_group']}) between hover and "
+            + (f"{tr_end:.1f} m/s, the end of the transition" if tr_end is not None else "")
+            + f"; the wing carries 80 % of the weight from "
             f"{tr['speed_wing_80pct_mps']:.1f} m/s and all of it from "
             f"{tr['speed_wing_100pct_mps']:.1f} m/s; peak power {tr['peak_power_w']:.0f} W."
+            + (
+                f" The wing does not carry the full weight with a "
+                f"{(trn.TRANSITION_END_BUFFER - 1) * 100:.0f} % speed margin within "
+                f"{trn.SWEEP_END_FACTOR:g} x cruise speed: the transition never completes. "
+                "Enlarge the wing or raise the cruise speed."
+                if incomplete
+                else ""
+            )
             + (
                 ""
                 if tr["level"] == "ok"
@@ -308,8 +358,28 @@ def build_checks(
             mm,
             c["transition_thrust_margin_min"],
             "",
-            _src(meta, "checks.transition_thrust_margin_min"),
+            _src(meta, "checks.transition_thrust_margin_min")
+            + f" Transition range: hover to {trn.TRANSITION_END_BUFFER:g} x the speed at "
+            "which the wing alone carries the weight (engine rule).",
         )
+        top = tr.get("top_speed")
+        if top:
+            add(
+                "top_speed_margin",
+                "Top-speed thrust margin",
+                top["level"],
+                _top_speed_message(top),
+                top["margin_min"],
+                top["required_margin"],
+                "",
+                f"Engine rule: in wing-borne flight up to {trn.SWEEP_END_FACTOR:g} x cruise "
+                "speed the cruise "
+                f"propellers should give at least {top['required_margin']:.2f} x the force "
+                "needed (drag, plus the acceleration force below cruise speed). The "
+                f"{(top['required_margin'] - 1) * 100:.0f} % reserve is the stated "
+                "thrust-coefficient uncertainty of the generic propeller model. Warn only: "
+                "the cruise-speed check covers flight at cruise.",
+            )
 
     # 8. Spar and boom
     sp = s["spar"]

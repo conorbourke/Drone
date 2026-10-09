@@ -74,7 +74,7 @@ from app.engine.quantity import (
     status,
 )
 
-ENGINE_VERSION = "tier2-1.0"
+ENGINE_VERSION = "tier2-1.1"
 RESULT_SCHEMA = "analysis-result/1"
 MISSION_PROFILE = {"takeoff_hover_s": 45.0, "landing_hover_s": 45.0}
 AVIONICS_POWER_W = {"prototype": 8.0, "final": 25.0}
@@ -1552,22 +1552,49 @@ def _assemble(
     # ----- Transition summary -----
     transition = None
     if tr_nom:
+        tr_f = ["mass", "ct", "cp", "motor_loss", "pack_r", "parasite"]
         mm = oat(
             lambda r: (r["max"]["transition"] or {}).get("min_thrust_margin", float("nan")),
-            ["mass", "ct", "cp", "motor_loss", "pack_r", "parasite"],
+            tr_f,
         )
+
+        def top_margin(r: dict[str, Any]) -> float:
+            top = (r["max"]["transition"] or {}).get("top_speed") or {}
+            val = top.get("margin_min")
+            return float("nan") if val is None else val
+
+        tm = oat(top_margin, [*tr_f, "profile"])
+        tr_end = tr_nom["transition_end_speed_mps"]
         transition = {
             **{k: v for k, v in tr_nom.items()},
             "min_margin": _q_oat(
                 *mm,
                 "",
                 "Minimum transition thrust margin",
-                "Available thrust divided by the thrust needed, at the "
-                "worst speed of the transition. 1.0 means no reserve.",
-                "Quasi-steady transition sweep 0-1.3 x cruise speed.",
+                "Available thrust divided by the thrust needed, at the worst speed of the "
+                f"transition (hover to {tr_end:.1f} m/s, where the wing carries the full "
+                f"weight with a {(trn.TRANSITION_END_BUFFER - 1) * 100:.0f} % speed buffer and the "
+                "propellers are fully tilted). "
+                "1.0 means no reserve.",
+                "Quasi-steady transition sweep; transition range = "
+                f"{trn.TRANSITION_END_BUFFER:g} x the speed at which "
+                "the wing carries the full weight at the transition attitude.",
             ),
         }
-
+        if tr_nom["top_speed"]["margin_min"] is not None:
+            transition["top_speed_margin"] = _q_oat(
+                *tm,
+                "",
+                "Top-speed thrust margin",
+                "Forward thrust the cruise propellers give at full throttle divided by the "
+                "drag (plus the acceleration force below cruise speed), at the worst speed of "
+                f"wing-borne flight up to {trn.SWEEP_END_FACTOR:g} x cruise "
+                f"({trn.SWEEP_END_FACTOR * v:.1f} m/s). Below 1.0 the aircraft cannot fly "
+                "that fast.",
+                f"Quasi-steady sweep 0-{trn.SWEEP_END_FACTOR:g} x cruise speed, wing-borne points; "
+                "full-throttle "
+                "propeller and motor model with axial inflow.",
+            )
     # ----- CG envelope sweep (five payloads) -----
     envelope = []
     pl_lo, pl_hi = mission["payload_min_g"], mission["payload_max_g"]
@@ -1606,6 +1633,8 @@ def _assemble(
     }
     if transition:
         summary["transition_min_margin"] = transition["min_margin"]
+        if "top_speed_margin" in transition:
+            summary["top_speed_thrust_margin"] = transition["top_speed_margin"]
 
     # ----- Tier 1 comparison -----
     table_wing = st["table_wing"] or st["polars"]["wing MAC"]

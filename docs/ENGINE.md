@@ -324,6 +324,15 @@ When to trust which:
 | Statistical motor/ESC/propeller/battery masses | Real parts (Phase 4) |
 | Printed and carbon areal densities | Calibration with built weights (Phase 6) |
 
+### Transition and top-speed thrust margins (server, `transition.py`)
+
+The sweep runs from 0 to 1.3 × cruise speed but carries two separate margins, each with its own check:
+
+- **Transition thrust margin** (`transition.min_margin`, `min_thrust_margin`, check `transition_margin`, threshold `checks.transition_thrust_margin_min`): available / required thrust of the busiest rotor group from hover to the end of the transition, `transition_end_speed_mps` = 1.1 × the speed at which the wing alone carries the weight at the transition attitude (1.2 V_s). The tilt reaches its limit at or before that speed. The 10 % speed buffer (21 % on lift) is an engine assumption: a speed undershoot at the end of the transition should not hand weight back to rotors that are already tilted. In `points[]`, `thrust_margin` is this margin and is `null` above the transition range (`phase: "wing_borne"`), so the chart, its minimum marker and the check use the same numbers.
+- **Top-speed thrust margin** (`transition.top_speed`, `transition.top_speed_margin`, summary `top_speed_thrust_margin`, check `top_speed_margin`): on every wing-borne point of the sweep, the forward thrust of the cruise propellers at full throttle (tilting pair at the tilt limit, or the pusher) / the forward force needed (drag, plus m·a below cruise speed), per point `forward_thrust_margin`. Warning below 1.15 (the ±15 % thrust-coefficient uncertainty of the generic propeller model); never a fail, because the cruise-speed check (`cruise_thrust`) covers flight at cruise. `top_speed_mps` is where the margin reaches 1.0. For tilt layouts the limit is usually propeller unloading: a low-pitch hover propeller's thrust falls to zero as the advance ratio J = V/(nD) approaches about 1.1 P/D + 0.05, and at full throttle the motor cannot spin it fast enough to keep J low.
+
+Before this split the reported minimum was taken only up to cruise speed while the chart showed the whole sweep. On the default design it reported 2.16 at 0 m/s while the curve fell to 1.01 at 20.8 m/s (1.3 × cruise). Now the transition margin is 2.16 at 0 m/s (hover to 14.7 m/s, check ok). The top-speed margin is 1.01 at 20.8 m/s (check warn: the 13 × 5.5 in hover propellers run at J = 0.48 against a zero-thrust J of 0.52). The estimated top speed is 20.8 m/s.
+
 ## References
 
 - D. P. Raymer, *Aircraft Design: A Conceptual Approach*, 6th ed., AIAA, 2018: ch. 4 (wing geometry), ch. 6 (tail volume coefficients), ch. 7 (wetted area), ch. 12 (lift-curve slope, maximum lift, parasite-drag build-up, skin friction, form factors, interference, Oswald efficiency), ch. 15 (weights).
