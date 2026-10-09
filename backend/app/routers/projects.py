@@ -10,7 +10,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.db import utcnow
 from app.defaults import DEFAULT_DESIGN_PARAMETERS, DEFAULT_MISSION
-from app.deps import CurrentUser, DbSession, current_user
+from app.deps import AppSettings, CurrentUser, DbSession, current_user
+from app.imaging import remove_project_files
 from app.models import DesignVersion, Project, User
 from app.routers.common import conflict, draft_payload, owned_project
 from app.schemas.project import (
@@ -91,7 +92,9 @@ def list_projects(db: DbSession, user: CurrentUser) -> list[ProjectListItem]:
 
 
 @router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
-def create_project(body: ProjectCreate, db: DbSession, user: CurrentUser) -> ProjectOut:
+def create_project(
+    body: ProjectCreate, db: DbSession, user: CurrentUser, settings: AppSettings
+) -> ProjectOut:
     if _name_taken(db, user, body.name):
         raise _name_conflict(body.name)
     project = Project(
@@ -109,6 +112,9 @@ def create_project(body: ProjectCreate, db: DbSession, user: CurrentUser) -> Pro
     except IntegrityError:
         db.rollback()
         raise _name_conflict(body.name) from None
+    # SQLite can reuse the id of a deleted project; never let a new project inherit files
+    # left behind by an interrupted delete.
+    remove_project_files(settings.images_dir, project.id)
     return _project_out(db, project)
 
 
@@ -137,7 +143,11 @@ def update_project(
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(project_id: int, db: DbSession, user: CurrentUser) -> None:
+def delete_project(
+    project_id: int, db: DbSession, user: CurrentUser, settings: AppSettings
+) -> None:
+    """Delete a project. The DDL cascades its versions, images and readings; the image files
+    are removed with the project's directory once the rows are gone."""
     project = owned_project(db, user, project_id)
     db.delete(project)
     try:
@@ -147,6 +157,7 @@ def delete_project(project_id: int, db: DbSession, user: CurrentUser) -> None:
         raise conflict(
             "This project cannot be deleted because other records still refer to it."
         ) from None
+    remove_project_files(settings.images_dir, project_id)
 
 
 @router.get("/{project_id}/draft", response_model=DraftOut)

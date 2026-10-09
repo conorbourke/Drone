@@ -12,6 +12,9 @@ fly.toml
 **/.ruff_cache
 frontend/dist
 **/data
+# Committed engine data (airfoil coordinates and XFOIL polars) must reach the image.
+!backend/app/engine/data
+!backend/app/engine/data/**
 **/*.db
 **/*.db-wal
 **/*.db-shm

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-DESIGN_SCHEMA_VERSION = 1
+DESIGN_SCHEMA_VERSION = 2
 MISSION_SCHEMA_VERSION = 1
 SETTINGS_SCHEMA_VERSION = 1
 
@@ -32,6 +32,7 @@ DEFAULT_DESIGN_PARAMETERS: dict[str, Any] = {
         "sweep_deg": 0.0,
         "dihedral_deg": 3.0,
         "incidence_deg": 2.0,
+        "twist_deg": 0.0,
         "airfoil": "sd7037",
         "x_le_mm": 300.0,
         "z_mm": 0.0,
@@ -47,6 +48,7 @@ DEFAULT_DESIGN_PARAMETERS: dict[str, Any] = {
         "lateral_offset_mm": 300.0,
         "length_mm": 700.0,
         "x_offset_mm": -250.0,
+        "diameter_mm": 20.0,
     },
     "motors": {
         "front_x_mm": 40.0,
@@ -67,6 +69,8 @@ DEFAULT_DESIGN_PARAMETERS: dict[str, Any] = {
         "chord_mm": 140.0,
         "arm_mm": 620.0,
         "height_mm": 180.0,
+        "v_angle_deg": 40.0,
+        "airfoil": "naca0009",
     },
     "nose_bay": {
         "length_mm": 180.0,
@@ -76,6 +80,22 @@ DEFAULT_DESIGN_PARAMETERS: dict[str, Any] = {
     "landing_gear": {
         "type": "skids",
         "height_mm": 90.0,
+    },
+    "propulsion": {
+        "prop_diameter_mm": 330.0,
+        "prop_pitch_mm": 140.0,
+        "prop_blades": 2,
+    },
+    "battery": {
+        "chemistry": "lipo",
+        "cells_series": 6,
+        "cells_parallel": 1,
+        "capacity_mah": 5000.0,
+        "x_mm": 380.0,
+    },
+    "allowances": {
+        "avionics_g": 220.0,
+        "wiring_fraction": 0.06,
     },
 }
 

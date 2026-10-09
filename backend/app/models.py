@@ -145,3 +145,45 @@ class AppSettings(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
     )
     data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class Image(TimestampMixin, Base):
+    """A reference image uploaded to a project. The file lives at
+    ``{APP_DATA_DIR}/files/images/{project_id}/{storage_name}``; deleting the row (through the
+    API) deletes the file, and deleting the project deletes its directory."""
+
+    __tablename__ = "images"
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    width_px: Mapped[int] = mapped_column(Integer, nullable=False)
+    height_px: Mapped[int] = mapped_column(Integer, nullable=False)
+    view: Mapped[str] = mapped_column(String(20), nullable=False)
+    storage_name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+
+
+class ImageReading(TimestampMixin, Base):
+    """One Claude reading of a project's reference images and the proposal derived from it."""
+
+    __tablename__ = "image_readings"
+
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    reference: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    image_ids: Mapped[list[int]] = mapped_column(JSON, nullable=False)
+    proposal: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    usage: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

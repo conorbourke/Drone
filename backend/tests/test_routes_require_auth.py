@@ -67,6 +67,16 @@ def test_every_api_route_requires_session(app: FastAPI) -> None:
         ("GET", "/api/system/backups/{name}"),
         ("POST", "/api/auth/logout"),
         ("GET", "/api/{path:path}"),
+        ("GET", "/api/airfoils"),
+        ("GET", "/api/airfoils/{airfoil_id}"),
+        ("POST", "/api/projects/{project_id}/images"),
+        ("GET", "/api/projects/{project_id}/images"),
+        ("PATCH", "/api/images/{image_id}"),
+        ("DELETE", "/api/images/{image_id}"),
+        ("GET", "/api/images/{image_id}/file"),
+        ("POST", "/api/projects/{project_id}/image-readings"),
+        ("GET", "/api/projects/{project_id}/image-readings"),
+        ("GET", "/api/image-readings/status"),
     }
     assert expected <= checked, expected - checked
-    assert len(checked) > 25
+    assert len(checked) > 35

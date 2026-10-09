@@ -5,7 +5,11 @@ never rewritten in place; documents are upgraded on read and on restore; new fie
 defaults so the Pydantic model fills them.
 
 Each ``_*_STEPS`` table maps a version ``n`` to a function that turns a version-``n`` document
-into version ``n + 1``. Phase 1 ships version 1 of every document, so the tables are empty.
+into version ``n + 1``. Steps add new fields with the values they had when the step was
+written (not the live defaults), so an upgrade gives the same result whatever later defaults do.
+
+Design parameters: 1 -> 2 (Phase 2) adds wing twist, boom diameter, the tail V angle and airfoil,
+and the propulsion, battery and allowances blocks.
 """
 
 from __future__ import annotations
@@ -23,7 +27,40 @@ class UnknownSchemaVersion(ValueError):
     """The stored document is newer than this build understands."""
 
 
-_PARAMETER_STEPS: dict[int, Upgrader] = {}
+def _setdefaults(doc: dict[str, Any], block: str, values: dict[str, Any]) -> None:
+    current = doc.get(block)
+    if not isinstance(current, dict):
+        current = {}
+        doc[block] = current
+    for key, value in values.items():
+        current.setdefault(key, copy.deepcopy(value))
+
+
+def _parameters_1_to_2(doc: dict[str, Any]) -> dict[str, Any]:
+    _setdefaults(doc, "wing", {"twist_deg": 0.0})
+    _setdefaults(doc, "booms", {"diameter_mm": 20.0})
+    _setdefaults(doc, "tail", {"v_angle_deg": 40.0, "airfoil": "naca0009"})
+    _setdefaults(
+        doc,
+        "propulsion",
+        {"prop_diameter_mm": 330.0, "prop_pitch_mm": 140.0, "prop_blades": 2},
+    )
+    _setdefaults(
+        doc,
+        "battery",
+        {
+            "chemistry": "lipo",
+            "cells_series": 6,
+            "cells_parallel": 1,
+            "capacity_mah": 5000.0,
+            "x_mm": 380.0,
+        },
+    )
+    _setdefaults(doc, "allowances", {"avionics_g": 220.0, "wiring_fraction": 0.06})
+    return doc
+
+
+_PARAMETER_STEPS: dict[int, Upgrader] = {1: _parameters_1_to_2}
 _MISSION_STEPS: dict[int, Upgrader] = {}
 _SETTINGS_STEPS: dict[int, Upgrader] = {}
 

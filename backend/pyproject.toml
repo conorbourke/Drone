@@ -1,6 +1,6 @@
 [project]
 name = "vtol-drone-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "Backend for the VTOL drone design tool: FastAPI API, SQLite storage, static SPA serving."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,11 @@ dependencies = [
     "pydantic-settings>=2.3",
     "bcrypt>=4.1",
     "itsdangerous>=2.2",
+    "anthropic>=1.12",
+    "pillow>=11",
+    "python-multipart>=0.0.20",
+    # XFOIL (Fortran) wrapped for Python; needs gfortran and cmake at install time.
+    "xfoil @ git+https://github.com/DARcorporation/xfoil-python@0a8c2fce02ba73b7f89f72306e43d78291d1e024",
 ]
 
 [dependency-groups]

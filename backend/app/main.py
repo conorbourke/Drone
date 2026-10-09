@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -24,16 +25,18 @@ from app.config import Settings, get_settings
 from app.db import make_engine, make_session_factory, sqlite_path
 from app.deps import current_user
 from app.models import User
-from app.routers import auth, parts, projects, schema, system, versions
+from app.routers import airfoils, auth, images, parts, projects, readings, schema, system, versions
 from app.routers import settings as settings_router
 from app.security import AuthState
 
 log = logging.getLogger("app")
 
 STATE_CHANGING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-# The largest legitimate /api body is a settings or draft document (a few kB). Phase 2
-# uploads will get their own, larger limit on their own route.
+# The largest legitimate /api body is a settings or draft document (a few kB). The image upload
+# route is the one exception: a 15 MB file plus the multipart envelope.
 MAX_API_BODY_BYTES = 1_000_000
+MAX_UPLOAD_BODY_BYTES = 16 * 1024 * 1024
+UPLOAD_ROUTE = re.compile(r"^/api/projects/\d+/images$")
 STATIC_ROOT_FILES: dict[str, str] = {
     "favicon.svg": "image/svg+xml",
     "manifest.webmanifest": "application/manifest+json",
@@ -61,7 +64,9 @@ class SecurityHeadersMiddleware:
                 headers["X-Content-Type-Options"] = "nosniff"
                 headers["Referrer-Policy"] = "same-origin"
                 headers["X-Frame-Options"] = "DENY"
-                if is_api:
+                # API responses are never cached, except where a route sets its own policy
+                # (the image file route allows the browser a private copy for an hour).
+                if is_api and "cache-control" not in headers:
                     headers["Cache-Control"] = "no-store"
                 if self.production:
                     headers["Strict-Transport-Security"] = "max-age=31536000"
@@ -73,26 +78,38 @@ class SecurityHeadersMiddleware:
 class ApiBodyLimitMiddleware:
     """Refuses oversized /api request bodies before they are read into memory."""
 
-    def __init__(self, app: ASGIApp, limit: int = MAX_API_BODY_BYTES) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        limit: int = MAX_API_BODY_BYTES,
+        upload_limit: int = MAX_UPLOAD_BODY_BYTES,
+    ) -> None:
         self.app = app
         self.limit = limit
+        self.upload_limit = upload_limit
+
+    def _limit_for(self, scope: Scope) -> tuple[int, str]:
+        """The image upload route (POST only) gets its own larger limit; nothing else does."""
+        if scope.get("method", "GET").upper() == "POST" and UPLOAD_ROUTE.match(
+            scope.get("path", "")
+        ):
+            return self.upload_limit, f"{self.upload_limit // (1024 * 1024)} MB"
+        return self.limit, f"{self.limit // 1000} kB"
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http" and scope.get("path", "").startswith("/api"):
             headers = {k: v for k, v in scope["headers"]}
             length = headers.get(b"content-length")
             if length is not None:
+                limit, label = self._limit_for(scope)
                 try:
                     declared = int(length)
                 except ValueError:
-                    declared = self.limit + 1
-                if declared > self.limit:
+                    declared = limit + 1
+                if declared > limit:
                     response = JSONResponse(
                         status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                        content={
-                            "detail": "The request body is too large "
-                            f"(limit {self.limit // 1000} kB)."
-                        },
+                        content={"detail": f"The request body is too large (limit {label})."},
                     )
                     await response(scope, receive, send)
                     return
@@ -260,6 +277,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(settings_router.router)
     app.include_router(schema.router)
     app.include_router(system.router)
+    app.include_router(airfoils.router)
+    app.include_router(images.router)
+    app.include_router(readings.router)
 
     @app.api_route(
         "/api/{path:path}",

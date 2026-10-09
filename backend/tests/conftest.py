@@ -8,6 +8,7 @@ tables are emptied afterwards.
 from __future__ import annotations
 
 import logging
+import shutil
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -66,10 +67,19 @@ def app(settings: Settings) -> FastAPI:
 
 
 @pytest.fixture(autouse=True)
-def _clean_tables(app: FastAPI) -> Iterator[None]:
+def _clean_tables(app: FastAPI, settings: Settings) -> Iterator[None]:
     yield
+    shutil.rmtree(settings.files_dir, ignore_errors=True)
     with app.state.session_factory() as db:
-        for table in ("design_versions", "projects", "part_listings", "parts", "app_settings"):
+        for table in (
+            "image_readings",
+            "images",
+            "design_versions",
+            "projects",
+            "part_listings",
+            "parts",
+            "app_settings",
+        ):
             db.execute(text(f"DELETE FROM {table}"))
         db.commit()
 

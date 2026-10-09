@@ -20,9 +20,11 @@ def test_migration_created_every_table_with_fk_actions(app: FastAPI) -> None:
         "parts",
         "part_listings",
         "app_settings",
+        "images",
+        "image_readings",
         "alembic_version",
     } <= tables
-    for reserved in ("images", "analyses", "flight_logs", "calibrations", "export_files"):
+    for reserved in ("analyses", "flight_logs", "calibrations", "export_files"):
         assert reserved not in tables
 
     def fk_actions(table: str) -> dict[str, str | None]:
@@ -37,6 +39,8 @@ def test_migration_created_every_table_with_fk_actions(app: FastAPI) -> None:
     assert fk_actions("design_versions")["parent_version_id"] == "SET NULL"
     assert fk_actions("part_listings")["part_id"] == "CASCADE"
     assert fk_actions("app_settings")["owner_id"] == "CASCADE"
+    assert fk_actions("images")["project_id"] == "CASCADE"
+    assert fk_actions("image_readings")["project_id"] == "CASCADE"
     for table in ("projects", "design_versions", "parts"):
         assert {"id", "created_at", "updated_at"} <= {
             c["name"] for c in inspector.get_columns(table)

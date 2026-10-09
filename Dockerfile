@@ -12,19 +12,44 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---------------------------------------------------------------------------
-# Stage 2 (reserved for Phase 3): compile the aerodynamics tools.
-# AVL and XFOIL are Fortran programs; they will be built here with gfortran
-# and copied into the runtime image, so the runtime stage below does not need
-# a compiler. Keep this stage in place so the layout does not change later.
+# Stage 2: build the Python environment (Phase 2).
+# The xfoil package (XFOIL compiled from Fortran, used to build and later to extend the airfoil
+# tables) is built from source here, so this stage carries the compilers; the runtime stage
+# below only needs the Fortran runtime library.
+# ---------------------------------------------------------------------------
+FROM python:3.12-slim-bookworm AS backend-build
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PYTHON=/usr/local/bin/python3.12 \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
+
+# uv: fast, reproducible installs from uv.lock. Pinned to the version used to create the lock.
+COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /usr/local/bin/
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends build-essential gfortran cmake git ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY backend/pyproject.toml backend/uv.lock ./
+# The backend is not an installable package (tool.uv package = false): this installs only the
+# locked dependencies, xfoil included, into /app/.venv.
+RUN uv sync --frozen --no-dev --no-install-project
+
+# ---------------------------------------------------------------------------
+# Stage 3 (reserved for Phase 3): further aerodynamics tools.
+# AVL comes from the optvl wheel (a Python dependency in uv.lock, installed by stage 2), so no
+# separate Fortran build is expected. If a tool ever needs its own compiled binary, build it in
+# a stage here and copy only the result into the runtime image, for example:
 #
-# FROM debian:bookworm-slim AS aero-tools
-# RUN apt-get update && apt-get install -y --no-install-recommends gfortran make ca-certificates curl \
-#  && rm -rf /var/lib/apt/lists/*
-# ... download and build AVL and XFOIL into /opt/aero/bin/{avl,xfoil}
+# FROM backend-build AS aero-tools
+# RUN ... build into /opt/aero/bin/
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# Stage 3: runtime
+# Stage 4: runtime
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim-bookworm AS runtime
 
@@ -36,11 +61,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_PYTHON=/usr/local/bin/python3.12 \
     UV_PROJECT_ENVIRONMENT=/app/.venv
 
-# uv: fast, reproducible installs from uv.lock. Pinned to the version used to create the lock.
+# uv stays available in the image for maintenance commands; nothing installs at start-up.
 COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /usr/local/bin/
 
+# libgfortran5 is the only runtime library the compiled xfoil extension needs.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl sqlite3 \
+ && apt-get install -y --no-install-recommends ca-certificates curl sqlite3 libgfortran5 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 1000 app \
  && useradd --system --uid 1000 --gid app --home-dir /app --shell /usr/sbin/nologin app \
@@ -49,16 +75,18 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Install dependencies first (cached unless the lock changes), then the app itself.
-COPY --chown=app:app backend/pyproject.toml backend/uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# The ready-built virtual environment (same base image, so its python symlink resolves).
+COPY --from=backend-build --chown=app:app /app/.venv /app/.venv
+# The app itself (backend/.venv and local data are excluded by .dockerignore).
 COPY --chown=app:app backend/ ./
-RUN uv sync --frozen --no-dev && chmod +x /app/entrypoint.sh
+# The import check fails the build if the copied environment or the Fortran runtime is broken.
+RUN chmod +x /app/entrypoint.sh \
+ && /app/.venv/bin/python -c "import anthropic, fastapi, PIL, python_multipart; from xfoil import XFoil; XFoil()"
 
 # Built SPA, served by the API process.
 COPY --from=frontend --chown=app:app /build/frontend/dist /app/static
 
-# Phase 3 will add: COPY --from=aero-tools /opt/aero/bin/ /usr/local/bin/
+# Phase 3 will add (only if a tool needs its own binary): COPY --from=aero-tools /opt/aero/bin/ /usr/local/bin/
 
 ENV APP_ENV=production \
     APP_DATA_DIR=/data \

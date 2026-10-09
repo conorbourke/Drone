@@ -26,6 +26,8 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Fortran toolchain (the xfoil dependency builds from source)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gfortran cmake
       - name: Install
         run: uv sync --frozen
       - name: Lint
@@ -75,6 +77,8 @@ jobs:
           cache-dependency-path: |
             frontend/package-lock.json
             e2e/package-lock.json
+      - name: Install Fortran toolchain (the xfoil dependency builds from source)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gfortran cmake
       - name: Install backend
         run: uv sync --frozen
         working-directory: backend
@@ -126,5 +130,7 @@ jobs:
             -d '{"password":"ci-password"}' http://127.0.0.1:8080/api/auth/login)
           echo "login: $code"
           test "$code" = "200"
+          # The committed airfoil data and the compiled xfoil extension must be in the image.
+          docker exec smoke python -c "from app.engine.airfoils import LIBRARY, airfoil_detail; [airfoil_detail(e) for e in LIBRARY]; from xfoil import XFoil; XFoil(); print('airfoil data and xfoil ok')"
           docker logs smoke | tail -n 20
           docker rm -f smoke

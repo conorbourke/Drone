@@ -77,7 +77,19 @@ class Settings(BaseSettings):
         description="Overrides the reported application version (for example a git SHA).",
     )
     anthropic_api_key: SecretStr | None = Field(
-        default=None, description="Claude API key, server only. Unused until Phase 3."
+        default=None,
+        description="Claude API key, server only. Enables reading reference images (Phase 2) "
+        "and the assistant (Phase 3). Without it those features show a plain message.",
+    )
+    claude_model: str = Field(
+        default="claude-opus-5-5",
+        min_length=1,
+        description="Claude model used for image reading.",
+    )
+    claude_fake_response_file: Path | None = Field(
+        default=None,
+        description="Test seam: outside production, image reading returns this JSON file "
+        "instead of calling the Claude API. Ignored when APP_ENV=production.",
     )
     backup_hour_utc: int = Field(
         default=3, ge=0, le=23, description="Hour (UTC) of the daily in-app database backup."
@@ -149,6 +161,21 @@ class Settings(BaseSettings):
     @property
     def backups_dir(self) -> Path:
         return self.app_data_dir / "backups"
+
+    @property
+    def files_dir(self) -> Path:
+        return self.app_data_dir / "files"
+
+    @property
+    def images_dir(self) -> Path:
+        return self.files_dir / "images"
+
+    @property
+    def fake_claude_response_file(self) -> Path | None:
+        """The test-seam file, only outside production."""
+        if self.is_production:
+            return None
+        return self.claude_fake_response_file
 
     @property
     def version(self) -> str:

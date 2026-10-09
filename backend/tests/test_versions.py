@@ -100,7 +100,7 @@ def test_get_patch_version(auth_client: TestClient, project: dict) -> None:
     got = auth_client.get(f"/api/versions/{v1['id']}")
     assert got.status_code == 200
     assert got.json()["project_id"] == pid
-    assert got.json()["parameters"]["schema_version"] == 1
+    assert got.json()["parameters"]["schema_version"] == 2
     patched = auth_client.patch(f"/api/versions/{v1['id']}", json={"notes": "n", "name": "one"})
     assert patched.status_code == 200
     assert patched.json()["name"] == "one" and patched.json()["notes"] == "n"

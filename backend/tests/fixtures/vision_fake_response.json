@@ -1,0 +1,44 @@
+{
+  "layout": {
+    "value": "front_tilt",
+    "confidence": 0.8,
+    "reason": "Four motors on two booms; the front motor pods have hinge fairings and the rear propellers sit flat, which matches a front-tilt quadplane."
+  },
+  "fuselage_length_to_span": {
+    "value": 0.48,
+    "confidence": 0.75,
+    "note": "Measured in the top view: nose tip to tail cone against tip-to-tip span."
+  },
+  "measurements": [
+    {"key": "wing.root_chord_mm", "value": 0.13, "confidence": 0.8, "note": "Top view, chord at the wing-fuselage junction."},
+    {"key": "wing.tip_chord_mm", "value": 0.085, "confidence": 0.75, "note": "Top view, chord just inside the rounded tip."},
+    {"key": "wing.sweep_deg", "value": 2.0, "confidence": 0.6, "note": "Leading edge is almost straight; slight sweep from the taper."},
+    {"key": "wing.dihedral_deg", "value": 4.0, "confidence": 0.5, "note": "Front view, both panels rise slightly towards the tips."},
+    {"key": "wing.x_le_mm", "value": 0.34, "confidence": 0.7, "note": "Side view, nose tip to the wing root leading edge."},
+    {"key": "fuselage.width_mm", "value": 0.12, "confidence": 0.6, "note": "Top view, widest point just ahead of the wing."},
+    {"key": "fuselage.height_mm", "value": 0.14, "confidence": 0.6, "note": "Side view, deepest point under the wing."},
+    {"key": "booms.lateral_offset_mm", "value": 0.17, "confidence": 0.8, "note": "Top view, centreline to boom centreline."},
+    {"key": "booms.length_mm", "value": 0.4, "confidence": 0.75, "note": "Top view, boom tip to boom end at the tail."},
+    {"key": "booms.x_offset_mm", "value": -0.14, "confidence": 0.65, "note": "Booms start well ahead of the wing leading edge."},
+    {"key": "motors.front_x_mm", "value": 0.02, "confidence": 0.7, "note": "Front motor pod sits at the very front of each boom."},
+    {"key": "motors.rear_x_mm", "value": 0.37, "confidence": 0.7, "note": "Rear motor sits near the boom end, ahead of the tail."},
+    {"key": "tail.span_mm", "value": 0.3, "confidence": 0.65, "note": "Front view, tip to tip of the inverted V."},
+    {"key": "tail.chord_mm", "value": 0.075, "confidence": 0.6, "note": "Top view, average chord of the tail panels."},
+    {"key": "tail.arm_mm", "value": 0.36, "confidence": 0.6, "note": "Top view, wing quarter chord to tail quarter chord."},
+    {"key": "tail.v_angle_deg", "value": 35.0, "confidence": 0.55, "note": "Front view, panels hang about 35 degrees below horizontal."},
+    {"key": "propulsion.prop_diameter_mm", "value": 0.19, "confidence": 0.6, "note": "Top view, propeller disc of the rear motors."},
+    {"key": "propulsion.prop_blades", "value": 2, "confidence": 0.9, "note": "Two-blade propellers on all four motors."},
+    {"key": "nose_bay.length_mm", "value": 0.2, "confidence": 0.5, "note": "Side view, the camera dome and hatch line in the nose."},
+    {"key": "landing_gear.height_mm", "value": 0.05, "confidence": 0.5, "note": "Side view, skids under the booms."}
+  ],
+  "choices": [
+    {"key": "tail.type", "value": "inverted_v", "confidence": 0.85, "note": "Two tail panels angled downwards from the boom ends."},
+    {"key": "fuselage.cross_section", "value": "ellipse", "confidence": 0.6, "note": "Rounded fuselage in the front view."},
+    {"key": "landing_gear.type", "value": "skids", "confidence": 0.7, "note": "Skids under each boom."}
+  ],
+  "not_visible": [
+    "propeller pitch",
+    "battery position",
+    "boom tube diameter"
+  ]
+}
