@@ -64,9 +64,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # uv stays available in the image for maintenance commands; nothing installs at start-up.
 COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /uvx /usr/local/bin/
 
-# libgfortran5 is the only runtime library the compiled xfoil extension needs.
+# libgfortran5 libgl1 is the only runtime library the compiled xfoil extension needs.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl sqlite3 libgfortran5 \
+ && apt-get install -y --no-install-recommends ca-certificates curl sqlite3 libgfortran5 libgl1 \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 1000 app \
  && useradd --system --uid 1000 --gid app --home-dir /app --shell /usr/sbin/nologin app \

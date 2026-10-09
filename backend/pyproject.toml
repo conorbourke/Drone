@@ -25,7 +25,6 @@ dependencies = [
     "ezdxf>=1.4",
     "reportlab>=4.2",
     "trimesh>=4.5",
-    "manifold3d>=3.0",
 ]
 
 [dependency-groups]
